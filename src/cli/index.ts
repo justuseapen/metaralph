@@ -13,6 +13,7 @@ import { startDaemon, stopDaemon, getDaemonStatus, formatUptime } from '../daemo
 import { Logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
 import { addProject, removeProject, listProjects } from '../registry/index.js';
+import { createGroup, addToGroup, removeFromGroup, listGroups, deleteGroup } from '../registry/group.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -174,30 +175,113 @@ const groupsCommand = program
   .command('groups')
   .description('Manage project groups');
 
+/**
+ * Display list of groups with their projects in a formatted table
+ */
+function displayGroupsList(): void {
+  const groups = listGroups();
+
+  if (groups.length === 0) {
+    console.log('No groups created.');
+    console.log('Use "metaralph groups create <name>" to create a group.');
+    return;
+  }
+
+  console.log('Project Groups');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  for (const group of groups) {
+    console.log(`Group:       ${group.name}`);
+    console.log(`ID:          ${group.id}`);
+    if (group.description) {
+      console.log(`Description: ${group.description}`);
+    }
+    console.log(`Created:     ${group.created_at}`);
+
+    if (group.projects.length > 0) {
+      console.log(`Projects:    ${group.projects.length}`);
+      for (const project of group.projects) {
+        console.log(`  - ${project.name} (${project.path})`);
+      }
+    } else {
+      console.log(`Projects:    (none)`);
+    }
+    console.log('──────────────────────────────────────────────────────────────');
+  }
+
+  console.log(`Total: ${groups.length} group(s)`);
+}
+
 groupsCommand
   .command('list')
   .description('List all project groups')
   .action(() => {
-    console.log('Listing groups... (not yet implemented)');
+    displayGroupsList();
   });
 
 groupsCommand
   .command('create <name>')
   .description('Create a new project group')
-  .action((name: string) => {
-    console.log(`Creating group ${name}... (not yet implemented)`);
+  .option('-d, --description <description>', 'Description for the group')
+  .action((name: string, options: { description?: string }) => {
+    const result = createGroup(name, options.description);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+      if (result.group) {
+        console.log(`  ID: ${result.group.id}`);
+      }
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 groupsCommand
   .command('add <group> <path>')
   .description('Add a project to a group')
   .action((group: string, projectPath: string) => {
-    console.log(`Adding ${projectPath} to group ${group}... (not yet implemented)`);
+    const result = addToGroup(group, projectPath);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
+  });
+
+groupsCommand
+  .command('remove <path>')
+  .description('Remove a project from its group')
+  .action((projectPath: string) => {
+    const result = removeFromGroup(projectPath);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
+  });
+
+groupsCommand
+  .command('delete <group>')
+  .description('Delete a group (projects will be unlinked but not deleted)')
+  .action((group: string) => {
+    const result = deleteGroup(group);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 // Default action for 'groups' (list when no subcommand)
 groupsCommand.action(() => {
-  console.log('Listing groups... (not yet implemented)');
+  displayGroupsList();
 });
 
 // Queue management command
