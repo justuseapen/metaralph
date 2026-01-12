@@ -14,6 +14,9 @@ import { Logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
 import { addProject, removeProject, listProjects } from '../registry/index.js';
 import { createGroup, addToGroup, removeFromGroup, listGroups, deleteGroup } from '../registry/group.js';
+import { TaskRepository } from '../queue/task.js';
+import { ApprovalQueue } from '../queue/approval.js';
+import { getProject } from '../registry/index.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -284,12 +287,103 @@ groupsCommand.action(() => {
   displayGroupsList();
 });
 
-// Queue management command
-program
+// Queue management commands
+const queueCommand = program
   .command('queue')
-  .description('View and manage the task queue')
+  .description('View and manage the task queue');
+
+/**
+ * Display task queue in a formatted table
+ */
+function displayTaskQueue(): void {
+  const tasks = TaskRepository.findPending();
+
+  if (tasks.length === 0) {
+    console.log('No tasks in queue.');
+    return;
+  }
+
+  console.log('Task Queue');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  // Group tasks by status
+  const pendingApproval = tasks.filter(t => t.approvalStatus === 'pending');
+  const queued = tasks.filter(t => t.status === 'queued');
+
+  if (pendingApproval.length > 0) {
+    console.log('\nPending Approval:');
+    console.log('ID                                    | Type      | Effort    | Title');
+    console.log('──────────────────────────────────────┼───────────┼───────────┼──────────────');
+    for (const task of pendingApproval) {
+      const project = getProject(task.projectId);
+      const projectName = project?.name ?? 'Unknown';
+      console.log(`${task.id.slice(0, 36)} | ${task.type.padEnd(9)} | ${task.estimatedEffort.padEnd(9)} | ${task.title}`);
+      console.log(`  Project: ${projectName} | Score: ${task.priorityScore}`);
+    }
+  }
+
+  if (queued.length > 0) {
+    console.log('\nQueued for Execution:');
+    console.log('ID                                    | Type      | Effort    | Title');
+    console.log('──────────────────────────────────────┼───────────┼───────────┼──────────────');
+    for (const task of queued) {
+      const project = getProject(task.projectId);
+      const projectName = project?.name ?? 'Unknown';
+      console.log(`${task.id.slice(0, 36)} | ${task.type.padEnd(9)} | ${task.estimatedEffort.padEnd(9)} | ${task.title}`);
+      console.log(`  Project: ${projectName} | Score: ${task.priorityScore}`);
+    }
+  }
+
+  console.log('──────────────────────────────────────────────────────────────────');
+  console.log(`Total: ${tasks.length} task(s) (${pendingApproval.length} pending approval, ${queued.length} queued)`);
+}
+
+// Default action for 'queue' (list when no subcommand)
+queueCommand.action(() => {
+  displayTaskQueue();
+});
+
+queueCommand
+  .command('list')
+  .description('List all tasks in the queue')
   .action(() => {
-    console.log('Task queue... (not yet implemented)');
+    displayTaskQueue();
+  });
+
+// Approve command
+program
+  .command('approve <id>')
+  .description('Approve a task for execution')
+  .action((id: string) => {
+    const queue = new ApprovalQueue();
+    const result = queue.approve(id);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+      if (result.task) {
+        console.log(`  Status: ${result.task.status}`);
+        console.log(`  Approval: ${result.task.approvalStatus}`);
+      }
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
+  });
+
+// Reject command
+program
+  .command('reject <id>')
+  .description('Reject a task (removes from queue)')
+  .action((id: string) => {
+    const queue = new ApprovalQueue();
+    const result = queue.reject(id);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 // Worker management command

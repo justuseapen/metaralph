@@ -1,0 +1,271 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-2-8-core-features",
+  "description": "MetaRalph Phases 2-8 Consolidated: Complete core functionality including work queue, worker orchestration, CLI dashboard, onboarding, collaboration, learning, and self-improvement.",
+  "userStories": [
+    {
+      "id": "US-010",
+      "title": "Create task model with priority scoring",
+      "description": "As a developer, I need task management with quick-wins-first priority scoring.",
+      "acceptanceCriteria": [
+        "src/queue/task.ts exports Task interface with: id, projectId, type, title, source, priorityScore, estimatedEffort, requiresApproval, approvalStatus, status, prdJson",
+        "src/queue/prioritizer.ts exports calculatePriorityScore() using: typeScore * effortMultiplier * confidence",
+        "Type scores: bug_fix=100, test=90, docs=85, refactor=70, feature=50",
+        "Effort multipliers: quick_win=2.0, small=1.5, medium=1.0, large=0.5",
+        "TaskRepository with create(), findById(), findPending(), getNextTasks()",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement approval queue with auto-approve logic",
+      "description": "As a user, I want bug fixes/docs/tests to auto-execute while features need approval.",
+      "acceptanceCriteria": [
+        "src/queue/approval.ts exports categorizeTask() returning 'auto' or 'needs_approval'",
+        "Auto-approve: type in ['bug_fix', 'docs', 'test'] AND effort in ['quick_win', 'small']",
+        "ApprovalQueue class with: submit(), approve(), reject(), getPending()",
+        "CLI commands: 'metaralph queue', 'metaralph approve <id>', 'metaralph reject <id>'",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement execution tracking and Ralph spawner",
+      "description": "As a developer, I need to spawn Ralph instances and track their execution.",
+      "acceptanceCriteria": [
+        "src/workers/execution.ts exports Execution interface with: id, taskId, pid, status, iterationsUsed, ralphOutput",
+        "src/workers/ralph-spawner.ts exports RalphSpawner.spawn(task, project) that creates prd.json and runs ralph.sh",
+        "Captures stdout/stderr, detects '<promise>COMPLETE</promise>' for success",
+        "ExecutionRepository with create(), update(), findRunning()",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Implement worker orchestrator with concurrency control",
+      "description": "As a developer, I need an orchestrator to manage concurrent Ralph workers.",
+      "acceptanceCriteria": [
+        "src/workers/index.ts exports WorkerOrchestrator class",
+        "Enforces maxConcurrentWorkers from config and one worker per project",
+        "scheduleTask(task) spawns worker if capacity available",
+        "Monitors workers for completion, updates task/execution status",
+        "src/workers/failure-handler.ts handles retries (up to 2) with exponential backoff",
+        "CLI: 'metaralph workers' shows active workers",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Implement queue manager scheduling loop",
+      "description": "As a developer, I need the daemon to continuously process the work queue.",
+      "acceptanceCriteria": [
+        "src/queue/index.ts exports QueueManager class",
+        "start() begins scheduling loop (runs every 5 seconds)",
+        "Loop: check capacity -> get next tasks -> schedule via WorkerOrchestrator",
+        "Integrates with daemon lifecycle (starts on daemon start, stops on stop)",
+        "Emits events: 'task:scheduled', 'task:completed', 'task:failed'",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Set up Ink dashboard framework with tab navigation",
+      "description": "As a user, I need a terminal UI to monitor and control MetaRalph.",
+      "acceptanceCriteria": [
+        "src/cli/dashboard.tsx exports Dashboard component using Ink",
+        "'metaralph' or 'metaralph dashboard' launches the TUI",
+        "Tab navigation: [1]Queue [2]Approvals [3]Projects [4]Workers",
+        "Header shows version and daemon status, footer shows keyboard shortcuts",
+        "q quits, 1-4 switches tabs",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement Queue and Approvals dashboard views",
+      "description": "As a user, I need to see and manage tasks from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/QueueView.tsx shows tasks table with: Priority, ID, Project, Type, Status",
+        "src/cli/components/ApprovalView.tsx shows pending tasks with full details",
+        "Arrow keys navigate, 'a' approves, 'r' rejects in ApprovalView",
+        "Views refresh automatically when data changes",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement Projects and Workers dashboard views",
+      "description": "As a user, I need to manage projects and monitor workers from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/ProjectsView.tsx shows projects grouped by group with health scores",
+        "src/cli/components/WorkersView.tsx shows running workers with progress",
+        "'a' in ProjectsView prompts to add project, 'd' removes with confirmation",
+        "WorkersView shows iteration progress and last output lines",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Implement codebase analyzer and TODO extractor",
+      "description": "As MetaRalph, I need to analyze projects when they're added.",
+      "acceptanceCriteria": [
+        "src/onboarding/analyzer.ts exports CodebaseAnalyzer.analyze(path) returning ImprovementOpportunity[]",
+        "Detects: outdated deps (npm outdated), type errors, lint issues if available",
+        "src/onboarding/todo-extractor.ts extracts TODO/FIXME/XXX/HACK with file:line",
+        "Categorizes findings by type and estimates effort",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Implement onboarding engine with proposal generation",
+      "description": "As MetaRalph, I need to generate improvement proposals when projects are onboarded.",
+      "acceptanceCriteria": [
+        "src/onboarding/index.ts exports OnboardingEngine.onboard(projectPath)",
+        "Pipeline: validate git -> analyze -> extract TODOs -> generate proposals",
+        "src/onboarding/proposal-generator.ts creates Task objects from findings",
+        "Updates project.lastAnalyzed, creates initial conversation with summary",
+        "'metaralph projects analyze <id>' triggers re-analysis",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Implement conversation model and discussion engine",
+      "description": "As a user, I need to have conversations with MetaRalph about projects.",
+      "acceptanceCriteria": [
+        "src/collaboration/conversation.ts exports Conversation and Message models",
+        "ConversationRepository with create(), addMessage(), findByProject(), findActive()",
+        "src/collaboration/discussion.ts uses Claude to generate contextual responses",
+        "Includes project context (README, structure) in prompts",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Implement PRD builder and chat CLI",
+      "description": "As a user, I need to collaboratively create PRDs through conversation.",
+      "acceptanceCriteria": [
+        "src/collaboration/prd-builder.ts exports PrdBuilder for interactive PRD creation",
+        "Claude helps refine: description, user stories, acceptance criteria",
+        "buildPrd() generates final prd.json structure",
+        "'metaralph chat <project>' opens interactive chat session",
+        "'metaralph propose <project>' asks MetaRalph to propose improvements",
+        "When PRD finalized, auto-creates Task and queues for execution",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement learning system with pattern extraction",
+      "description": "As MetaRalph, I need to learn from execution outcomes.",
+      "acceptanceCriteria": [
+        "src/learning/learning.ts exports Learning model with: category, content, confidence, timesApplied, timesSuccessful",
+        "src/learning/cross-project.ts extracts patterns from progress.txt after executions",
+        "src/learning/outcome-tracker.ts correlates outcomes with task attributes",
+        "LearningRepository stores and retrieves applicable learnings",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Implement learning application to new tasks",
+      "description": "As MetaRalph, I need to apply learnings to improve future task success.",
+      "acceptanceCriteria": [
+        "src/learning/index.ts exports LearningSystem class",
+        "findApplicableLearnings(task) returns relevant learnings by context matching",
+        "injectLearnings(task, learnings) adds context to generated CLAUDE.md",
+        "Tracks when learnings are applied and updates success metrics",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Register Ralph and MetaRalph as self-managed projects",
+      "description": "As MetaRalph, I need to treat my own codebases as self-improvement targets.",
+      "acceptanceCriteria": [
+        "On daemon start, auto-register Ralph and MetaRalph with is_self=true",
+        "Self projects always enabled, use separate isolated branches",
+        "src/self-improve/ralph-analyzer.ts analyzes Ralph/MetaRalph for improvements",
+        "Proposes: optimizations, missing tests, documentation gaps",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Implement sandboxed self-execution with rollback",
+      "description": "As MetaRalph, I need to safely execute and validate self-improvements.",
+      "acceptanceCriteria": [
+        "src/self-improve/safe-executor.ts creates isolated branch: self-improve/<feature>-<timestamp>",
+        "Runs Ralph on isolated branch, validates with full test suite",
+        "src/self-improve/rollback.ts can revert to checkpoint on failure",
+        "Auto-rollback on: test failure, validation failure, runtime error",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Implement self-improvement coordinator with safety guardrails",
+      "description": "As MetaRalph, I need to orchestrate the self-improvement loop safely.",
+      "acceptanceCriteria": [
+        "src/self-improve/guardrails.ts prevents modification of core safety code without approval",
+        "Risk scoring (0-100): high-risk changes (>70) require explicit approval",
+        "src/self-improve/index.ts exports SelfImprovementEngine",
+        "run() triggers: analyze -> propose -> approve -> execute -> validate -> merge/rollback",
+        "'metaralph self-improve' triggers manual run, '--dry-run' shows proposals only",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

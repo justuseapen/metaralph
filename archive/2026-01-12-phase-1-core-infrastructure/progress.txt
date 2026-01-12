@@ -1,0 +1,179 @@
+# MetaRalph Progress Log
+Started: 2025-01-12
+
+## Codebase Patterns
+- Project uses ESM modules ("type": "module" in package.json)
+- TypeScript uses NodeNext module resolution for ESM compatibility
+- Run `npm run typecheck` to verify TypeScript before committing
+- Use `tsx` to run TypeScript files directly (e.g., `npx tsx src/index.ts`)
+- Utilities go in src/utils/ directory
+- Database modules go in src/db/ directory
+- CLI modules go in src/cli/ directory
+- Daemon modules go in src/daemon/ directory
+- Use getPidFilePath() from daemon/index.ts for PID file location
+- Use `import * as fs from 'node:fs'` for Node.js built-in modules (ESM style)
+- Config directory: ~/.config/metaralph/ (use getConfigDir() from config.ts)
+- Use initDatabase() from src/db/index.ts to get database instance
+- Database uses better-sqlite3 (synchronous API, no async/await needed)
+- CLI uses commander for argument parsing (src/cli/index.ts)
+- Registry modules go in src/registry/ directory
+- Registry functions accept optional db parameter to reuse database connections
+
+---
+
+## Project Context
+MetaRalph is an autonomous multi-project orchestration engine built on top of Ralph.
+
+Key architectural decisions:
+- TypeScript/Node.js for Ralph ecosystem compatibility
+- SQLite for zero-config persistence
+- Ink (React for CLI) for terminal UI
+- Opt-in project management (user explicitly adds projects)
+- Project groups for bundling related repos
+- Collaborative PRD creation via conversation threads
+
+Phase 1 focuses on core infrastructure:
+- Daemon lifecycle (start/stop/status)
+- Database schema
+- Configuration management
+- CLI framework
+- Project and group registry
+
+---
+
+## 2026-01-12 - US-001
+- What was implemented: TypeScript project scaffolding with all required dependencies
+- Files changed:
+  - package.json (created) - Project manifest with dependencies
+  - tsconfig.json (created) - TypeScript config for ESM with strict mode
+  - src/index.ts (created) - Entry point placeholder
+- **Learnings for future iterations:**
+  - Project uses ESM modules (type: "module" in package.json)
+  - TypeScript configured with NodeNext module resolution for proper ESM compatibility
+  - All dependencies installed: better-sqlite3, commander, ink, react, uuid
+  - tsx is available for running TypeScript directly without compilation
+  - npm run typecheck can verify TypeScript without building
+---
+
+## 2026-01-12 - US-002
+- What was implemented: Structured logger utility with configurable log levels and file output
+- Files changed:
+  - src/utils/logger.ts (created) - Logger class with debug/info/warn/error levels
+- **Learnings for future iterations:**
+  - Logger supports ISO timestamps automatically via new Date().toISOString()
+  - Logger can output to stdout and optionally to a file simultaneously
+  - Use Logger class constructor options to set level and logFilePath
+  - Default logger instance exported as `logger` for convenience
+  - Log levels have priority: debug < info < warn < error (lower = more verbose)
+---
+
+## 2026-01-12 - US-003
+- What was implemented: Configuration management utility with load/save functions and validation
+- Files changed:
+  - src/utils/config.ts (created) - Config management with loadConfig() and saveConfig()
+- **Learnings for future iterations:**
+  - Config directory is at ~/.config/metaralph/ (use os.homedir() for cross-platform compatibility)
+  - Config file is at ~/.config/metaralph/config.json
+  - loadConfig() auto-creates the config directory if it doesn't exist
+  - loadConfig() returns defaults if config.json doesn't exist (no error thrown)
+  - saveConfig() validates config before writing to prevent invalid configurations
+  - Default values: dbPath (in config dir), logsPath (config dir/logs), maxConcurrentWorkers: 3, selfImprovementEnabled: true
+  - Config merges with defaults on load, so missing fields in existing configs get filled in
+---
+
+## 2026-01-12 - US-004
+- What was implemented: SQLite database layer with full schema for MetaRalph persistence
+- Files changed:
+  - src/db/index.ts (created) - Database initialization with initDatabase() and closeDatabase()
+- **Learnings for future iterations:**
+  - Database modules go in src/db/ directory
+  - Use better-sqlite3 for synchronous SQLite operations (no async/await needed)
+  - Export type DatabaseInstance = Database.Database for type annotations
+  - Foreign keys enabled via db.pragma('foreign_keys = ON')
+  - Use datetime('now') SQLite function for default timestamps
+  - Tables created: project_groups, projects, conversations, messages, tasks, executions, learnings
+  - Projects have optional group_id foreign key to project_groups
+  - Tasks track acceptance_criteria as TEXT (store JSON or markdown)
+  - Executions store output_log and error_log as TEXT
+  - Learnings have confidence (0-1 REAL) and applied_count for self-improvement tracking
+  - Indexes created for common query patterns (status, foreign keys)
+  - Use .js extension in imports (e.g., '../utils/config.js') for ESM compatibility
+---
+
+## 2026-01-12 - US-005
+- What was implemented: CLI entry point with commander for argument parsing
+- Files changed:
+  - bin/metaralph (created) - Executable shell script that runs CLI via tsx
+  - src/cli/index.ts (created) - Main CLI module with commander setup
+- **Learnings for future iterations:**
+  - CLI code goes in src/cli/ directory
+  - bin/metaralph uses spawn() to invoke tsx with the CLI TypeScript file
+  - Use fileURLToPath(import.meta.url) to get __filename equivalent in ESM
+  - commander.version() takes the second argument as flag (e.g., '-v, --version')
+  - Subcommands created via program.command('parent').command('child')
+  - Default action on parent command (projectsCommand.action()) runs when no subcommand specified
+  - Read package.json version dynamically using fs.readFileSync and JSON.parse
+  - Use path.resolve(__dirname, '../../package.json') to get package.json from src/cli/
+---
+
+## 2026-01-12 - US-006
+- What was implemented: Daemon lifecycle management with start/stop/status functions
+- Files changed:
+  - src/daemon/index.ts (created) - Daemon lifecycle with startDaemon(), stopDaemon(), getDaemonStatus(), formatUptime()
+  - src/cli/index.ts (modified) - Wired daemon functions to CLI start/stop/status commands
+- **Learnings for future iterations:**
+  - Daemon modules go in src/daemon/ directory
+  - PID file stored at ~/.config/metaralph/metaralph.pid (use getPidFilePath())
+  - Start time stored at ~/.config/metaralph/metaralph.started for uptime calculation
+  - Use process.kill(pid, 0) to check if a process is running (no signal sent, just checks existence)
+  - Spawn detached processes with { detached: true, stdio: 'ignore' } and call child.unref()
+  - DaemonStatus interface provides running, pid, uptime, startedAt fields
+  - CLI commands can accept Logger instance for logging events to daemon.log
+  - formatUptime() converts seconds to human-readable format like "2d 5h 30m 15s"
+---
+
+## 2026-01-12 - US-007
+- What was implemented: Project registry with opt-in management for adding/removing projects
+- Files changed:
+  - src/registry/index.ts (created) - Project registry with addProject(), removeProject(), listProjects()
+  - src/cli/index.ts (modified) - Wired project commands to use registry functions
+- **Learnings for future iterations:**
+  - Registry modules go in src/registry/ directory
+  - Use isGitRepository() to validate a path contains a .git directory
+  - extractProjectName() reads package.json first, falls back to directory name
+  - Database operations can take optional db parameter to reuse existing connection
+  - Use path.resolve() to convert relative paths to absolute before storing
+  - RegistryResult interface provides success, message, and optional project fields
+  - displayProjectsList() helper in CLI formats project output consistently
+  - Projects table has unique constraint on path to prevent duplicates
+---
+
+## 2026-01-12 - US-008
+- What was implemented: Project group management for bundling related repositories
+- Files changed:
+  - src/registry/group.ts (created) - Group management with createGroup(), addToGroup(), removeFromGroup(), listGroups(), deleteGroup()
+  - src/cli/index.ts (modified) - Wired group commands to use group registry functions
+- **Learnings for future iterations:**
+  - Group functions follow same pattern as project registry (optional db parameter, GroupResult return type)
+  - addToGroup() auto-registers a project if not already registered (uses addProject internally)
+  - Groups can be identified by name or ID in most functions for user convenience
+  - listGroups() returns GroupWithProjects[] which includes nested projects array
+  - deleteGroup() uses foreign key ON DELETE SET NULL to unlink projects without deleting them
+  - Use getGroupByName() and getGroupById() for single group lookups
+  - CLI supports both 'metaralph groups' and 'metaralph groups list' to list groups
+  - 'metaralph groups create' supports optional -d/--description flag
+---
+
+## 2026-01-12 - US-009
+- What was implemented: Finalized Phase 1 infrastructure with complete git tracking
+- Files changed:
+  - .gitignore (modified) - Added .last-branch to ignored files
+  - prd.json (modified) - Marked US-009 as passes: true
+  - progress.txt (modified) - Added this progress entry
+- **Learnings for future iterations:**
+  - All Phase 1 user stories (US-001 through US-009) are now complete
+  - Phase 1 provides: daemon lifecycle, SQLite database, config management, CLI framework, project/group registry
+  - .gitignore should cover: node_modules/, dist/, *.db, *.db-journal, *.log, logs/, .last-branch
+  - This branch (ralph/phase-1-core-infrastructure) is the foundation for all future MetaRalph development
+  - Phase 2 will focus on task queue, worker pool, and Claude Code integration
+---
