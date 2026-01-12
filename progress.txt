@@ -8,10 +8,12 @@ Started: 2025-01-12
 - Use `tsx` to run TypeScript files directly (e.g., `npx tsx src/index.ts`)
 - Utilities go in src/utils/ directory
 - Database modules go in src/db/ directory
+- CLI modules go in src/cli/ directory
 - Use `import * as fs from 'node:fs'` for Node.js built-in modules (ESM style)
 - Config directory: ~/.config/metaralph/ (use getConfigDir() from config.ts)
 - Use initDatabase() from src/db/index.ts to get database instance
 - Database uses better-sqlite3 (synchronous API, no async/await needed)
+- CLI uses commander for argument parsing (src/cli/index.ts)
 
 ---
 
@@ -92,4 +94,20 @@ Phase 1 focuses on core infrastructure:
   - Learnings have confidence (0-1 REAL) and applied_count for self-improvement tracking
   - Indexes created for common query patterns (status, foreign keys)
   - Use .js extension in imports (e.g., '../utils/config.js') for ESM compatibility
+---
+
+## 2026-01-12 - US-005
+- What was implemented: CLI entry point with commander for argument parsing
+- Files changed:
+  - bin/metaralph (created) - Executable shell script that runs CLI via tsx
+  - src/cli/index.ts (created) - Main CLI module with commander setup
+- **Learnings for future iterations:**
+  - CLI code goes in src/cli/ directory
+  - bin/metaralph uses spawn() to invoke tsx with the CLI TypeScript file
+  - Use fileURLToPath(import.meta.url) to get __filename equivalent in ESM
+  - commander.version() takes the second argument as flag (e.g., '-v, --version')
+  - Subcommands created via program.command('parent').command('child')
+  - Default action on parent command (projectsCommand.action()) runs when no subcommand specified
+  - Read package.json version dynamically using fs.readFileSync and JSON.parse
+  - Use path.resolve(__dirname, '../../package.json') to get package.json from src/cli/
 ---
