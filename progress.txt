@@ -6,6 +6,8 @@ Started: 2025-01-12
 - TypeScript uses NodeNext module resolution for ESM compatibility
 - Run `npm run typecheck` to verify TypeScript before committing
 - Use `tsx` to run TypeScript files directly (e.g., `npx tsx src/index.ts`)
+- Utilities go in src/utils/ directory
+- Use `import * as fs from 'node:fs'` for Node.js built-in modules (ESM style)
 
 ---
 
@@ -41,4 +43,16 @@ Phase 1 focuses on core infrastructure:
   - All dependencies installed: better-sqlite3, commander, ink, react, uuid
   - tsx is available for running TypeScript directly without compilation
   - npm run typecheck can verify TypeScript without building
+---
+
+## 2026-01-12 - US-002
+- What was implemented: Structured logger utility with configurable log levels and file output
+- Files changed:
+  - src/utils/logger.ts (created) - Logger class with debug/info/warn/error levels
+- **Learnings for future iterations:**
+  - Logger supports ISO timestamps automatically via new Date().toISOString()
+  - Logger can output to stdout and optionally to a file simultaneously
+  - Use Logger class constructor options to set level and logFilePath
+  - Default logger instance exported as `logger` for convenience
+  - Log levels have priority: debug < info < warn < error (lower = more verbose)
 ---
