@@ -38,6 +38,35 @@ export function initDatabase(dbPath?: string): DatabaseInstance {
 }
 
 /**
+ * Migrate tasks table to add new columns if they don't exist
+ * This handles upgrades from older schema versions
+ *
+ * @param db - The database instance
+ */
+function migrateTasksTable(db: DatabaseInstance): void {
+  // Get existing columns
+  const columns = db.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((c) => c.name));
+
+  // Add new columns if they don't exist
+  const migrations: Array<{ column: string; definition: string }> = [
+    { column: 'type', definition: "TEXT NOT NULL DEFAULT 'feature'" },
+    { column: 'source', definition: "TEXT NOT NULL DEFAULT 'manual'" },
+    { column: 'priority_score', definition: 'REAL NOT NULL DEFAULT 0' },
+    { column: 'estimated_effort', definition: "TEXT NOT NULL DEFAULT 'medium'" },
+    { column: 'requires_approval', definition: 'INTEGER NOT NULL DEFAULT 1' },
+    { column: 'approval_status', definition: "TEXT NOT NULL DEFAULT 'pending'" },
+    { column: 'prd_json', definition: 'TEXT' },
+  ];
+
+  for (const migration of migrations) {
+    if (!columnNames.has(migration.column)) {
+      db.exec(`ALTER TABLE tasks ADD COLUMN ${migration.column} ${migration.definition}`);
+    }
+  }
+}
+
+/**
  * Create all required tables in the database
  * Uses IF NOT EXISTS to be idempotent
  *
@@ -94,23 +123,29 @@ function createTables(db: DatabaseInstance): void {
   `);
 
   // Tasks table - PRD user stories / tasks for execution
+  // Extended with priority scoring, approval workflow, and PRD storage
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
-      conversation_id TEXT,
+      type TEXT NOT NULL DEFAULT 'feature',
       title TEXT NOT NULL,
-      description TEXT,
-      acceptance_criteria TEXT,
-      priority INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'manual',
+      priority_score REAL NOT NULL DEFAULT 0,
+      estimated_effort TEXT NOT NULL DEFAULT 'medium',
+      requires_approval INTEGER NOT NULL DEFAULT 1,
+      approval_status TEXT NOT NULL DEFAULT 'pending',
       status TEXT NOT NULL DEFAULT 'pending',
-      passes INTEGER NOT NULL DEFAULT 0,
+      prd_json TEXT,
+      description TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     )
   `);
+
+  // Add new columns to existing tasks table if they don't exist (migration)
+  migrateTasksTable(db);
 
   // Executions table - individual Ralph executions for tasks
   db.exec(`
@@ -154,6 +189,9 @@ function createTables(db: DatabaseInstance): void {
     CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_priority_score ON tasks(priority_score);
+    CREATE INDEX IF NOT EXISTS idx_tasks_approval_status ON tasks(approval_status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type);
     CREATE INDEX IF NOT EXISTS idx_executions_task_id ON executions(task_id);
     CREATE INDEX IF NOT EXISTS idx_executions_project_id ON executions(project_id);
     CREATE INDEX IF NOT EXISTS idx_executions_status ON executions(status);
