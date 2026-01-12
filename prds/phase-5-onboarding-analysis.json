@@ -1,0 +1,94 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-5-onboarding-analysis",
+  "description": "MetaRalph Phase 5: Onboarding & Analysis Engine - Analyze new projects, extract TODOs, fetch issues, generate improvement proposals.",
+  "userStories": [
+    {
+      "id": "US-026",
+      "title": "Implement codebase analyzer",
+      "description": "As MetaRalph, I need to analyze codebases to find improvement opportunities when projects are added.",
+      "acceptanceCriteria": [
+        "src/onboarding/analyzer.ts exports CodebaseAnalyzer class",
+        "analyze(projectPath) returns ImprovementOpportunity[]",
+        "Detects: missing tests, outdated deps, type errors, lint issues",
+        "Runs: npm outdated, npm run typecheck, npm run lint (if available)",
+        "Categorizes findings by type and severity",
+        "Estimates effort for each finding",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Implement TODO/FIXME extractor",
+      "description": "As MetaRalph, I need to find TODO and FIXME comments to create tasks from them.",
+      "acceptanceCriteria": [
+        "src/onboarding/todo-extractor.ts exports TodoExtractor class",
+        "extract(projectPath) returns TodoComment[]",
+        "Finds: TODO, FIXME, XXX, HACK, BUG comments",
+        "Extracts: type, content, file, line number",
+        "Uses git blame to find author and age",
+        "Ignores node_modules, dist, .git directories",
+        "Priority: FIXME > BUG > TODO > XXX > HACK",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Implement GitHub Issues fetcher",
+      "description": "As MetaRalph, I need to fetch open issues from GitHub to create tasks from them.",
+      "acceptanceCriteria": [
+        "src/onboarding/issue-fetcher.ts exports IssueFetcher class",
+        "fetch(projectPath) detects GitHub remote and fetches open issues",
+        "Uses GitHub MCP tools or gh CLI if available",
+        "Returns: title, body, labels, assignee, created_at",
+        "Filters to issues without 'wontfix' or 'invalid' labels",
+        "Maps issue labels to task types (bug -> bug_fix, enhancement -> feature)",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Implement initial proposals generator",
+      "description": "As MetaRalph, I need to generate improvement proposals when a project is onboarded.",
+      "acceptanceCriteria": [
+        "src/onboarding/proposal-generator.ts exports ProposalGenerator class",
+        "generate(project, analysisResults) creates Task objects",
+        "Combines: codebase analysis, TODOs, GitHub issues",
+        "Deduplicates similar findings",
+        "Assigns priority scores using prioritizer",
+        "Creates initial conversation with proposals summary",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-030",
+      "title": "Implement onboarding coordinator",
+      "description": "As MetaRalph, I need to orchestrate the full onboarding flow when a project is added.",
+      "acceptanceCriteria": [
+        "src/onboarding/index.ts exports OnboardingEngine class",
+        "onboard(projectPath) runs full analysis pipeline",
+        "Pipeline: validate git repo -> analyze -> extract TODOs -> fetch issues -> generate proposals",
+        "Updates project.lastAnalyzed timestamp",
+        "Creates conversation with findings summary",
+        "Emits events: 'onboarding:started', 'onboarding:completed'",
+        "'metaralph projects analyze <id>' triggers re-onboarding",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

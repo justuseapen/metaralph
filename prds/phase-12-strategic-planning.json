@@ -1,0 +1,92 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-12-strategic-planning",
+  "description": "MetaRalph Phase 12: Strategic Planning - Roadmap generation, market analysis, competitive intelligence, feature prioritization.",
+  "userStories": [
+    {
+      "id": "US-067",
+      "title": "Implement project roadmap generator",
+      "description": "As MetaRalph, I need to generate strategic roadmaps for projects.",
+      "acceptanceCriteria": [
+        "src/strategy/roadmap.ts exports RoadmapGenerator class",
+        "Analyzes: existing issues, user feedback, competitive landscape",
+        "Generates quarterly/yearly roadmap with milestones",
+        "Prioritizes features by: impact, effort, strategic value",
+        "Creates PRD drafts for roadmap items",
+        "Roadmap stored in project and visualized in dashboard",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-068",
+      "title": "Implement competitive analysis",
+      "description": "As MetaRalph, I need to analyze competitors to inform feature decisions.",
+      "acceptanceCriteria": [
+        "src/strategy/competitive.ts exports CompetitiveAnalyzer class",
+        "Monitors competitor: GitHub repos, changelogs, documentation",
+        "Identifies: new features, differentiators, gaps",
+        "Suggests features to match or differentiate",
+        "Tracks competitive positioning over time",
+        "Requires user to configure competitor list",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-069",
+      "title": "Implement user feedback analyzer",
+      "description": "As MetaRalph, I need to analyze user feedback to prioritize features.",
+      "acceptanceCriteria": [
+        "src/strategy/feedback.ts exports FeedbackAnalyzer class",
+        "Sources: GitHub issues, discussions, stars context",
+        "Clusters feedback into themes and feature requests",
+        "Scores requests by: frequency, sentiment, user importance",
+        "Creates strategic proposals from top requests",
+        "Tracks feature request trends over time",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-070",
+      "title": "Implement strategic proposal generator",
+      "description": "As MetaRalph, I need to proactively propose strategic improvements.",
+      "acceptanceCriteria": [
+        "src/strategy/proposer.ts exports StrategicProposer class",
+        "Uses Claude to analyze project and suggest improvements",
+        "Considers: market trends, user needs, technical debt, growth opportunities",
+        "Generates detailed proposals with rationale and impact estimate",
+        "Proposals require user discussion before becoming PRDs",
+        "Runs on schedule (default: weekly)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-071",
+      "title": "Implement strategy coordinator",
+      "description": "As MetaRalph, I need to orchestrate strategic planning activities.",
+      "acceptanceCriteria": [
+        "src/strategy/index.ts exports StrategyEngine class",
+        "Runs periodic strategic review (default: monthly)",
+        "Generates: roadmap updates, competitive insights, feature proposals",
+        "'metaralph strategy <project>' triggers strategic review",
+        "'metaralph roadmap <project>' shows project roadmap",
+        "Dashboard shows: StrategyView with roadmap, proposals, insights",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

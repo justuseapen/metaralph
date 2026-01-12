@@ -1,0 +1,126 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-11-marketing",
+  "description": "MetaRalph Phase 11: Autonomous Marketing - Content generation, social media, changelog management, community engagement.",
+  "userStories": [
+    {
+      "id": "US-060",
+      "title": "Implement changelog generator",
+      "description": "As MetaRalph, I need to generate changelogs from completed PRDs and commits.",
+      "acceptanceCriteria": [
+        "src/marketing/changelog.ts exports ChangelogGenerator class",
+        "Parses git commits since last release",
+        "Groups by: Features, Bug Fixes, Performance, Documentation",
+        "Generates human-readable descriptions from commit messages",
+        "Updates CHANGELOG.md in project",
+        "Supports: Keep a Changelog format, conventional commits",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-061",
+      "title": "Implement release notes generator",
+      "description": "As MetaRalph, I need to create polished release notes for new versions.",
+      "acceptanceCriteria": [
+        "src/marketing/release-notes.ts exports ReleaseNotesGenerator class",
+        "Uses Claude to write engaging release notes from changelog",
+        "Highlights key features and improvements",
+        "Includes migration notes if breaking changes",
+        "Generates multiple formats: markdown, HTML, plain text",
+        "Can include screenshots and GIFs",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-062",
+      "title": "Implement documentation updater",
+      "description": "As MetaRalph, I need to keep project documentation up to date.",
+      "acceptanceCriteria": [
+        "src/marketing/docs-updater.ts exports DocsUpdater class",
+        "Detects outdated docs by comparing with code",
+        "Updates README with new features and usage",
+        "Generates API documentation from code",
+        "Updates CLI help and man pages",
+        "Creates tasks for major doc rewrites",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-063",
+      "title": "Implement social media content generator",
+      "description": "As MetaRalph, I need to generate social media posts for releases and updates.",
+      "acceptanceCriteria": [
+        "src/marketing/social.ts exports SocialMediaGenerator class",
+        "Generates: Twitter/X threads, LinkedIn posts, dev.to articles",
+        "Content tailored to platform character limits and style",
+        "Includes relevant hashtags and mentions",
+        "Requires user approval before posting",
+        "Scheduling support for optimal posting times",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-064",
+      "title": "Implement GitHub release publisher",
+      "description": "As MetaRalph, I need to create and publish GitHub releases.",
+      "acceptanceCriteria": [
+        "src/marketing/github-release.ts exports GitHubReleasePublisher class",
+        "Creates GitHub release with: tag, title, release notes, assets",
+        "Bumps version in package.json following semver",
+        "Attaches build artifacts if configured",
+        "Creates draft release for review before publishing",
+        "Notifies user when release is ready for review",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-065",
+      "title": "Implement community engagement tracker",
+      "description": "As MetaRalph, I need to monitor and respond to community engagement.",
+      "acceptanceCriteria": [
+        "src/marketing/community.ts exports CommunityEngagement class",
+        "Monitors: GitHub issues, discussions, stars, forks",
+        "Identifies: unanswered questions, popular feature requests",
+        "Suggests responses using Claude",
+        "Creates tasks from recurring feature requests",
+        "Tracks community health metrics over time",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-066",
+      "title": "Implement marketing coordinator",
+      "description": "As MetaRalph, I need to orchestrate marketing activities around releases.",
+      "acceptanceCriteria": [
+        "src/marketing/index.ts exports MarketingEngine class",
+        "onRelease(project, version) triggers marketing pipeline",
+        "Pipeline: changelog -> release notes -> docs -> social -> GitHub release",
+        "Requires approval before publishing external content",
+        "'metaralph release <project> [version]' triggers release workflow",
+        "Dashboard shows: MarketingView with pending content, scheduled posts",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

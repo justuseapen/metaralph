@@ -1,0 +1,91 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-3-worker-orchestration",
+  "description": "MetaRalph Phase 3: Worker Orchestration - Spawn and manage Ralph instances, track executions, handle failures and retries.",
+  "userStories": [
+    {
+      "id": "US-015",
+      "title": "Create execution tracking model",
+      "description": "As a developer, I need to track Ralph executions so that MetaRalph knows what's running and what completed.",
+      "acceptanceCriteria": [
+        "src/workers/execution.ts exports Execution interface and ExecutionRepository class",
+        "Execution includes: id, taskId, projectId, pid, startedAt, completedAt, status, iterationsUsed, maxIterations, ralphOutput, commits, filesChanged",
+        "Status values: 'running', 'success', 'failed', 'timeout', 'terminated'",
+        "ExecutionRepository has: create(), update(), findById(), findByTask(), findRunning()",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement Ralph spawner",
+      "description": "As a developer, I need to spawn Ralph instances so that MetaRalph can execute PRDs autonomously.",
+      "acceptanceCriteria": [
+        "src/workers/ralph-spawner.ts exports RalphSpawner class",
+        "spawn(task, project) creates prd.json in project directory from task.prdJson",
+        "spawn() checks out the correct git branch",
+        "spawn() runs: ./ralph.sh --tool claude <maxIterations>",
+        "Returns Execution object with pid",
+        "Captures stdout/stderr to execution.ralphOutput",
+        "Detects '<promise>COMPLETE</promise>' signal for success",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement worker orchestrator",
+      "description": "As a developer, I need an orchestrator to manage concurrent Ralph workers across projects.",
+      "acceptanceCriteria": [
+        "src/workers/index.ts exports WorkerOrchestrator class",
+        "Enforces maxConcurrentWorkers limit from config",
+        "Enforces one worker per project (prevents git conflicts)",
+        "scheduleTask(task) spawns a worker if capacity available",
+        "Monitors running workers for completion",
+        "Updates task and execution status on completion",
+        "Emits events: 'worker:started', 'worker:completed', 'worker:failed'",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Implement failure handling and retries",
+      "description": "As a user, I need MetaRalph to handle failures gracefully and retry when appropriate.",
+      "acceptanceCriteria": [
+        "src/workers/failure-handler.ts exports FailureHandler class",
+        "analyzeFailure(execution) returns: 'retry', 'rollback', 'escalate', or 'abort'",
+        "Timeout failures -> retry with more iterations (up to 2 retries)",
+        "Git conflict -> rollback, rebase, retry",
+        "Repeated failures (3+) -> escalate (mark for human attention)",
+        "Critical errors -> abort and log",
+        "Retries use exponential backoff",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Implement workers CLI commands",
+      "description": "As a user, I need CLI commands to monitor and control running workers.",
+      "acceptanceCriteria": [
+        "'metaralph workers' lists active workers with: id, project, task, started, iterations",
+        "'metaralph workers stop <id>' terminates a specific worker",
+        "'metaralph workers logs <id>' shows recent output from a worker",
+        "Output includes worker health status",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

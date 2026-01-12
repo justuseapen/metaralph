@@ -1,0 +1,109 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-10-qa",
+  "description": "MetaRalph Phase 10: Autonomous QA - Automated testing, visual regression, performance monitoring, bug detection and auto-fix.",
+  "userStories": [
+    {
+      "id": "US-054",
+      "title": "Implement test runner integration",
+      "description": "As MetaRalph, I need to run tests for projects to validate changes.",
+      "acceptanceCriteria": [
+        "src/qa/test-runner.ts exports TestRunner class",
+        "Auto-detects test framework: jest, vitest, mocha, pytest, etc.",
+        "runTests(project) executes test suite and returns results",
+        "Parses test output for: passed, failed, skipped counts",
+        "Captures failure messages and stack traces",
+        "Supports running specific test files",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-055",
+      "title": "Implement visual regression testing",
+      "description": "As MetaRalph, I need to detect visual changes in UI projects.",
+      "acceptanceCriteria": [
+        "src/qa/visual-regression.ts exports VisualRegressionTester class",
+        "Uses Playwright or Puppeteer for screenshots",
+        "Captures baseline screenshots from main branch",
+        "Compares new screenshots against baseline",
+        "Highlights visual differences with diff images",
+        "Configurable threshold for acceptable changes",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-056",
+      "title": "Implement performance monitoring",
+      "description": "As MetaRalph, I need to detect performance regressions.",
+      "acceptanceCriteria": [
+        "src/qa/performance.ts exports PerformanceMonitor class",
+        "Runs Lighthouse audits for web projects",
+        "Tracks: page load time, bundle size, memory usage",
+        "Compares against baseline metrics",
+        "Flags regressions above threshold (e.g., >10% slower)",
+        "Suggests performance improvements based on findings",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-057",
+      "title": "Implement E2E test generator",
+      "description": "As MetaRalph, I need to generate E2E tests for new features.",
+      "acceptanceCriteria": [
+        "src/qa/e2e-generator.ts exports E2ETestGenerator class",
+        "Analyzes PRD acceptance criteria to generate test cases",
+        "Uses Claude to write Playwright/Cypress tests",
+        "Tests cover happy path and edge cases",
+        "Integrates with existing test structure",
+        "Tests are added to the codebase as part of the feature",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-058",
+      "title": "Implement bug detection and auto-fix",
+      "description": "As MetaRalph, I need to detect bugs in production and create fix tasks.",
+      "acceptanceCriteria": [
+        "src/qa/bug-detector.ts exports BugDetector class",
+        "Monitors: error logs, crash reports, user feedback (if integrated)",
+        "Clusters similar errors to identify unique bugs",
+        "Analyzes stack traces to locate bug source",
+        "Creates bug_fix task with context and suggested fix",
+        "High-severity bugs get elevated priority",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-059",
+      "title": "Implement QA coordinator",
+      "description": "As MetaRalph, I need to orchestrate the full QA pipeline.",
+      "acceptanceCriteria": [
+        "src/qa/index.ts exports QAEngine class",
+        "runQA(project, execution) runs full QA suite",
+        "Pipeline: unit tests -> visual regression -> performance -> E2E",
+        "Blocks deployment if QA fails",
+        "Creates tasks for failed tests and regressions",
+        "'metaralph qa <project>' triggers manual QA run",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

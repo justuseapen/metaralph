@@ -1,0 +1,107 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-6-collaboration",
+  "description": "MetaRalph Phase 6: Collaborative PRD Creation - Conversation threads, proposal discussion, user idea intake, PRD co-creation.",
+  "userStories": [
+    {
+      "id": "US-031",
+      "title": "Create conversation model and repository",
+      "description": "As a developer, I need conversation tracking so that MetaRalph can have ongoing discussions about projects.",
+      "acceptanceCriteria": [
+        "src/collaboration/conversation.ts exports Conversation, Message interfaces",
+        "Conversation: id, projectId, groupId, title, status, createdAt, updatedAt",
+        "Message: id, conversationId, role ('user'|'metaralph'|'system'), content, createdAt",
+        "ConversationRepository: create(), addMessage(), findByProject(), findActive()",
+        "Status: 'active', 'prd_ready', 'closed'",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-032",
+      "title": "Implement Claude-powered discussion engine",
+      "description": "As MetaRalph, I need to have intelligent discussions with users about project improvements.",
+      "acceptanceCriteria": [
+        "src/collaboration/discussion.ts exports DiscussionEngine class",
+        "Uses Claude API to generate contextual responses",
+        "Maintains conversation history for context",
+        "Can discuss: proposals, user ideas, implementation details, tradeoffs",
+        "Includes project context (README, structure, recent commits) in prompts",
+        "Responses are actionable and specific to the project",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-033",
+      "title": "Implement PRD builder with user collaboration",
+      "description": "As a user, I need to collaboratively create PRDs with MetaRalph through conversation.",
+      "acceptanceCriteria": [
+        "src/collaboration/prd-builder.ts exports PrdBuilder class",
+        "startPrd(conversation, title) initiates PRD creation",
+        "Claude helps refine: description, user stories, acceptance criteria",
+        "User can accept, modify, or reject suggestions",
+        "buildPrd() generates final prd.json structure",
+        "Validates PRD has required fields before finalizing",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-034",
+      "title": "Implement idea intake flow",
+      "description": "As a user, I want MetaRalph to ask me for ideas and help develop them into PRDs.",
+      "acceptanceCriteria": [
+        "src/collaboration/idea-intake.ts exports IdeaIntake class",
+        "promptForIdeas(project) asks: 'What would you like to build?'",
+        "Helps user refine vague ideas into concrete features",
+        "Asks clarifying questions about scope, priority, constraints",
+        "Transitions to PrdBuilder when idea is sufficiently defined",
+        "Can handle multiple ideas in one session",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-035",
+      "title": "Implement conversation CLI and dashboard view",
+      "description": "As a user, I need to chat with MetaRalph from both CLI and dashboard.",
+      "acceptanceCriteria": [
+        "'metaralph chat <project>' opens interactive chat session",
+        "'metaralph conversations' lists active conversations",
+        "'metaralph propose <project>' asks MetaRalph to propose improvements",
+        "src/cli/components/ConversationView.tsx shows chat in dashboard",
+        "Chat supports markdown rendering",
+        "Shows typing indicator when MetaRalph is thinking",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-036",
+      "title": "Auto-queue PRDs for Ralph execution",
+      "description": "As a user, when a PRD is finalized it should automatically queue for execution.",
+      "acceptanceCriteria": [
+        "When conversation.status changes to 'prd_ready', create Task from PRD",
+        "Task inherits project context from conversation",
+        "Features require approval, quick wins auto-approve",
+        "User notified: 'PRD queued for execution'",
+        "Task linked to conversation via conversationId",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

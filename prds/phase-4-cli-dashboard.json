@@ -1,0 +1,110 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-4-cli-dashboard",
+  "description": "MetaRalph Phase 4: CLI Dashboard - Terminal UI with real-time views for queue, approvals, projects, workers, and conversations.",
+  "userStories": [
+    {
+      "id": "US-020",
+      "title": "Set up Ink dashboard framework",
+      "description": "As a developer, I need the Ink framework set up so that we can build React-based terminal UI components.",
+      "acceptanceCriteria": [
+        "src/cli/dashboard.tsx exports Dashboard component",
+        "'metaralph' or 'metaralph dashboard' launches the TUI",
+        "Dashboard has tab navigation: [1]Queue [2]Approvals [3]Projects [4]Workers [5]Logs",
+        "Keyboard: Tab/1-5 switches views, q quits",
+        "Header shows: 'MetaRalph v{version}' and daemon status",
+        "Footer shows keyboard shortcuts",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Implement Queue view component",
+      "description": "As a user, I need to see the work queue in the dashboard with filtering and sorting.",
+      "acceptanceCriteria": [
+        "src/cli/components/QueueView.tsx shows all tasks in a table",
+        "Columns: Priority, ID, Project, Type, Status, Effort",
+        "Arrow keys navigate rows",
+        "Filter dropdown: All, Pending, Queued, Running, Completed",
+        "Shows task count in header",
+        "Enter key shows task details",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement Approvals view component",
+      "description": "As a user, I need to review and approve/reject pending tasks from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/ApprovalView.tsx shows pending approval tasks",
+        "Shows full task details: title, description, source, rationale",
+        "Keyboard: 'a' approves, 'r' rejects (prompts for reason), 'n' next, 'p' previous",
+        "'A' approves all pending",
+        "Shows count of pending approvals",
+        "Updates in real-time as tasks are submitted",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Implement Projects view component",
+      "description": "As a user, I need to manage projects and groups from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/ProjectsView.tsx shows projects grouped by group",
+        "Shows: name, path, health score, last analyzed, active workers",
+        "'a' prompts to add new project",
+        "'g' prompts to create new group",
+        "'d' removes selected project (with confirmation)",
+        "'r' triggers re-analysis of selected project",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Implement Workers view component",
+      "description": "As a user, I need to monitor active Ralph workers in real-time.",
+      "acceptanceCriteria": [
+        "src/cli/components/WorkersView.tsx shows running workers",
+        "Shows: ID, Project, Task, Started, Duration, Iteration X/Y",
+        "Progress bar for iteration progress",
+        "Live output tail (last 5 lines) for selected worker",
+        "'s' stops selected worker (with confirmation)",
+        "'l' opens full log view for worker",
+        "Auto-refreshes every 2 seconds",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Implement Logs view component",
+      "description": "As a user, I need to see MetaRalph system logs in the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/LogsView.tsx shows system logs",
+        "Streams logs in real-time",
+        "Filter by level: debug, info, warn, error",
+        "Search/filter by text",
+        "Shows timestamp, level, message",
+        "Color-coded by level",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

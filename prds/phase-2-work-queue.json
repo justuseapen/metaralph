@@ -1,0 +1,93 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-2-work-queue",
+  "description": "MetaRalph Phase 2: Work Queue System - Priority-based task queue with quick wins first, auto-approve vs approval-required categorization.",
+  "userStories": [
+    {
+      "id": "US-010",
+      "title": "Create task model and database operations",
+      "description": "As a developer, I need a task model so that MetaRalph can track PRDs and work items in the database.",
+      "acceptanceCriteria": [
+        "src/queue/task.ts exports Task interface and TaskRepository class",
+        "Task includes: id, projectId, conversationId, type, title, description, source, priorityScore, estimatedEffort, requiresApproval, approvalStatus, status, prdJson, createdAt",
+        "TaskRepository has: create(), update(), delete(), findById(), findByProject(), findPending()",
+        "Task types: 'bug_fix', 'docs', 'test', 'refactor', 'feature', 'strategic'",
+        "Effort levels: 'quick_win', 'small', 'medium', 'large'",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement quick wins priority scoring algorithm",
+      "description": "As a user, I want quick wins prioritized first so that MetaRalph maintains momentum with fast completions.",
+      "acceptanceCriteria": [
+        "src/queue/prioritizer.ts exports calculatePriorityScore() function",
+        "Score formula: typeScore * effortMultiplier * confidence + agePenalty * projectHealth",
+        "Type scores: bug_fix=100, test=90, docs=85, refactor=70, feature=50, strategic=40",
+        "Effort multipliers: quick_win=2.0, small=1.5, medium=1.0, large=0.5",
+        "Age bonus: min(daysSinceCreated * 0.5, 20) to prevent starvation",
+        "Exports getNextTasks(limit) returning highest priority tasks",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement auto-approve vs needs-approval categorization",
+      "description": "As a user, I want bug fixes, docs, and tests to auto-execute while features require my approval.",
+      "acceptanceCriteria": [
+        "src/queue/approval.ts exports categorizeTask() function",
+        "Auto-approve: type in ['bug_fix', 'docs', 'test'] AND effort in ['quick_win', 'small'] AND confidence >= 0.8",
+        "Everything else requires approval",
+        "Exports ApprovalQueue class with: submit(), approve(), reject(), getPending()",
+        "Approved tasks move to status 'queued'",
+        "Rejected tasks move to status 'rejected' with reason stored",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Implement queue CLI commands",
+      "description": "As a user, I need CLI commands to view and manage the work queue.",
+      "acceptanceCriteria": [
+        "'metaralph queue' lists all tasks with: id, project, type, status, priority, effort",
+        "'metaralph queue --pending' filters to approval_status='pending'",
+        "'metaralph queue --running' filters to status='in_progress'",
+        "'metaralph approve <id>' approves a task",
+        "'metaralph approve --all' approves all pending tasks",
+        "'metaralph reject <id> [reason]' rejects a task with optional reason",
+        "Output is formatted as a table",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Create queue manager with scheduling loop",
+      "description": "As a developer, I need a queue manager that continuously processes tasks when the daemon is running.",
+      "acceptanceCriteria": [
+        "src/queue/index.ts exports QueueManager class",
+        "QueueManager.start() begins the scheduling loop",
+        "Loop runs every 5 seconds checking for work",
+        "Respects maxConcurrentWorkers from config",
+        "Only schedules tasks where status='queued' or auto-approved",
+        "Emits events: 'task:scheduled', 'task:completed', 'task:failed'",
+        "QueueManager.stop() gracefully stops the loop",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

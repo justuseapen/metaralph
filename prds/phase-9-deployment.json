@@ -1,0 +1,106 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-9-deployment",
+  "description": "MetaRalph Phase 9: Autonomous Deployment - CI/CD integration, environment management, deployment automation, rollback on failure.",
+  "userStories": [
+    {
+      "id": "US-048",
+      "title": "Create deployment configuration model",
+      "description": "As a user, I need to configure how each project should be deployed.",
+      "acceptanceCriteria": [
+        "src/deploy/config.ts exports DeploymentConfig interface",
+        "Config includes: provider, environment, branch, commands, healthCheck",
+        "Providers: 'vercel', 'netlify', 'railway', 'fly', 'aws', 'custom'",
+        "Environments: 'staging', 'production'",
+        "Stored per-project in projects.deployConfig JSON column",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-049",
+      "title": "Implement deployment provider integrations",
+      "description": "As MetaRalph, I need to deploy to various cloud providers.",
+      "acceptanceCriteria": [
+        "src/deploy/providers/index.ts exports DeploymentProvider interface",
+        "Implementations: VercelProvider, NetlifyProvider, RailwayProvider, FlyProvider, CustomProvider",
+        "Each provider implements: deploy(), getStatus(), rollback(), getLogs()",
+        "Uses provider CLIs or APIs (vercel, netlify, railway, flyctl)",
+        "Validates credentials before deployment",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-050",
+      "title": "Implement staging deployment flow",
+      "description": "As MetaRalph, I need to deploy completed PRDs to staging automatically.",
+      "acceptanceCriteria": [
+        "src/deploy/staging.ts exports StagingDeployer class",
+        "Triggers when task.status changes to 'completed'",
+        "Only deploys if project has deployConfig with staging environment",
+        "Runs deployment commands in order",
+        "Waits for deployment to be live",
+        "Runs health check after deployment",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-051",
+      "title": "Implement production deployment with approval",
+      "description": "As a user, I need to approve production deployments explicitly.",
+      "acceptanceCriteria": [
+        "src/deploy/production.ts exports ProductionDeployer class",
+        "Production deployments ALWAYS require approval",
+        "Creates deployment approval request in queue",
+        "Shows: changes summary, staging test results, rollback plan",
+        "'metaralph deploy approve <id>' approves production deploy",
+        "Deployment includes automatic rollback on failure",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-052",
+      "title": "Implement deployment rollback",
+      "description": "As MetaRalph, I need to automatically rollback failed deployments.",
+      "acceptanceCriteria": [
+        "src/deploy/rollback.ts exports DeploymentRollback class",
+        "Keeps last 3 successful deployment states",
+        "Auto-rollback triggers on: health check failure, error rate spike",
+        "rollback(deploymentId) reverts to previous state",
+        "Notifies user of rollback with reason",
+        "Creates incident report for failed deployment",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-053",
+      "title": "Implement deployment CLI and dashboard",
+      "description": "As a user, I need to view and manage deployments from CLI and dashboard.",
+      "acceptanceCriteria": [
+        "'metaralph deploy <project> [environment]' triggers deployment",
+        "'metaralph deploy status <project>' shows deployment status",
+        "'metaralph deploy logs <project>' shows deployment logs",
+        "'metaralph deploy rollback <project>' triggers manual rollback",
+        "Dashboard shows: DeploymentsView with history, status, actions",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

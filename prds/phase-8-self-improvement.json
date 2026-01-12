@@ -1,0 +1,106 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-8-self-improvement",
+  "description": "MetaRalph Phase 8: Self-Improvement Pipeline - Recursive self-improvement of Ralph and MetaRalph codebases with safety guardrails.",
+  "userStories": [
+    {
+      "id": "US-042",
+      "title": "Register Ralph and MetaRalph as self-managed projects",
+      "description": "As MetaRalph, I need to treat my own codebases as special self-improvement targets.",
+      "acceptanceCriteria": [
+        "On daemon start, auto-register Ralph and MetaRalph projects with is_self=true",
+        "Self projects always enabled regardless of user opt-in",
+        "Self projects have special safety constraints",
+        "Self-improvement runs on separate isolated branches",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-043",
+      "title": "Implement self-analyzer",
+      "description": "As MetaRalph, I need to analyze my own codebase for improvement opportunities.",
+      "acceptanceCriteria": [
+        "src/self-improve/ralph-analyzer.ts exports SelfAnalyzer class",
+        "analyzeRalph() and analyzeMetaRalph() find improvements",
+        "Looks for: performance issues, code duplication, missing tests, documentation gaps",
+        "Proposes: new features, optimizations, bug fixes",
+        "Generates proposals with detailed rationale",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-044",
+      "title": "Implement sandboxed self-execution",
+      "description": "As MetaRalph, I need to safely test self-improvements before applying them.",
+      "acceptanceCriteria": [
+        "src/self-improve/safe-executor.ts exports SafeExecutor class",
+        "Creates isolated branch: self-improve/<feature>-<timestamp>",
+        "Runs Ralph on isolated branch",
+        "Validates changes with full test suite",
+        "Validates no regression in core functionality",
+        "Never modifies main/master directly",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-045",
+      "title": "Implement rollback mechanism",
+      "description": "As MetaRalph, I need to rollback failed self-improvements automatically.",
+      "acceptanceCriteria": [
+        "src/self-improve/rollback.ts exports RollbackManager class",
+        "createCheckpoint() saves current state before changes",
+        "rollback(checkpoint) reverts to saved state",
+        "Auto-rollback triggers on: test failure, validation failure, runtime error",
+        "Preserves failed attempt logs for analysis",
+        "Notifies user of rollback with reason",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-046",
+      "title": "Implement self-improvement safety guardrails",
+      "description": "As a user, I need safety guardrails so MetaRalph can't break itself.",
+      "acceptanceCriteria": [
+        "src/self-improve/guardrails.ts exports SafetyGuardrails class",
+        "NEVER modify: core execution loop, safety guardrails, rollback mechanism without approval",
+        "ALWAYS require tests for self-modifications",
+        "ALWAYS run full validation before merge",
+        "Risk scoring for proposed changes (0-100)",
+        "High-risk changes (>70) require explicit user approval",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-047",
+      "title": "Implement self-improvement coordinator",
+      "description": "As MetaRalph, I need a coordinator to orchestrate the full self-improvement loop.",
+      "acceptanceCriteria": [
+        "src/self-improve/index.ts exports SelfImprovementEngine class",
+        "run() triggers: analyze -> propose -> approve -> execute -> validate -> merge/rollback",
+        "Runs on configurable schedule (default: daily)",
+        "'metaralph self-improve' triggers manual run",
+        "'metaralph self-improve --dry-run' shows proposals without executing",
+        "Emits events: 'self-improve:started', 'self-improve:completed', 'self-improve:rollback'",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

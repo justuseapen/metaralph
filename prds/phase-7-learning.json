@@ -1,0 +1,86 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-7-learning",
+  "description": "MetaRalph Phase 7: Learning System - Cross-project pattern extraction, outcome tracking, proposal quality scoring.",
+  "userStories": [
+    {
+      "id": "US-037",
+      "title": "Create learning model and repository",
+      "description": "As a developer, I need to persist learnings so MetaRalph can improve over time.",
+      "acceptanceCriteria": [
+        "src/learning/learning.ts exports Learning interface and LearningRepository",
+        "Learning: id, projectId, executionId, category, content, confidence, timesApplied, timesSuccessful, createdAt",
+        "Categories: 'pattern', 'gotcha', 'optimization', 'failure_mode'",
+        "Repository: create(), update(), findByCategory(), findApplicable(context)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-038",
+      "title": "Implement cross-project pattern extractor",
+      "description": "As MetaRalph, I need to extract patterns from successful executions to apply elsewhere.",
+      "acceptanceCriteria": [
+        "src/learning/cross-project.ts exports PatternExtractor class",
+        "extractFromExecution(execution) parses progress.txt for patterns",
+        "Identifies: code patterns, gotchas, successful approaches",
+        "Clusters similar patterns across projects",
+        "Assigns confidence based on frequency and success rate",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-039",
+      "title": "Implement outcome tracker",
+      "description": "As MetaRalph, I need to track execution outcomes to learn what works.",
+      "acceptanceCriteria": [
+        "src/learning/outcome-tracker.ts exports OutcomeTracker class",
+        "trackExecution(execution) records success/failure with context",
+        "Correlates outcomes with: task type, project, source, approach",
+        "Identifies: high-failure patterns, reliable approaches",
+        "Updates learning confidence based on new outcomes",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-040",
+      "title": "Implement proposal quality scoring",
+      "description": "As MetaRalph, I need to track which proposals succeed to improve future proposals.",
+      "acceptanceCriteria": [
+        "src/learning/proposal-quality.ts exports ProposalQualityTracker class",
+        "recordOutcome(proposal, execution) tracks proposal success",
+        "getQualityBySource() returns success rates by source (TODO, issue, strategic)",
+        "adjustConfidence(proposal) uses history to refine scores",
+        "Low-quality sources get deprioritized over time",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-041",
+      "title": "Implement learning application",
+      "description": "As MetaRalph, I need to apply learnings to new tasks to improve success rates.",
+      "acceptanceCriteria": [
+        "src/learning/index.ts exports LearningSystem class",
+        "findApplicableLearnings(task) returns relevant learnings",
+        "injectLearnings(task, learnings) adds context to PRD",
+        "Learnings included in CLAUDE.md prompt for Ralph",
+        "Tracks when learnings are applied and outcomes",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
