@@ -9,6 +9,9 @@ import { Command } from 'commander';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startDaemon, stopDaemon, getDaemonStatus, formatUptime } from '../daemon/index.js';
+import { Logger } from '../utils/logger.js';
+import { loadConfig } from '../utils/config.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -23,26 +26,68 @@ program
   .description('Autonomous multi-project orchestration engine built on Ralph')
   .version(packageJson.version, '-v, --version', 'Output the current version');
 
+// Create logger for daemon operations
+function createDaemonLogger(): Logger {
+  const config = loadConfig();
+  return new Logger({
+    level: 'info',
+    logFilePath: path.join(config.logsPath, 'daemon.log'),
+  });
+}
+
 // Daemon lifecycle commands
 program
   .command('start')
   .description('Start the MetaRalph daemon')
   .action(() => {
-    console.log('Starting MetaRalph daemon... (not yet implemented)');
+    const logger = createDaemonLogger();
+    const result = startDaemon(logger);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 program
   .command('stop')
   .description('Stop the MetaRalph daemon')
   .action(() => {
-    console.log('Stopping MetaRalph daemon... (not yet implemented)');
+    const logger = createDaemonLogger();
+    const result = stopDaemon(logger);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 program
   .command('status')
   .description('Show the status of the MetaRalph daemon')
   .action(() => {
-    console.log('MetaRalph daemon status... (not yet implemented)');
+    const status = getDaemonStatus();
+
+    if (status.running) {
+      console.log('MetaRalph Daemon Status');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`Status:     Running`);
+      console.log(`PID:        ${status.pid}`);
+      if (status.uptime !== null) {
+        console.log(`Uptime:     ${formatUptime(status.uptime)}`);
+      }
+      if (status.startedAt) {
+        console.log(`Started:    ${status.startedAt.toISOString()}`);
+      }
+    } else {
+      console.log('MetaRalph Daemon Status');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`Status:     Not running`);
+    }
   });
 
 // Project management commands
