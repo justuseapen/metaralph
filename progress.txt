@@ -44,3 +44,22 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - CLI commands can be top-level (approve/reject) or nested (queue list)
   - getProject() imported from registry for task display
 ---
+
+## 2026-01-12 20:00 - US-012
+- What was implemented:
+  - Created src/workers/execution.ts with Execution interface and ExecutionRepository
+  - Created src/workers/ralph-spawner.ts with RalphSpawner class
+  - RalphSpawner.spawn(task, project) creates prd.json and spawns ralph.sh subprocess
+  - RalphSpawner.monitor(execution, childProcess) tracks process and collects output
+  - Detects '<promise>COMPLETE</promise>' for success
+- Files changed:
+  - src/workers/execution.ts (new)
+  - src/workers/ralph-spawner.ts (new)
+- **Learnings for future iterations:**
+  - Execution statuses: pending, running, completed, failed
+  - ExecutionRepository methods: create(), update(), findById(), findRunning(), findByTask(), findByProject()
+  - RalphSpawner.spawn() returns { success, execution, childProcess, error? }
+  - RalphSpawner.monitor() returns Promise<CompletionResult> with output, exitCode, iterationsUsed
+  - findRalphScript() searches project-local and user-level locations for ralph.sh
+  - Child process spawned with stdio: ['ignore', 'pipe', 'pipe'] to capture output
+---
