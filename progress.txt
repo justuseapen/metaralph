@@ -28,3 +28,19 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - Task statuses: pending, approved, queued, running, completed, failed
   - TaskRepository methods: create(), findById(), findPending(), getNextTasks(), updateStatus(), updateApprovalStatus(), findByProject(), updatePrdJson()
 ---
+
+## 2026-01-12 19:30 - US-011
+- What was implemented:
+  - Created src/queue/approval.ts with ApprovalQueue class and categorizeTask() re-export
+  - ApprovalQueue has: submit(), approve(), reject(), getPending() methods
+  - Updated src/cli/index.ts with queue commands: 'metaralph queue', 'metaralph approve <id>', 'metaralph reject <id>'
+  - Queue display shows tasks grouped by approval status
+- Files changed:
+  - src/queue/approval.ts (new)
+  - src/cli/index.ts (modified)
+- **Learnings for future iterations:**
+  - categorizeTask() is in prioritizer.ts; approval.ts re-exports it for API clarity
+  - ApprovalQueue follows same db pattern as TaskRepository (optional db param)
+  - CLI commands can be top-level (approve/reject) or nested (queue list)
+  - getProject() imported from registry for task display
+---
