@@ -1,0 +1,27 @@
+# MetaRalph Progress Log
+Started: 2025-01-12
+
+## Codebase Patterns
+(To be populated as patterns are discovered)
+
+---
+
+## Project Context
+MetaRalph is an autonomous multi-project orchestration engine built on top of Ralph.
+
+Key architectural decisions:
+- TypeScript/Node.js for Ralph ecosystem compatibility
+- SQLite for zero-config persistence
+- Ink (React for CLI) for terminal UI
+- Opt-in project management (user explicitly adds projects)
+- Project groups for bundling related repos
+- Collaborative PRD creation via conversation threads
+
+Phase 1 focuses on core infrastructure:
+- Daemon lifecycle (start/stop/status)
+- Database schema
+- Configuration management
+- CLI framework
+- Project and group registry
+
+---

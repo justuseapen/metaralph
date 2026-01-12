@@ -1,0 +1,156 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-1-core-infrastructure",
+  "description": "MetaRalph Phase 1: Core Infrastructure - Set up the foundational daemon, database, configuration, and CLI framework for the autonomous multi-project orchestration engine.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Initialize TypeScript project with dependencies",
+      "description": "As a developer, I need the project scaffolding so that I can start building MetaRalph with proper TypeScript configuration and all required dependencies.",
+      "acceptanceCriteria": [
+        "package.json exists with name 'metaralph', version '0.1.0'",
+        "Dependencies include: better-sqlite3, commander, ink, react, uuid",
+        "DevDependencies include: typescript, @types/node, @types/better-sqlite3, @types/react, tsx",
+        "tsconfig.json configured for ESM with strict mode",
+        "src/ directory exists",
+        "npm install completes successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create structured logger utility",
+      "description": "As a developer, I need a logging utility so that all MetaRalph operations are logged consistently with timestamps and log levels.",
+      "acceptanceCriteria": [
+        "src/utils/logger.ts exports a Logger class",
+        "Supports log levels: debug, info, warn, error",
+        "Each log entry includes ISO timestamp and level",
+        "Logs to stdout by default",
+        "Can be configured with a log file path",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Create configuration management",
+      "description": "As a user, I need MetaRalph to load configuration from ~/.config/metaralph/config.json so that I can customize its behavior.",
+      "acceptanceCriteria": [
+        "src/utils/config.ts exports loadConfig() and saveConfig() functions",
+        "Creates ~/.config/metaralph/ directory if it doesn't exist",
+        "Returns default config if config.json doesn't exist",
+        "Default config includes: dbPath, logsPath, maxConcurrentWorkers (3), selfImprovementEnabled (true)",
+        "Config is validated with TypeScript types",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Set up SQLite database with initial schema",
+      "description": "As a developer, I need the database layer so that MetaRalph can persist projects, tasks, executions, and learnings.",
+      "acceptanceCriteria": [
+        "src/db/index.ts exports initDatabase() function",
+        "Creates SQLite database at configured dbPath",
+        "Creates tables: project_groups, projects, conversations, messages, tasks, executions, learnings",
+        "Uses better-sqlite3 for synchronous operations",
+        "Includes proper foreign key constraints",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create CLI entry point with commander",
+      "description": "As a user, I need a CLI interface so that I can interact with MetaRalph via terminal commands.",
+      "acceptanceCriteria": [
+        "bin/metaralph is an executable Node.js script",
+        "Uses commander for CLI argument parsing",
+        "Implements 'metaralph --version' showing version from package.json",
+        "Implements 'metaralph --help' showing available commands",
+        "Placeholder commands registered: start, stop, status, projects, groups, queue, workers",
+        "package.json has 'bin' field pointing to bin/metaralph",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement daemon lifecycle (start/stop/status)",
+      "description": "As a user, I need to start and stop the MetaRalph daemon so that it can run continuously in the background.",
+      "acceptanceCriteria": [
+        "src/daemon/index.ts exports startDaemon(), stopDaemon(), getDaemonStatus() functions",
+        "Daemon writes PID to ~/.config/metaralph/metaralph.pid when running",
+        "'metaralph start' starts the daemon process (detached)",
+        "'metaralph stop' sends SIGTERM to the daemon process",
+        "'metaralph status' shows whether daemon is running and uptime",
+        "Daemon logs startup and shutdown events",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create project registry with opt-in management",
+      "description": "As a user, I need to add and remove projects from MetaRalph so that it only works on projects I explicitly authorize.",
+      "acceptanceCriteria": [
+        "src/registry/index.ts exports addProject(), removeProject(), listProjects() functions",
+        "addProject(path) validates path is a git repository",
+        "addProject extracts project name from directory name or package.json",
+        "Projects are stored in the database with id, name, path, added_at",
+        "'metaralph projects' lists all registered projects",
+        "'metaralph projects add <path>' adds a project",
+        "'metaralph projects remove <id>' removes a project",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Create project groups for related repositories",
+      "description": "As a user, I need to group related projects (e.g., microservices + API) so they can be managed together as a single unit.",
+      "acceptanceCriteria": [
+        "src/registry/group.ts exports createGroup(), addToGroup(), removeFromGroup(), listGroups() functions",
+        "Groups stored in project_groups table with id, name, description",
+        "Projects can optionally belong to a group (group_id foreign key)",
+        "'metaralph groups' lists all groups with their projects",
+        "'metaralph groups create <name>' creates a new group",
+        "'metaralph groups add <group> <path>' adds a project to a group",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Initialize progress.txt and make initial commit",
+      "description": "As a developer, I need the Ralph infrastructure files committed so that future Ralph iterations can build on this foundation.",
+      "acceptanceCriteria": [
+        "progress.txt exists with initial header and Phase 1 completion notes",
+        ".gitignore includes node_modules/, dist/, *.db, *.log",
+        "All source files are committed to the ralph/phase-1-core-infrastructure branch",
+        "Commit message follows format: 'feat: [US-XXX] - Title'",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
