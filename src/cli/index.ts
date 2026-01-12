@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { startDaemon, stopDaemon, getDaemonStatus, formatUptime } from '../daemon/index.js';
 import { Logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
+import { addProject, removeProject, listProjects } from '../registry/index.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -95,30 +96,77 @@ const projectsCommand = program
   .command('projects')
   .description('Manage projects registered with MetaRalph');
 
+/**
+ * Display list of projects in a formatted table
+ */
+function displayProjectsList(): void {
+  const projects = listProjects();
+
+  if (projects.length === 0) {
+    console.log('No projects registered.');
+    console.log('Use "metaralph projects add <path>" to add a project.');
+    return;
+  }
+
+  console.log('Registered Projects');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  for (const project of projects) {
+    console.log(`ID:     ${project.id}`);
+    console.log(`Name:   ${project.name}`);
+    console.log(`Path:   ${project.path}`);
+    if (project.group_id) {
+      console.log(`Group:  ${project.group_id}`);
+    }
+    console.log(`Added:  ${project.added_at}`);
+    console.log('──────────────────────────────────────────────────────────────');
+  }
+
+  console.log(`Total: ${projects.length} project(s)`);
+}
+
 projectsCommand
   .command('list')
   .description('List all registered projects')
   .action(() => {
-    console.log('Listing projects... (not yet implemented)');
+    displayProjectsList();
   });
 
 projectsCommand
   .command('add <path>')
   .description('Add a project to MetaRalph')
   .action((projectPath: string) => {
-    console.log(`Adding project at ${projectPath}... (not yet implemented)`);
+    const result = addProject(projectPath);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+      if (result.project) {
+        console.log(`  ID:   ${result.project.id}`);
+        console.log(`  Path: ${result.project.path}`);
+      }
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 projectsCommand
   .command('remove <id>')
   .description('Remove a project from MetaRalph')
   .action((id: string) => {
-    console.log(`Removing project ${id}... (not yet implemented)`);
+    const result = removeProject(id);
+
+    if (result.success) {
+      console.log(`✓ ${result.message}`);
+    } else {
+      console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
   });
 
 // Default action for 'projects' (list when no subcommand)
 projectsCommand.action(() => {
-  console.log('Listing projects... (not yet implemented)');
+  displayProjectsList();
 });
 
 // Group management commands
