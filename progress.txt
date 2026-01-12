@@ -2,7 +2,10 @@
 Started: 2025-01-12
 
 ## Codebase Patterns
-(To be populated as patterns are discovered)
+- Project uses ESM modules ("type": "module" in package.json)
+- TypeScript uses NodeNext module resolution for ESM compatibility
+- Run `npm run typecheck` to verify TypeScript before committing
+- Use `tsx` to run TypeScript files directly (e.g., `npx tsx src/index.ts`)
 
 ---
 
@@ -24,4 +27,18 @@ Phase 1 focuses on core infrastructure:
 - CLI framework
 - Project and group registry
 
+---
+
+## 2026-01-12 - US-001
+- What was implemented: TypeScript project scaffolding with all required dependencies
+- Files changed:
+  - package.json (created) - Project manifest with dependencies
+  - tsconfig.json (created) - TypeScript config for ESM with strict mode
+  - src/index.ts (created) - Entry point placeholder
+- **Learnings for future iterations:**
+  - Project uses ESM modules (type: "module" in package.json)
+  - TypeScript configured with NodeNext module resolution for proper ESM compatibility
+  - All dependencies installed: better-sqlite3, commander, ink, react, uuid
+  - tsx is available for running TypeScript directly without compilation
+  - npm run typecheck can verify TypeScript without building
 ---
