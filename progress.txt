@@ -147,3 +147,19 @@ Phase 1 focuses on core infrastructure:
   - displayProjectsList() helper in CLI formats project output consistently
   - Projects table has unique constraint on path to prevent duplicates
 ---
+
+## 2026-01-12 - US-008
+- What was implemented: Project group management for bundling related repositories
+- Files changed:
+  - src/registry/group.ts (created) - Group management with createGroup(), addToGroup(), removeFromGroup(), listGroups(), deleteGroup()
+  - src/cli/index.ts (modified) - Wired group commands to use group registry functions
+- **Learnings for future iterations:**
+  - Group functions follow same pattern as project registry (optional db parameter, GroupResult return type)
+  - addToGroup() auto-registers a project if not already registered (uses addProject internally)
+  - Groups can be identified by name or ID in most functions for user convenience
+  - listGroups() returns GroupWithProjects[] which includes nested projects array
+  - deleteGroup() uses foreign key ON DELETE SET NULL to unlink projects without deleting them
+  - Use getGroupByName() and getGroupById() for single group lookups
+  - CLI supports both 'metaralph groups' and 'metaralph groups list' to list groups
+  - 'metaralph groups create' supports optional -d/--description flag
+---
