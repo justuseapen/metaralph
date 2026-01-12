@@ -16,6 +16,8 @@ Started: 2025-01-12
 - Use initDatabase() from src/db/index.ts to get database instance
 - Database uses better-sqlite3 (synchronous API, no async/await needed)
 - CLI uses commander for argument parsing (src/cli/index.ts)
+- Registry modules go in src/registry/ directory
+- Registry functions accept optional db parameter to reuse database connections
 
 ---
 
@@ -128,4 +130,20 @@ Phase 1 focuses on core infrastructure:
   - DaemonStatus interface provides running, pid, uptime, startedAt fields
   - CLI commands can accept Logger instance for logging events to daemon.log
   - formatUptime() converts seconds to human-readable format like "2d 5h 30m 15s"
+---
+
+## 2026-01-12 - US-007
+- What was implemented: Project registry with opt-in management for adding/removing projects
+- Files changed:
+  - src/registry/index.ts (created) - Project registry with addProject(), removeProject(), listProjects()
+  - src/cli/index.ts (modified) - Wired project commands to use registry functions
+- **Learnings for future iterations:**
+  - Registry modules go in src/registry/ directory
+  - Use isGitRepository() to validate a path contains a .git directory
+  - extractProjectName() reads package.json first, falls back to directory name
+  - Database operations can take optional db parameter to reuse existing connection
+  - Use path.resolve() to convert relative paths to absolute before storing
+  - RegistryResult interface provides success, message, and optional project fields
+  - displayProjectsList() helper in CLI formats project output consistently
+  - Projects table has unique constraint on path to prevent duplicates
 ---
