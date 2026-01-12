@@ -9,6 +9,8 @@ Started: 2025-01-12
 - Utilities go in src/utils/ directory
 - Database modules go in src/db/ directory
 - CLI modules go in src/cli/ directory
+- Daemon modules go in src/daemon/ directory
+- Use getPidFilePath() from daemon/index.ts for PID file location
 - Use `import * as fs from 'node:fs'` for Node.js built-in modules (ESM style)
 - Config directory: ~/.config/metaralph/ (use getConfigDir() from config.ts)
 - Use initDatabase() from src/db/index.ts to get database instance
@@ -110,4 +112,20 @@ Phase 1 focuses on core infrastructure:
   - Default action on parent command (projectsCommand.action()) runs when no subcommand specified
   - Read package.json version dynamically using fs.readFileSync and JSON.parse
   - Use path.resolve(__dirname, '../../package.json') to get package.json from src/cli/
+---
+
+## 2026-01-12 - US-006
+- What was implemented: Daemon lifecycle management with start/stop/status functions
+- Files changed:
+  - src/daemon/index.ts (created) - Daemon lifecycle with startDaemon(), stopDaemon(), getDaemonStatus(), formatUptime()
+  - src/cli/index.ts (modified) - Wired daemon functions to CLI start/stop/status commands
+- **Learnings for future iterations:**
+  - Daemon modules go in src/daemon/ directory
+  - PID file stored at ~/.config/metaralph/metaralph.pid (use getPidFilePath())
+  - Start time stored at ~/.config/metaralph/metaralph.started for uptime calculation
+  - Use process.kill(pid, 0) to check if a process is running (no signal sent, just checks existence)
+  - Spawn detached processes with { detached: true, stdio: 'ignore' } and call child.unref()
+  - DaemonStatus interface provides running, pid, uptime, startedAt fields
+  - CLI commands can accept Logger instance for logging events to daemon.log
+  - formatUptime() converts seconds to human-readable format like "2d 5h 30m 15s"
 ---
