@@ -206,3 +206,35 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - formatElapsed() helper for human-readable time since startedAt
   - Progress bars: use '█' for filled and '░' for empty segments
 ---
+
+## 2026-01-13 - US-018
+- What was implemented:
+  - Created src/onboarding/analyzer.ts with CodebaseAnalyzer class:
+    - analyze(projectPath) returns ImprovementOpportunity[] array
+    - detectOutdatedDeps() runs `npm outdated --json` and parses results
+    - detectTypeErrors() runs `tsc --noEmit` and parses error output
+    - detectLintIssues() runs `eslint . --format json` if eslint config exists
+    - runCommand() helper spawns child processes and captures stdout/stderr
+    - hasPackageJson(), hasTsConfig(), hasEslintConfig() detect available tools
+    - commandExists() checks for local node_modules/.bin commands
+  - Created src/onboarding/todo-extractor.ts with TodoExtractor:
+    - extract(projectPath) returns TodoComment[] with tag, content, file, line
+    - extractAsOpportunities() converts TODOs to ImprovementOpportunity[]
+    - getSummary() returns counts by TODO/FIXME/XXX/HACK tag
+    - Scans common file extensions, skips node_modules/dist/build etc.
+    - tagToTaskType() maps FIXME->bug_fix, HACK->refactor, TODO/XXX->feature
+    - estimateEffort() keyword-based effort estimation from comment content
+- Files changed:
+  - src/onboarding/analyzer.ts (new)
+  - src/onboarding/todo-extractor.ts (new)
+- **Learnings for future iterations:**
+  - ImprovementOpportunity interface: type, title, description, file?, line?, severity, suggestedTaskType, suggestedEffort
+  - OpportunityType: 'outdated_dep' | 'type_error' | 'lint_issue' | 'todo_comment'
+  - TodoExtractor tags: TODO, FIXME, XXX, HACK (searched with regex in comments)
+  - Severity mapping: FIXME=high, HACK/XXX=medium, TODO=low
+  - npm outdated --json returns {pkgName: {current, wanted, latest, dependent, location}}
+  - TypeScript error format: path/file.ts(line,col): error TS####: message
+  - ESLint JSON format: [{filePath, messages: [{line, column, severity, message, ruleId}]}]
+  - SKIP_DIRS for file scanning: node_modules, .git, dist, build, out, etc.
+  - MAX_FILE_SIZE = 1MB to avoid memory issues on large files
+---
