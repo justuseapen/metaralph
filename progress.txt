@@ -238,3 +238,34 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - SKIP_DIRS for file scanning: node_modules, .git, dist, build, out, etc.
   - MAX_FILE_SIZE = 1MB to avoid memory issues on large files
 ---
+
+## 2026-01-13 - US-019
+- What was implemented:
+  - Created src/onboarding/proposal-generator.ts with ProposalGenerator:
+    - generate() creates Task objects from ImprovementOpportunity findings
+    - createTask() for single opportunity to task conversion
+    - preview() to preview proposals without creating tasks
+    - Generates PRD JSON with acceptance criteria based on opportunity type
+    - Returns ProposalGenerationResult with summary statistics
+  - Created src/onboarding/index.ts with OnboardingEngine:
+    - onboard(projectPath) - full pipeline: validate git -> analyze -> extract TODOs -> generate proposals
+    - analyze(projectId) - re-analyze existing project by ID
+    - preview(projectPath) - analysis without creating tasks
+    - Creates initial conversation with analysis summary
+    - Updates project.lastAnalyzed timestamp
+  - Added last_analyzed column to projects table via migration
+  - Added CLI command: 'metaralph projects analyze <id>' with --preview option
+- Files changed:
+  - src/onboarding/proposal-generator.ts (new)
+  - src/onboarding/index.ts (new)
+  - src/db/index.ts (modified - added migrateProjectsTable)
+  - src/cli/index.ts (modified - added analyze command)
+- **Learnings for future iterations:**
+  - ProposalGenerator creates PRD JSON with userStories structure matching ralph.sh expectations
+  - Proposal interface: id, projectId, opportunity, taskInput, createdAt
+  - OnboardingEngine uses isGitRepository() from registry to validate projects
+  - Conversations and messages are stored in DB for project onboarding summaries
+  - migrateProjectsTable follows same pattern as migrateTasksTable for column additions
+  - CLI async actions supported by commander - use async/await in action handler
+  - getProjectById aliased import pattern to avoid naming conflicts with getProject
+---
