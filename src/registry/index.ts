@@ -18,6 +18,8 @@ export interface Project {
   name: string;
   path: string;
   group_id: string | null;
+  /** JSON string of deployment configuration */
+  deploy_config: string | null;
   added_at: string;
   updated_at: string;
   /** Whether this is a self-managed project (Ralph or MetaRalph itself) */
@@ -143,6 +145,7 @@ export function addProject(projectPath: string, db?: DatabaseInstance): Registry
       name,
       path: absolutePath,
       group_id: null,
+      deploy_config: null,
       added_at: now,
       updated_at: now,
     };
@@ -346,6 +349,7 @@ export function registerSelfProject(
       name,
       path: absolutePath,
       group_id: null,
+      deploy_config: null,
       added_at: now,
       updated_at: now,
       is_self: true,

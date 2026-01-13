@@ -14,6 +14,7 @@ import { QueueView } from './components/QueueView.js';
 import { ApprovalView } from './components/ApprovalView.js';
 import { ProjectsView } from './components/ProjectsView.js';
 import { WorkersView } from './components/WorkersView.js';
+import { DeploymentStatusBar } from './components/DeploymentNotifications.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -66,10 +67,13 @@ function Header(): React.ReactElement {
         <Text bold color="blue">MetaRalph Dashboard</Text>
         <Text>v{packageJson.version}</Text>
       </Box>
-      <Box>
-        <Text>Daemon: </Text>
-        <Text color={statusColor}>{statusText}</Text>
-        <Text dimColor>{uptimeText}</Text>
+      <Box justifyContent="space-between">
+        <Box>
+          <Text>Daemon: </Text>
+          <Text color={statusColor}>{statusText}</Text>
+          <Text dimColor>{uptimeText}</Text>
+        </Box>
+        <DeploymentStatusBar />
       </Box>
     </Box>
   );
