@@ -115,3 +115,27 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - Runner module checks process.argv to detect direct execution
   - QueueManager tracks stats: tasksScheduled, tasksCompleted, tasksFailed, lastScheduleCheck
 ---
+
+## 2026-01-13 - US-015
+- What was implemented:
+  - Created src/cli/dashboard.tsx with Ink-based terminal UI:
+    - Dashboard component with tab navigation: Queue, Approvals, Projects, Workers
+    - Header component showing version and daemon status (refreshes every 2s)
+    - TabBar component with [1] [2] [3] [4] shortcut indicators
+    - TabContent placeholder component (will be implemented in US-016/US-017)
+    - Footer component showing keyboard shortcuts
+    - useInput hook handles keyboard: q quits, 1-4 switches tabs
+  - Updated src/cli/index.ts:
+    - Added 'metaralph dashboard' command
+    - Added default action so 'metaralph' (no args) launches dashboard
+- Files changed:
+  - src/cli/dashboard.tsx (new)
+  - src/cli/index.ts (modified)
+- **Learnings for future iterations:**
+  - Ink uses React 18 with hooks (useState, useEffect, useInput, useApp)
+  - useApp().exit() exits the Ink app
+  - Tab type uses discriminated union pattern with TabId
+  - getDaemonStatus() imported from daemon/index.js for header display
+  - Package version read from package.json via fileURLToPath
+  - TSX files work due to "jsx": "react-jsx" in tsconfig.json
+---
