@@ -299,3 +299,41 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - getDirectoryStructure() uses tree-like format with └── and ├── connectors
   - Discussion responses are automatically stored as messages in the conversation
 ---
+
+## 2026-01-13 - US-021
+- What was implemented:
+  - Created src/collaboration/prd-builder.ts with PrdBuilder class for interactive PRD creation:
+    - PrdBuilder.start() begins a new PRD building session with Claude
+    - PrdBuilder.continue() continues an existing session with user messages
+    - PrdBuilder.buildPrd() generates complete PRD from description using AI
+    - createTaskFromPrd() auto-creates Task when PRD is finalized
+    - Parses PRD JSON from Claude response using <prd></prd> tags
+    - In-memory session store (activeSessions Map) tracks ongoing PRD conversations
+    - Prd and UserStory interfaces match Ralph's expected prd.json format
+  - Created src/cli/chat.ts with interactive terminal chat implementation:
+    - startChatSession() opens interactive readline-based chat with MetaRalph
+    - Detects PRD-related requests and switches to PrdBuilder mode
+    - Falls back to DiscussionEngine for general questions
+    - Auto-displays task details when PRD is finalized
+  - Added startProposeSession() for automated improvement proposals:
+    - Runs OnboardingEngine.preview() for concrete analysis
+    - Uses Claude to generate higher-level improvement proposals
+    - Displays analysis summary and proposal recommendations
+  - Updated src/cli/index.ts with new CLI commands:
+    - 'metaralph chat <project>' opens interactive chat session
+    - 'metaralph propose <project>' with --auto-queue option
+    - Both commands accept project ID or name
+- Files changed:
+  - src/collaboration/prd-builder.ts (new)
+  - src/cli/chat.ts (new)
+  - src/cli/index.ts (modified - added chat and propose commands)
+- **Learnings for future iterations:**
+  - PrdBuilder uses session-based approach with in-memory Map for active sessions
+  - Claude response parsing: look for <prd></prd> tags or raw JSON with "project" key
+  - Interactive CLI uses node:readline createInterface for terminal input
+  - Task source for PRD-created tasks is 'conversation' (vs 'onboarding' for analysis)
+  - inferTaskType() maps keywords like 'bug'/'fix' -> bug_fix, 'test' -> test, etc.
+  - inferEffortLevel() based on story count: 1=quick_win, 2-3=small, 4-5=medium, 6+=large
+  - PRD_BUILDER_SYSTEM_PROMPT emphasizes small tasks, verifiable criteria, proper sequencing
+  - Chat session cleanup: handle SIGINT, close readline on exit
+---
