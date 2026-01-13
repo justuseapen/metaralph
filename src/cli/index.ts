@@ -20,6 +20,7 @@ import { ApprovalQueue } from '../queue/approval.js';
 import { getProject } from '../registry/index.js';
 import { ExecutionRepository } from '../workers/execution.js';
 import { startDashboard } from './dashboard.js';
+import { startChatSession, startProposeSession } from './chat.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -523,6 +524,73 @@ function displayWorkersStatus(): void {
 
   console.log('──────────────────────────────────────────────────────────────────');
 }
+
+// Chat command - interactive conversation with MetaRalph about a project
+program
+  .command('chat <project>')
+  .description('Open an interactive chat session with MetaRalph about a project')
+  .action(async (projectId: string) => {
+    // Find project by ID or name
+    let project = getProjectById(projectId);
+    if (!project) {
+      // Try to find by name
+      const projects = listProjects();
+      project = projects.find(p => p.name.toLowerCase() === projectId.toLowerCase());
+    }
+
+    if (!project) {
+      console.error(`✗ Project not found: ${projectId}`);
+      console.log('Use "metaralph projects" to list available projects.');
+      process.exit(1);
+    }
+
+    console.log(`Starting chat session with MetaRalph for project: ${project.name}`);
+    console.log(`Path: ${project.path}`);
+    console.log('');
+    console.log('Type your messages and press Enter. Type "exit" or press Ctrl+C to quit.');
+    console.log('Type "finalize" when you\'re happy with a PRD to create a task.');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('');
+
+    try {
+      await startChatSession(project.id);
+    } catch (error) {
+      console.error(`✗ Chat failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+// Propose command - ask MetaRalph to propose improvements for a project
+program
+  .command('propose <project>')
+  .description('Ask MetaRalph to propose improvements for a project')
+  .option('--auto-queue', 'Automatically queue approved proposals for execution')
+  .action(async (projectId: string, options: { autoQueue?: boolean }) => {
+    // Find project by ID or name
+    let project = getProjectById(projectId);
+    if (!project) {
+      // Try to find by name
+      const projects = listProjects();
+      project = projects.find(p => p.name.toLowerCase() === projectId.toLowerCase());
+    }
+
+    if (!project) {
+      console.error(`✗ Project not found: ${projectId}`);
+      console.log('Use "metaralph projects" to list available projects.');
+      process.exit(1);
+    }
+
+    console.log(`Asking MetaRalph to propose improvements for: ${project.name}`);
+    console.log(`Path: ${project.path}`);
+    console.log('');
+
+    try {
+      await startProposeSession(project.id, options.autoQueue ?? false);
+    } catch (error) {
+      console.error(`✗ Proposal generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
 
 // Default action (no subcommand) - launch dashboard
 program.action(() => {
