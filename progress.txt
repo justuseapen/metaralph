@@ -89,3 +89,29 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - ActiveWorker contains: task, project, execution, childProcess, startedAt, completionPromise
   - Exponential backoff formula: BASE_DELAY * 2^(retryNumber - 1)
 ---
+
+## 2026-01-13 - US-014
+- What was implemented:
+  - Created src/queue/index.ts with QueueManager class:
+    - start() begins scheduling loop running every 5 seconds (SCHEDULING_INTERVAL_MS = 5000)
+    - stop() and stopAll() for graceful shutdown
+    - scheduleNextTasks() checks capacity, gets next tasks, schedules via WorkerOrchestrator
+    - Emits events: 'task:scheduled', 'task:completed', 'task:failed'
+    - Re-exports all queue module exports (Task, TaskRepository, ApprovalQueue, etc.)
+  - Created src/daemon/runner.ts as the daemon process entry point:
+    - Initializes QueueManager and starts scheduling loop
+    - Sets up event listeners for logging
+    - Handles SIGTERM/SIGINT for graceful shutdown
+  - Updated src/daemon/index.ts to spawn runner.ts instead of inline script
+- Files changed:
+  - src/queue/index.ts (new)
+  - src/daemon/runner.ts (new)
+  - src/daemon/index.ts (modified)
+- **Learnings for future iterations:**
+  - QueueManager extends EventEmitter like WorkerOrchestrator
+  - QueueManager wraps WorkerOrchestrator (composition pattern)
+  - scheduleNextTasks() updates task status to 'running' before scheduling
+  - Daemon lifecycle: startDaemon() spawns runner.js as detached process
+  - Runner module checks process.argv to detect direct execution
+  - QueueManager tracks stats: tasksScheduled, tasksCompleted, tasksFailed, lastScheduleCheck
+---
