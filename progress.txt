@@ -446,3 +446,38 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - detectMissingDocs() limits to 10 results to avoid overwhelming
   - findMetaRalphPath() also checks current working directory for metaralph package
 ---
+
+## 2026-01-13 - US-025
+- What was implemented:
+  - Created src/self-improve/safe-executor.ts with SafeExecutor module:
+    - generateIsolatedBranchName() creates branches: self-improve/<feature>-<timestamp>
+    - createIsolatedBranch() creates/checks out isolated branches from main
+    - execute() full execution flow: checkpoint -> branch -> spawn Ralph -> validate -> rollback on failure
+    - runValidation() runs both typecheck and tests
+    - runTypecheck() runs tsc --noEmit if available
+    - runTests() detects and runs npm test with passWithNoTests
+    - handleFailure() performs rollback and updates task status
+    - mergeBranch() merges successful branches back to main
+    - cleanupBranch() removes branches after execution
+  - Created src/self-improve/rollback.ts with Rollback module:
+    - Checkpoint interface: id, commitSha, branchName, description, createdAt, hadUncommittedChanges, stashRef
+    - createCheckpoint() saves current state and stashes uncommitted changes
+    - rollbackToCheckpoint() restores to checkpoint: abort ops, clean, checkout, reset, restore stash
+    - immediateRollback() quick reset to HEAD discarding all changes
+    - verifyRollback() confirms current SHA matches checkpoint
+    - cleanupBranches() deletes branches matching pattern
+    - listMetaRalphStashes() and cleanupStashes() for stash management
+- Files changed:
+  - src/self-improve/safe-executor.ts (new)
+  - src/self-improve/rollback.ts (new)
+- **Learnings for future iterations:**
+  - SafeExecutor.execute() flow: checkpoint -> branch -> spawn -> monitor -> validate -> success OR rollback
+  - SafeExecutionResult includes: success, branchName, checkpoint, execution, completionResult, validationPassed, error, wasRolledBack
+  - SafeExecutionOptions: featureName (required), runTests, runTypecheck, autoMerge, maxIterations
+  - Checkpoint stores stashRef if uncommitted changes were present at checkpoint time
+  - Rollback.rollbackToCheckpoint() aborts any in-progress git operations (merge, rebase, cherry-pick)
+  - Rollback.cleanupBranches() sorts deletion by index (highest first) to avoid index shifting
+  - runCommand() helper is defined in both files (could be refactored to shared util)
+  - SafeExecutor integrates with RalphSpawner.spawn() and RalphSpawner.monitor() for execution
+  - Validation runs both typecheck and tests by default (can be disabled via options)
+---
