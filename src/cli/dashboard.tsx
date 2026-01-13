@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { getDaemonStatus, formatUptime } from '../daemon/index.js';
 import { QueueView } from './components/QueueView.js';
 import { ApprovalView } from './components/ApprovalView.js';
+import { ProjectsView } from './components/ProjectsView.js';
+import { WorkersView } from './components/WorkersView.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -107,21 +109,9 @@ function TabContent({ tab }: { tab: TabId }): React.ReactElement {
     case 'approvals':
       return <ApprovalView />;
     case 'projects':
-      // Placeholder for US-017
-      return (
-        <Box flexGrow={1} flexDirection="column" paddingX={1}>
-          <Text dimColor>Projects view - pending implementation (US-017)</Text>
-          <Text dimColor>Press 1-4 to switch tabs, q to quit.</Text>
-        </Box>
-      );
+      return <ProjectsView />;
     case 'workers':
-      // Placeholder for US-017
-      return (
-        <Box flexGrow={1} flexDirection="column" paddingX={1}>
-          <Text dimColor>Workers view - pending implementation (US-017)</Text>
-          <Text dimColor>Press 1-4 to switch tabs, q to quit.</Text>
-        </Box>
-      );
+      return <WorkersView />;
     default:
       return (
         <Box flexGrow={1} flexDirection="column" paddingX={1}>
