@@ -21,6 +21,11 @@ import { getProject } from '../registry/index.js';
 import { ExecutionRepository } from '../workers/execution.js';
 import { startDashboard } from './dashboard.js';
 import { startChatSession, startProposeSession } from './chat.js';
+import {
+  SelfImprovementEngine,
+  getRegisteredSelfProjects,
+  type RiskLevel,
+} from '../self-improve/index.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -588,6 +593,170 @@ program
       await startProposeSession(project.id, options.autoQueue ?? false);
     } catch (error) {
       console.error(`✗ Proposal generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+// Self-improvement command
+program
+  .command('self-improve')
+  .description('Run self-improvement analysis and execution on Ralph/MetaRalph')
+  .option('--dry-run', 'Only analyze and propose, do not execute changes')
+  .option('--auto-only', 'Only execute auto-approved (low-risk) changes')
+  .option('--max-executions <n>', 'Maximum number of changes to execute', '1')
+  .option('--auto-merge', 'Automatically merge successful changes')
+  .option('--project <id>', 'Run on specific self-managed project by ID or name')
+  .action(async (options: {
+    dryRun?: boolean;
+    autoOnly?: boolean;
+    maxExecutions?: string;
+    autoMerge?: boolean;
+    project?: string;
+  }) => {
+    console.log('MetaRalph Self-Improvement');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('');
+
+    if (options.dryRun) {
+      console.log('Mode: DRY RUN (no changes will be made)');
+      console.log('');
+    }
+
+    // Get self-managed projects
+    const selfProjects = getRegisteredSelfProjects();
+
+    if (selfProjects.length === 0) {
+      console.log('No self-managed projects registered.');
+      console.log('');
+      console.log('Self-managed projects are automatically registered when the daemon');
+      console.log('starts with selfImprovementEnabled=true in the config.');
+      console.log('');
+      console.log('Ensure the daemon has been started at least once with self-improvement enabled.');
+      return;
+    }
+
+    // Filter to specific project if requested
+    let projectsToProcess = selfProjects;
+    if (options.project) {
+      const filtered = selfProjects.filter(
+        (p) => p.id === options.project || p.name.toLowerCase() === options.project!.toLowerCase()
+      );
+      if (filtered.length === 0) {
+        console.error(`✗ Self-managed project not found: ${options.project}`);
+        console.log('');
+        console.log('Registered self-managed projects:');
+        for (const p of selfProjects) {
+          console.log(`  - ${p.name} (${p.id})`);
+        }
+        process.exit(1);
+      }
+      projectsToProcess = filtered;
+    }
+
+    console.log(`Found ${projectsToProcess.length} self-managed project(s) to analyze:`);
+    for (const project of projectsToProcess) {
+      console.log(`  - ${project.name}: ${project.path}`);
+    }
+    console.log('');
+
+    try {
+      for (const project of projectsToProcess) {
+        console.log(`Analyzing: ${project.name}`);
+        console.log('──────────────────────────────────────────────────────────────');
+
+        const result = await SelfImprovementEngine.run(project, {
+          dryRun: options.dryRun,
+          autoOnly: options.autoOnly ?? true,
+          maxExecutions: parseInt(options.maxExecutions || '1', 10),
+          autoMerge: options.autoMerge,
+          runTests: true,
+          runTypecheck: true,
+        });
+
+        // Display analysis results
+        console.log('');
+        console.log('Analysis Summary:');
+        console.log(`  Opportunities found: ${result.summary.opportunitiesFound}`);
+
+        if (result.analysis.byRisk) {
+          const riskLevels: RiskLevel[] = ['low', 'medium', 'high', 'critical'];
+          for (const level of riskLevels) {
+            const count = result.analysis.byRisk[level]?.length || 0;
+            if (count > 0) {
+              console.log(`    ${level}: ${count}`);
+            }
+          }
+        }
+
+        console.log(`  Safe to auto-execute: ${result.analysis.safeToAutoExecute.length}`);
+        console.log(`  Requires approval: ${result.analysis.requiresApproval.length}`);
+
+        // Display proposals if generated
+        if (result.proposals) {
+          console.log('');
+          console.log('Proposals:');
+          console.log(`  Tasks created: ${result.proposals.tasksCreated}`);
+          console.log(`  Auto-approved: ${result.proposals.tasksAutoApproved}`);
+          console.log(`  Pending approval: ${result.proposals.tasksPendingApproval}`);
+        }
+
+        // Display execution results if not dry run
+        if (!options.dryRun && result.executions.length > 0) {
+          console.log('');
+          console.log('Execution Results:');
+          console.log(`  Tasks executed: ${result.summary.tasksExecuted}`);
+          console.log(`  Succeeded: ${result.summary.tasksSucceeded}`);
+          console.log(`  Failed: ${result.summary.tasksFailed}`);
+          console.log(`  Rolled back: ${result.summary.tasksRolledBack}`);
+
+          for (const exec of result.executions) {
+            const status = exec.success ? '✓' : '✗';
+            const taskTitle = exec.task?.title || 'Unknown';
+            console.log(`  ${status} ${taskTitle}`);
+            if (exec.error) {
+              console.log(`    Error: ${exec.error}`);
+            }
+            if (exec.merged) {
+              console.log(`    Merged to main`);
+            }
+            if (exec.rolledBack) {
+              console.log(`    Changes rolled back`);
+            }
+          }
+        }
+
+        // Display top opportunities
+        if (result.analysis.opportunities.length > 0) {
+          console.log('');
+          console.log('Top Opportunities:');
+          const topOpps = result.analysis.opportunities.slice(0, 5);
+          for (const opp of topOpps) {
+            const risk = opp.riskLevel;
+            const autoApprove = !opp.requiresApproval && risk === 'low' ? '[auto]' : '[approval]';
+            console.log(`  ${autoApprove} ${opp.title}`);
+            console.log(`    Category: ${opp.category}, Risk: ${risk}, File: ${opp.file || 'N/A'}`);
+          }
+          if (result.analysis.opportunities.length > 5) {
+            console.log(`  ... and ${result.analysis.opportunities.length - 5} more`);
+          }
+        }
+
+        console.log('');
+      }
+
+      if (options.dryRun) {
+        console.log('──────────────────────────────────────────────────────────────');
+        console.log('DRY RUN complete. No changes were made.');
+        console.log('');
+        console.log('To execute auto-approved changes, run without --dry-run:');
+        console.log('  metaralph self-improve');
+        console.log('');
+        console.log('To approve and execute pending tasks:');
+        console.log('  metaralph queue                 # View pending tasks');
+        console.log('  metaralph approve <task-id>     # Approve a task');
+      }
+    } catch (error) {
+      console.error(`✗ Self-improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
