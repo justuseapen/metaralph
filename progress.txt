@@ -398,3 +398,51 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - Tag extraction looks for common tech keywords (typescript, react, etc.)
   - Content relevance uses keyword extraction with stop word filtering
 ---
+
+## 2026-01-13 - US-024
+- What was implemented:
+  - Added is_self and self_branch columns to projects table via migration:
+    - is_self: INTEGER flag (1 for self-managed projects)
+    - self_branch: TEXT for isolated branch name
+  - Created src/self-improve/ralph-analyzer.ts with RalphAnalyzer:
+    - SelfImprovementOpportunity extends ImprovementOpportunity with category, riskLevel, requiresApproval
+    - detectMissingTests() scans src/ for files without corresponding test files
+    - detectMissingDocs() finds exported functions/classes without JSDoc
+    - detectOptimizations() finds N+1 queries, excessive sync file ops, large switch statements
+    - checkStrictMode() checks tsconfig.json for strict mode settings
+    - runLintCheck() runs eslint and reports error counts
+    - Results sorted by risk level (low first) then severity (high first)
+    - getSafeOpportunities() filters for auto-executable changes (low risk, no approval)
+  - Created src/self-improve/self-registration.ts:
+    - findRalphPath() and findMetaRalphPath() search known locations
+    - generateSelfBranch() creates timestamped branch names: self-improve/<project>-YYYYMMDD
+    - registerSelfProjects() auto-registers both projects with is_self=true
+    - getRegisteredSelfProjects() returns all self-managed projects
+    - isSelfProject() helper to check is_self flag
+  - Updated src/registry/index.ts:
+    - Extended Project interface with is_self and self_branch optional fields
+    - Added registerSelfProject() for registering self-managed projects
+    - Added getSelfProjects() to list all self-managed projects
+  - Updated src/daemon/runner.ts:
+    - On startup, calls registerSelfProjects() if selfImprovementEnabled
+    - Logs registration results
+  - Updated src/utils/config.ts:
+    - Added optional ralphPath and metaRalphPath config options
+- Files changed:
+  - src/self-improve/ralph-analyzer.ts (new)
+  - src/self-improve/self-registration.ts (new)
+  - src/db/index.ts (modified - added is_self, self_branch columns)
+  - src/registry/index.ts (modified - added registerSelfProject, getSelfProjects)
+  - src/daemon/runner.ts (modified - auto-register self projects)
+  - src/utils/config.ts (modified - added optional path configs)
+- **Learnings for future iterations:**
+  - Self-improvement module lives in src/self-improve/ directory
+  - Self projects use is_self=1 in database (SQLite stores booleans as integers)
+  - generateSelfBranch() format: self-improve/<project>-YYYYMMDD
+  - RALPH_SEARCH_PATHS and METARALPH_SEARCH_PATHS define common install locations
+  - RalphAnalyzer categories: optimization, test, documentation, refactor, feature
+  - Risk levels: low (auto-execute), medium (review suggested), high (approval required)
+  - detectMissingTests() skips index.ts, test files, and type declarations
+  - detectMissingDocs() limits to 10 results to avoid overwhelming
+  - findMetaRalphPath() also checks current working directory for metaralph package
+---
