@@ -38,6 +38,23 @@ export function initDatabase(dbPath?: string): DatabaseInstance {
 }
 
 /**
+ * Migrate projects table to add new columns if they don't exist
+ * This handles upgrades from older schema versions
+ *
+ * @param db - The database instance
+ */
+function migrateProjectsTable(db: DatabaseInstance): void {
+  // Get existing columns
+  const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((c) => c.name));
+
+  // Add last_analyzed column if it doesn't exist
+  if (!columnNames.has('last_analyzed')) {
+    db.exec('ALTER TABLE projects ADD COLUMN last_analyzed TEXT');
+  }
+}
+
+/**
  * Migrate tasks table to add new columns if they don't exist
  * This handles upgrades from older schema versions
  *
@@ -96,6 +113,9 @@ function createTables(db: DatabaseInstance): void {
       FOREIGN KEY (group_id) REFERENCES project_groups(id) ON DELETE SET NULL
     )
   `);
+
+  // Add new columns to existing projects table if they don't exist (migration)
+  migrateProjectsTable(db);
 
   // Conversations table - collaborative PRD creation threads
   db.exec(`

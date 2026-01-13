@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { startDaemon, stopDaemon, getDaemonStatus, formatUptime } from '../daemon/index.js';
 import { Logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
-import { addProject, removeProject, listProjects } from '../registry/index.js';
+import { addProject, removeProject, listProjects, getProject as getProjectById } from '../registry/index.js';
+import { OnboardingEngine } from '../onboarding/index.js';
 import { createGroup, addToGroup, removeFromGroup, listGroups, deleteGroup } from '../registry/group.js';
 import { TaskRepository } from '../queue/task.js';
 import { ApprovalQueue } from '../queue/approval.js';
@@ -174,6 +175,78 @@ projectsCommand
       console.log(`✓ ${result.message}`);
     } else {
       console.error(`✗ ${result.message}`);
+      process.exit(1);
+    }
+  });
+
+projectsCommand
+  .command('analyze <id>')
+  .description('Analyze a project and generate improvement proposals')
+  .option('--preview', 'Preview analysis without creating tasks')
+  .action(async (id: string, options: { preview?: boolean }) => {
+    // First check if the project exists
+    const project = getProjectById(id);
+    if (!project) {
+      console.error(`✗ Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    console.log(`Analyzing project: ${project.name}...`);
+    console.log(`Path: ${project.path}`);
+    console.log('');
+
+    try {
+      const result = options.preview
+        ? await OnboardingEngine.preview(project.path)
+        : await OnboardingEngine.analyze(id);
+
+      if (result.success) {
+        console.log(`✓ ${result.message}`);
+        console.log('');
+
+        if (result.analysis) {
+          console.log('Analysis Summary');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          // Group opportunities by type
+          const byType = result.analysis.opportunities.reduce((acc, opp) => {
+            acc[opp.type] = (acc[opp.type] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+
+          if (byType.outdated_dep) console.log(`  Outdated dependencies: ${byType.outdated_dep}`);
+          if (byType.type_error) console.log(`  Type errors: ${byType.type_error}`);
+          if (byType.lint_issue) console.log(`  Lint issues: ${byType.lint_issue}`);
+          if (byType.todo_comment) console.log(`  TODO comments: ${byType.todo_comment}`);
+
+          console.log('');
+          console.log('TODO Summary');
+          console.log(`  TODO:  ${result.analysis.todoSummary.TODO}`);
+          console.log(`  FIXME: ${result.analysis.todoSummary.FIXME}`);
+          console.log(`  XXX:   ${result.analysis.todoSummary.XXX}`);
+          console.log(`  HACK:  ${result.analysis.todoSummary.HACK}`);
+          console.log(`  Total: ${result.analysis.todoSummary.total}`);
+        }
+
+        if (result.proposals) {
+          console.log('');
+          console.log('Proposals Generated');
+          console.log(`  Total opportunities: ${result.proposals.summary.totalOpportunities}`);
+          console.log(`  Proposals generated: ${result.proposals.summary.proposalsGenerated}`);
+          console.log(`  Tasks auto-queued:   ${result.proposals.summary.tasksAutoQueued}`);
+          console.log(`  Pending approval:    ${result.proposals.summary.tasksPendingApproval}`);
+        }
+
+        if (options.preview) {
+          console.log('');
+          console.log('(Preview mode - no tasks were created)');
+        }
+      } else {
+        console.error(`✗ ${result.message}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(`✗ Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
