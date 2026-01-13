@@ -139,3 +139,34 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - Package version read from package.json via fileURLToPath
   - TSX files work due to "jsx": "react-jsx" in tsconfig.json
 ---
+
+## 2026-01-13 - US-016
+- What was implemented:
+  - Created src/cli/components/QueueView.tsx showing task queue:
+    - Table with columns: Priority, ID, Project, Type, Status, Title
+    - Auto-refreshes every 2 seconds via useEffect interval
+    - Uses TaskRepository.findPending() for data
+    - Shows loading state and empty state messages
+  - Created src/cli/components/ApprovalView.tsx for approval management:
+    - Split view: task list on left (40%), details panel on right (60%)
+    - Arrow keys (up/down) navigate between pending tasks
+    - 'a' key approves selected task, 'r' key rejects
+    - Shows full task details: ID, Title, Project, Type, Effort, Priority, Source, Description
+    - Success/error messages with 3-second auto-dismiss
+    - Uses ApprovalQueue class for approve/reject operations
+  - Updated src/cli/dashboard.tsx:
+    - Integrated QueueView and ApprovalView components
+    - TabContent now uses switch statement to render appropriate view
+- Files changed:
+  - src/cli/components/QueueView.tsx (new)
+  - src/cli/components/ApprovalView.tsx (new)
+  - src/cli/dashboard.tsx (modified)
+- **Learnings for future iterations:**
+  - Ink components go in src/cli/components/ directory
+  - useInput hook is used for keyboard handling in approval view
+  - Views should auto-refresh with setInterval + useEffect pattern
+  - useCallback for functions referenced in useEffect dependencies
+  - Task display helpers: formatStatus(), formatType(), formatEffort(), truncate()
+  - Split layouts use Box with percentage widths (width="40%")
+  - Border styles: 'single', 'round' for different visual treatments
+---
