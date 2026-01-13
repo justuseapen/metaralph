@@ -337,3 +337,40 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - PRD_BUILDER_SYSTEM_PROMPT emphasizes small tasks, verifiable criteria, proper sequencing
   - Chat session cleanup: handle SIGINT, close readline on exit
 ---
+
+## 2026-01-13 - US-022
+- What was implemented:
+  - Created src/learning/learning.ts with Learning model and LearningRepository:
+    - Learning interface with: id, executionId, projectId, category, content, confidence, timesApplied, timesSuccessful, tags
+    - LearningCategory types: pattern, gotcha, dependency, testing, architecture, workflow, environment, general
+    - LearningRepository with: create(), findById(), findAll(), findByProject(), findByCategory(), findByExecution(), search(), update(), recordApplication(), delete(), findHighConfidence()
+    - Metadata (tags, timesSuccessful) stored in content field with ---METADATA--- separator
+    - recordApplication() recalculates confidence based on success rate formula
+  - Created src/learning/cross-project.ts with CrossProjectPatternExtractor:
+    - extractFromExecution(executionId) parses progress.txt for patterns
+    - extractPatternsFromContent() parses "Codebase Patterns" and "Learnings for future iterations" sections
+    - inferCategory() maps content keywords to LearningCategory
+    - extractTags() extracts technology-related tags from content
+    - Similarity-based deduplication to avoid duplicate learnings
+    - extractFromProject() processes all completed executions for a project
+    - extractFromProgressFile() for direct file processing
+  - Created src/learning/outcome-tracker.ts with OutcomeTracker:
+    - analyzeOutcomes() correlates execution outcomes with task attributes (type, effort, source)
+    - AttributeCorrelation tracks success rates per attribute value
+    - OutcomeInsight generates high_success, low_success, trend, and recommendation insights
+    - createLearningsFromAnalysis() creates Learning objects from outcome insights
+    - getHighSuccessTaskTypes() and getHighSuccessEffortLevels() for quick queries
+- Files changed:
+  - src/learning/learning.ts (new)
+  - src/learning/cross-project.ts (new)
+  - src/learning/outcome-tracker.ts (new)
+- **Learnings for future iterations:**
+  - Learning module lives in src/learning/ directory
+  - Metadata stored in content field using ---METADATA--- separator (avoids schema changes)
+  - LearningRepository follows same optional db parameter pattern as other repositories
+  - Confidence recalculation formula: min(1.0, 0.5 + (successRate * 0.5))
+  - Pattern extraction uses regex to find "Codebase Patterns" and "Learnings for future iterations" sections
+  - Similarity check uses word overlap ratio (threshold 0.7) to detect duplicate patterns
+  - OutcomeTracker minSampleSize default is 3 for statistical significance
+  - Insight confidence increases with sample size: min(0.9, 0.5 + (samples/20) * 0.4)
+---
