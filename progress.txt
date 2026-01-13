@@ -481,3 +481,41 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - SafeExecutor integrates with RalphSpawner.spawn() and RalphSpawner.monitor() for execution
   - Validation runs both typecheck and tests by default (can be disabled via options)
 ---
+
+## 2026-01-13 - US-026
+- What was implemented:
+  - Created src/self-improve/guardrails.ts with safety guardrails:
+    - CORE_SAFETY_PATTERNS defines protected files (guardrails, rollback, safe-executor, etc.)
+    - Risk scoring (0-100) based on: core safety impact, high-risk files, keywords, task type, effort
+    - Risk levels: low (0-39), medium (40-69), high (70-79), critical (80-100)
+    - assessTaskRisk() and assessOpportunityRisk() for comprehensive risk assessment
+    - validateChange() blocks high-risk/critical changes without approval
+    - filterSafeOpportunities() returns only low-risk auto-executable changes
+  - Created src/self-improve/index.ts with SelfImprovementEngine:
+    - analyze() scans project for improvement opportunities using RalphAnalyzer
+    - propose() creates tasks from opportunities with risk-based auto-approval
+    - executeApproved() runs approved tasks via SafeExecutor
+    - run() orchestrates full pipeline: analyze -> propose -> (approve) -> execute -> validate -> merge/rollback
+    - preview() for dry-run analysis without making changes
+    - Re-exports all types from submodules for convenient API
+  - Added CLI command 'metaralph self-improve':
+    - --dry-run: Only analyze and propose, no execution
+    - --auto-only: Execute only auto-approved (low-risk) changes
+    - --max-executions <n>: Limit concurrent changes (default 1)
+    - --auto-merge: Auto-merge successful changes to main
+    - --project <id>: Target specific self-managed project
+    - Displays analysis summary, proposals, and execution results
+- Files changed:
+  - src/self-improve/guardrails.ts (new)
+  - src/self-improve/index.ts (new)
+  - src/cli/index.ts (modified - added self-improve command)
+- **Learnings for future iterations:**
+  - Self-improvement module has full pipeline: analyze -> propose -> approve -> execute -> validate
+  - CORE_SAFETY_PATTERNS includes: guardrails, rollback, safe-executor, approval, config files
+  - High-risk keywords (delete, force, bypass, etc.) contribute to risk score
+  - Risk score formula: coreImpact(50) + highRiskFiles(10ea) + keywords(5ea) + taskType(0-15) + effort(0-20)
+  - Tasks created from opportunities use 'self_improvement' as TaskSource
+  - SelfImprovementEngine.run() returns comprehensive result with analysis, proposals, executions
+  - CLI displays top 5 opportunities with risk level and auto-approve status
+  - Guardrails.validateChange() is the main entry point for safety checks
+---
