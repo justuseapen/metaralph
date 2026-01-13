@@ -10,6 +10,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDaemonStatus, formatUptime } from '../daemon/index.js';
+import { QueueView } from './components/QueueView.js';
+import { ApprovalView } from './components/ApprovalView.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -96,22 +98,37 @@ function TabBar({ activeTab }: { activeTab: TabId }): React.ReactElement {
 }
 
 /**
- * Placeholder component for tab content (will be implemented in US-016 and US-017)
+ * Tab content component - renders the appropriate view for each tab
  */
 function TabContent({ tab }: { tab: TabId }): React.ReactElement {
-  const contentMap: Record<TabId, string> = {
-    queue: 'Task queue view - pending implementation (US-016)',
-    approvals: 'Approvals view - pending implementation (US-016)',
-    projects: 'Projects view - pending implementation (US-017)',
-    workers: 'Workers view - pending implementation (US-017)',
-  };
-
-  return (
-    <Box flexGrow={1} flexDirection="column" paddingX={1}>
-      <Text dimColor>{contentMap[tab]}</Text>
-      <Text dimColor>Press 1-4 to switch tabs, q to quit.</Text>
-    </Box>
-  );
+  switch (tab) {
+    case 'queue':
+      return <QueueView />;
+    case 'approvals':
+      return <ApprovalView />;
+    case 'projects':
+      // Placeholder for US-017
+      return (
+        <Box flexGrow={1} flexDirection="column" paddingX={1}>
+          <Text dimColor>Projects view - pending implementation (US-017)</Text>
+          <Text dimColor>Press 1-4 to switch tabs, q to quit.</Text>
+        </Box>
+      );
+    case 'workers':
+      // Placeholder for US-017
+      return (
+        <Box flexGrow={1} flexDirection="column" paddingX={1}>
+          <Text dimColor>Workers view - pending implementation (US-017)</Text>
+          <Text dimColor>Press 1-4 to switch tabs, q to quit.</Text>
+        </Box>
+      );
+    default:
+      return (
+        <Box flexGrow={1} flexDirection="column" paddingX={1}>
+          <Text dimColor>Unknown tab</Text>
+        </Box>
+      );
+  }
 }
 
 /**
