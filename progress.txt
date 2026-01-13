@@ -374,3 +374,27 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - OutcomeTracker minSampleSize default is 3 for statistical significance
   - Insight confidence increases with sample size: min(0.9, 0.5 + (samples/20) * 0.4)
 ---
+
+## 2026-01-13 - US-023
+- What was implemented:
+  - Created src/learning/index.ts with LearningSystem class:
+    - LearningSystem.findApplicableLearnings(task) finds relevant learnings by context matching
+    - Context matching uses: project match, category relevance, tag overlap, content keywords, confidence
+    - LearningSystem.injectLearnings(task, learnings) adds learnings to progress.txt Codebase Patterns section
+    - recordOutcome(taskId, wasSuccessful) updates learning success metrics after task execution
+    - getAppliedLearnings(taskId) retrieves which learnings were applied for tracking
+    - extractFromExecution() and analyzeAndCreateLearnings() delegate to submodules
+  - Re-exports all types from learning.ts, cross-project.ts, and outcome-tracker.ts
+  - Singleton instance exported as learningSystem
+- Files changed:
+  - src/learning/index.ts (new)
+- **Learnings for future iterations:**
+  - LearningSystem uses applicationRecords Map to track which learnings were applied to which tasks
+  - Relevance scoring uses weighted sum: project(3), category(2), tags(2), content(2), confidence(1)
+  - Minimum relevance threshold is 0.3 (learnings below this are not applied)
+  - Max 10 learnings are applied per task to avoid overwhelming context
+  - Learnings are injected into progress.txt Codebase Patterns section (not CLAUDE.md)
+  - Category relevance map determines which learning types are most useful for which task types
+  - Tag extraction looks for common tech keywords (typescript, react, etc.)
+  - Content relevance uses keyword extraction with stop word filtering
+---
