@@ -231,18 +231,18 @@ export class QueueManager extends EventEmitter {
 
 // Re-export task module exports
 export {
-  Task,
-  TaskType,
-  EffortLevel,
-  TaskStatus,
-  ApprovalStatus,
-  TaskSource,
-  CreateTaskInput,
+  type Task,
+  type TaskType,
+  type EffortLevel,
+  type TaskStatus,
+  type ApprovalStatus,
+  type TaskSource,
+  type CreateTaskInput,
   TaskRepository,
 } from './task.js';
 
 // Re-export approval module exports
-export { ApprovalQueue, ApprovalResult, categorizeTask, getApprovalQueue } from './approval.js';
+export { ApprovalQueue, type ApprovalResult, categorizeTask, getApprovalQueue } from './approval.js';
 
 // Re-export prioritizer exports
 export { calculatePriorityScore, TYPE_SCORES, EFFORT_MULTIPLIERS } from './prioritizer.js';

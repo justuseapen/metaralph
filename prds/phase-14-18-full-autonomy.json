@@ -1,0 +1,568 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/phase-14-18-full-autonomy",
+  "description": "MetaRalph Phases 14-18: Branch isolation for parallel execution, manual queue priority, worker observability, project browser, task dependencies, cost tracking, failure intelligence, GitHub integration, scheduling, remote execution, debug mode, hot-reload with versioning, and project health dashboard.",
+  "userStories": [
+    {
+      "id": "US-045",
+      "title": "Implement branch-per-task isolation",
+      "description": "As MetaRalph, I need to execute each task on its own git branch so multiple tasks can run in parallel without conflicts.",
+      "acceptanceCriteria": [
+        "src/workers/branch-manager.ts creates branches named ralph/<task-id>-<slug>",
+        "ralph-spawner.ts updated to checkout task branch before execution",
+        "Tasks table has branch_name, merge_strategy, merged_at columns",
+        "Config supports branchIsolation.enabled, mergeStrategy (auto|manual|pr), baseBranch",
+        "On task completion, branch auto-merges to base (if strategy=auto)",
+        "On task failure, branch is preserved for debugging",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-046",
+      "title": "Implement merge coordinator for completed branches",
+      "description": "As MetaRalph, I need to handle merging completed task branches back to the base branch.",
+      "acceptanceCriteria": [
+        "src/workers/merge-coordinator.ts exports MergeCoordinator class",
+        "Detects merge conflicts before attempting merge",
+        "For strategy=auto: merge immediately on success",
+        "For strategy=manual: queue for user approval in dashboard",
+        "For strategy=pr: create GitHub PR via MCP tools",
+        "Conflict resolution workflow notifies user",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-047",
+      "title": "Add manual priority control to queue",
+      "description": "As a user, I need to manually override task priority so I can control execution order.",
+      "acceptanceCriteria": [
+        "Tasks table has manual_priority column (nullable integer)",
+        "Effective priority = manual_priority ?? priority_score",
+        "src/queue/prioritizer.ts honors manual overrides",
+        "CLI: metaralph queue priority <task-id> <score> sets priority",
+        "CLI: metaralph queue reorder <task-id> --before <other-id> reorders",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-048",
+      "title": "Add priority controls to dashboard QueueView",
+      "description": "As a user, I need to adjust task priority from the dashboard.",
+      "acceptanceCriteria": [
+        "QueueView.tsx: +/- keys increment/decrement priority by 10",
+        "QueueView.tsx: p key opens priority input for exact value",
+        "Visual indicator (star or badge) for manually-prioritized tasks",
+        "Priority changes persist immediately to database",
+        "Queue re-sorts after priority change",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-049",
+      "title": "Implement worker output capture",
+      "description": "As MetaRalph, I need to capture Claude Code's full output for each Ralph iteration.",
+      "acceptanceCriteria": [
+        "src/workers/output-capture.ts captures stdout/stderr from Ralph process",
+        "ralph-spawner.ts uses pipe instead of ignore for stdio",
+        "Output written to file: ~/.config/metaralph/logs/<execution-id>.log",
+        "Database iterations table stores per-iteration output",
+        "Output truncated if exceeds 1MB per iteration",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-050",
+      "title": "Create iterations table and tracker",
+      "description": "As MetaRalph, I need to track each Ralph loop iteration with detailed metadata.",
+      "acceptanceCriteria": [
+        "Database migration adds iterations table",
+        "src/workers/iteration-tracker.ts parses Ralph output to detect iteration boundaries",
+        "Tracks: iteration_number, story_id, files_changed, commits, duration_seconds",
+        "Extracts summary and thinking from Claude output",
+        "Links iterations to executions via execution_id",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-051",
+      "title": "Add WorkerDetailView with live output streaming",
+      "description": "As a user, I need to see live Claude Code output for running workers.",
+      "acceptanceCriteria": [
+        "src/cli/components/WorkerDetailView.tsx shows live output stream",
+        "Select worker from WorkersView, press Enter to see details",
+        "Auto-scrolls to bottom, Space to pause scrolling",
+        "Shows iteration progress: Iteration 3/10 - Working on US-045",
+        "q returns to workers list",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-052",
+      "title": "Implement metaralph watch and logs commands",
+      "description": "As a user, I need CLI commands to view worker output.",
+      "acceptanceCriteria": [
+        "metaralph watch <task-id> tails live output for active worker",
+        "metaralph logs <execution-id> shows historical execution logs",
+        "metaralph logs --list shows recent executions",
+        "Output formatted with timestamps and iteration markers",
+        "Ctrl+C exits watch mode cleanly",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-053",
+      "title": "Implement directory scanner for project browser",
+      "description": "As MetaRalph, I need to scan directories and detect projects.",
+      "acceptanceCriteria": [
+        "src/registry/directory-scanner.ts scans directories recursively",
+        "src/registry/project-detector.ts detects project type by markers",
+        "Detects: package.json (Node), Cargo.toml (Rust), go.mod (Go), pyproject.toml (Python)",
+        "Returns DetectedProject with type, gitStatus, readme preview",
+        "Skips node_modules, .git, and other common ignore patterns",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-054",
+      "title": "Create ProjectBrowser component for dashboard",
+      "description": "As a user, I need to browse my filesystem and add projects from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/ProjectBrowser.tsx renders directory tree",
+        "Arrow keys navigate, Enter drills down, Backspace goes up",
+        "Projects shown with type badge and registration status",
+        "a key adds highlighted project to MetaRalph",
+        "/ key opens path input for quick jump",
+        "Preview pane shows README and git info for selected project",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-055",
+      "title": "Add multi-select and group creation to ProjectBrowser",
+      "description": "As a user, I need to select multiple projects and create groups.",
+      "acceptanceCriteria": [
+        "Space toggles selection on current item",
+        "Visual indicator (checkbox) for selected items",
+        "g key creates group from selected projects, prompts for name",
+        "f key toggles favorite/bookmark on directory",
+        "Favorites stored in config and shown at top of browser",
+        "Tab switches between Browse/Registered/Groups views",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-056",
+      "title": "Implement task dependencies system",
+      "description": "As MetaRalph, I need tasks to declare dependencies on other tasks.",
+      "acceptanceCriteria": [
+        "Database migration adds task_dependencies table (task_id, depends_on_id)",
+        "src/queue/dependencies.ts manages dependency graph",
+        "TaskRepository extended with addDependency, removeDependency, getDependencies",
+        "Circular dependency detection throws clear error",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-057",
+      "title": "Implement dependency-aware scheduler",
+      "description": "As MetaRalph, I need the scheduler to respect task dependencies.",
+      "acceptanceCriteria": [
+        "src/queue/scheduler.ts checks dependencies before scheduling",
+        "Task states: waiting (deps incomplete), ready (deps done), blocked (dep failed)",
+        "getNextTasks only returns tasks with all dependencies complete",
+        "If dependency fails, dependent tasks marked as blocked",
+        "CLI: metaralph task depends <id> --on <other-id>",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-058",
+      "title": "Add DependencyGraph visualization to dashboard",
+      "description": "As a user, I need to see task dependencies visually.",
+      "acceptanceCriteria": [
+        "src/cli/components/DependencyGraph.tsx renders tree view",
+        "Shows: [✓] complete, [◉] running, [○] waiting, [✗] failed",
+        "Accessible from queue view with d key on selected task",
+        "metaralph task graph <id> shows CLI version",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-059",
+      "title": "Implement cost tracking database and calculator",
+      "description": "As MetaRalph, I need to track token usage and calculate costs.",
+      "acceptanceCriteria": [
+        "Database migration adds cost_records table",
+        "src/costs/tracker.ts records tokens per iteration",
+        "src/costs/calculator.ts converts tokens to USD using pricing config",
+        "Pricing config in ~/.config/metaralph/config.json with per-model rates",
+        "Supports input_tokens, output_tokens, cached_tokens",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-060",
+      "title": "Implement budget management and alerts",
+      "description": "As a user, I need to set spending budgets with automatic actions.",
+      "acceptanceCriteria": [
+        "Database migration adds budgets table",
+        "src/costs/budget.ts manages budget limits",
+        "Budget scopes: global or per-project",
+        "Budget periods: day, week, month",
+        "Actions on limit: warn, pause (stop scheduling), stop (kill workers)",
+        "metaralph budget set <amount> --period <period> --action <action>",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-061",
+      "title": "Add CostDashboard component",
+      "description": "As a user, I need to see cost breakdowns in the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/CostDashboard.tsx shows cost summary",
+        "Displays: today, this week, this month totals",
+        "Bar chart by project showing percentage of spend",
+        "Top tasks by cost with iteration counts",
+        "Budget progress bar with limit indicator",
+        "metaralph costs CLI shows same data",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-062",
+      "title": "Implement failure recording and clustering",
+      "description": "As MetaRalph, I need to capture failures and group similar ones.",
+      "acceptanceCriteria": [
+        "Database migrations add failure_records and failure_clusters tables",
+        "src/learning/failure-analyzer.ts captures failure context",
+        "src/learning/failure-clusters.ts groups by error patterns",
+        "Records: error_type, error_message, stack_trace, context JSON",
+        "Auto-creates cluster when pattern matches 3+ failures",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-063",
+      "title": "Implement fix suggester and smart retry",
+      "description": "As MetaRalph, I need to suggest fixes and retry with adjusted prompts.",
+      "acceptanceCriteria": [
+        "src/learning/fix-suggester.ts recommends fixes from cluster history",
+        "src/learning/retry-strategy.ts adjusts prompt based on failure type",
+        "Clusters store suggested_fix and auto_retry_strategy JSON",
+        "On retry, adds failure context to Ralph prompt",
+        "metaralph failures shows clusters with occurrence counts",
+        "metaralph failures analyze <execution-id> shows detailed failure",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-064",
+      "title": "Implement GitHub PR manager",
+      "description": "As MetaRalph, I need to create pull requests from completed task branches.",
+      "acceptanceCriteria": [
+        "src/github/pr-manager.ts creates PRs via MCP GitHub tools",
+        "PR description generated from task PRD and commits",
+        "Config: github.autoCreatePR, prStrategy (always|on-demand|feature-only)",
+        "Config: github.defaultReviewers array",
+        "metaralph pr create <task-id> creates PR manually",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-065",
+      "title": "Implement GitHub issue synchronization",
+      "description": "As MetaRalph, I need to sync task status with GitHub issues.",
+      "acceptanceCriteria": [
+        "src/github/issue-sync.ts syncs bidirectionally with GitHub",
+        "Comments on issue when task starts and completes",
+        "Closes issue automatically when task completes (if configured)",
+        "Creates MetaRalph tasks from issues with specific labels",
+        "Config: github.syncIssues, closeIssuesOnComplete",
+        "metaralph issues sync triggers manual sync",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-066",
+      "title": "Implement cron-style task scheduling",
+      "description": "As a user, I need to schedule recurring tasks.",
+      "acceptanceCriteria": [
+        "Database migration adds schedules table",
+        "src/automation/scheduler.ts evaluates cron expressions",
+        "metaralph schedule add '<cron>' --task <template> --project <id>",
+        "metaralph schedule list shows all schedules with next run time",
+        "metaralph schedule remove <id> deletes schedule",
+        "Built-in templates: dependency-update, security-scan",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-067",
+      "title": "Implement webhook and trigger system",
+      "description": "As MetaRalph, I need to create tasks in response to external events.",
+      "acceptanceCriteria": [
+        "Database migration adds triggers table",
+        "src/automation/triggers.ts manages trigger definitions",
+        "src/automation/webhooks.ts handles incoming webhooks",
+        "Trigger types: webhook, github_event, file_watch",
+        "metaralph triggers list shows active triggers",
+        "Webhook endpoint configurable in daemon",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-068",
+      "title": "Implement remote execution coordinator",
+      "description": "As MetaRalph, I need to run Ralph workers on remote machines via SSH.",
+      "acceptanceCriteria": [
+        "src/remote/executor.ts coordinates remote execution",
+        "src/remote/ssh-worker.ts spawns Ralph via SSH",
+        "src/remote/sync.ts syncs code via git pull or rsync",
+        "Config: remote.machines array with host, user, keyPath, workDir",
+        "metaralph remote add <name> --host <host> --user <user>",
+        "metaralph remote test <name> verifies connection",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-069",
+      "title": "Implement task routing to remote machines",
+      "description": "As MetaRalph, I need to route tasks to local or remote based on effort.",
+      "acceptanceCriteria": [
+        "src/remote/health.ts monitors remote machine availability",
+        "Config: remote.routing.preferRemote (effort levels to send remote)",
+        "Config: remote.routing.preferLocal (effort levels to keep local)",
+        "Failover to local if remote unavailable",
+        "metaralph remote list shows machine status",
+        "Worker status shows execution location",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-070",
+      "title": "Implement interactive debug mode",
+      "description": "As a user, I need to pause a stuck task and intervene manually.",
+      "acceptanceCriteria": [
+        "src/debug/session.ts manages debug sessions",
+        "src/debug/context-builder.ts builds context for intervention",
+        "metaralph pause <task-id> pauses running worker",
+        "metaralph debug <task-id> opens interactive Claude Code with context",
+        "metaralph resume <task-id> resumes paused task",
+        "Debug session captures interventions as learnings",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-071",
+      "title": "Add DebugView to dashboard",
+      "description": "As a user, I need to manage debug sessions from the dashboard.",
+      "acceptanceCriteria": [
+        "src/cli/components/DebugView.tsx shows paused tasks",
+        "Shows pause reason: manual, error, breakpoint",
+        "Shows context: current story, iteration, files modified",
+        "d key on running worker pauses it",
+        "r key on paused worker resumes it",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-072",
+      "title": "Implement semantic versioning system",
+      "description": "As MetaRalph, I need to track my version and classify changes.",
+      "acceptanceCriteria": [
+        "src/versioning/version.ts manages MAJOR.MINOR.PATCH version",
+        "src/version.ts file stores current version (auto-updated)",
+        "src/versioning/classifier.ts classifies git diffs by impact",
+        "MAJOR: schema changes, breaking API, removed features",
+        "MINOR: new commands, new features, new files",
+        "PATCH: bug fixes, refactors, docs",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-073",
+      "title": "Implement hot-reload system",
+      "description": "As MetaRalph, I need to reload myself when my code changes.",
+      "acceptanceCriteria": [
+        "src/hot-reload/watcher.ts watches MetaRalph source files",
+        "src/hot-reload/reloader.ts handles graceful reload",
+        "src/hot-reload/state-persistence.ts saves/restores state",
+        "State includes: queue position, active workers, dashboard state",
+        "Reload waits for workers to reach safe checkpoint",
+        "Re-execs daemon process with new code",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-074",
+      "title": "Implement major version approval flow",
+      "description": "As a user, I need to approve major version updates before they apply.",
+      "acceptanceCriteria": [
+        "MAJOR version changes queued for approval, not auto-applied",
+        "src/self-improve/approval.ts manages update approval",
+        "metaralph update status shows pending updates",
+        "metaralph update approve applies pending major update",
+        "metaralph update reject discards pending update",
+        "5-minute stability window with auto-rollback on crash",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-075",
+      "title": "Add version display and update UI to dashboard",
+      "description": "As a user, I need to see version info and approve updates in dashboard.",
+      "acceptanceCriteria": [
+        "Dashboard header shows: MetaRalph v1.2.3",
+        "After update shows: Updated 2m ago (v1.2.2 → v1.2.3)",
+        "src/cli/components/UpdateApprovalView.tsx for major updates",
+        "Shows diff summary, migration info, rollback availability",
+        "Approve/Reject buttons for pending major updates",
+        "metaralph update history shows version history",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-076",
+      "title": "Implement project health analyzer",
+      "description": "As MetaRalph, I need to calculate health scores for projects.",
+      "acceptanceCriteria": [
+        "src/health/analyzer.ts calculates health metrics",
+        "Components: testCoverage, dependencyHealth, issueBacklog, buildStability, codeQuality",
+        "Overall score 0-100 weighted average",
+        "Trend detection: improving, stable, declining",
+        "Health alerts with severity and recommendations",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-077",
+      "title": "Add HealthDashboard component",
+      "description": "As a user, I need to see project health at a glance.",
+      "acceptanceCriteria": [
+        "src/cli/components/HealthDashboard.tsx shows all projects",
+        "Health bar visualization with score and trend arrow",
+        "Alert badges: security vulns, outdated deps, failing tests",
+        "Create fix tasks button for actionable alerts",
+        "metaralph health shows CLI version",
+        "metaralph health <project> shows detailed breakdown",
+        "Typecheck passes"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-078",
+      "title": "Implement auto-generated improvement tasks from health",
+      "description": "As MetaRalph, I need to create tasks automatically when projects become unhealthy.",
+      "acceptanceCriteria": [
+        "Health analyzer can auto-create tasks for critical issues",
+        "Security vulnerabilities create high-priority bug_fix tasks",
+        "Outdated dependencies create refactor tasks",
+        "Config: health.autoCreateTasks (boolean)",
+        "Config: health.thresholds for when to create tasks",
+        "Dashboard shows 'Apply All' for pending health recommendations",
+        "Typecheck passes"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

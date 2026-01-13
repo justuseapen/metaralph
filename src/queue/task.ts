@@ -7,6 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { initDatabase, type DatabaseInstance } from '../db/index.js';
+import { calculatePriorityScore, categorizeTask } from './prioritizer.js';
 
 /**
  * Type of work to be performed
@@ -121,8 +122,6 @@ export const TaskRepository = {
     const database = db ?? initDatabase();
 
     try {
-      const { calculatePriorityScore, categorizeTask } = require('./prioritizer.js');
-
       const id = uuidv4();
       const now = new Date().toISOString();
       const priorityScore = calculatePriorityScore(input.type, input.estimatedEffort);

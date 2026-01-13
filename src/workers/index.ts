@@ -349,7 +349,7 @@ export class WorkerOrchestrator extends EventEmitter {
 }
 
 // Export types and classes
-export { Execution, ExecutionRepository } from './execution.js';
+export { type Execution, ExecutionRepository } from './execution.js';
 export { RalphSpawner, type SpawnResult, type CompletionResult } from './ralph-spawner.js';
 export {
   FailureHandler,
