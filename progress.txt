@@ -170,3 +170,39 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - Split layouts use Box with percentage widths (width="40%")
   - Border styles: 'single', 'round' for different visual treatments
 ---
+
+## 2026-01-13 - US-017
+- What was implemented:
+  - Created src/cli/components/ProjectsView.tsx for project management:
+    - Shows projects in a table with: Name, Health Score, Tasks count, Path
+    - Health score calculated from completed vs failed task ratio (0-100%)
+    - Selected project shows details panel on right side
+    - 'a' key opens text input to add new project by path
+    - 'd' key deletes project with confirmation (press twice)
+    - Arrow keys (up/down) navigate between projects
+    - Auto-refreshes every 2 seconds
+    - Uses ink-text-input for path input
+  - Created src/cli/components/WorkersView.tsx for worker monitoring:
+    - Summary stats bar showing running/completed/failed counts
+    - Worker cards show: project name, task title, progress bar, elapsed time
+    - Progress bar based on iterations used (iterations/10 max)
+    - Last 3 output lines displayed for each worker
+    - Empty state with instructions for starting daemon and creating tasks
+    - Auto-refreshes every 2 seconds
+  - Updated src/cli/dashboard.tsx to integrate ProjectsView and WorkersView
+  - Added ink-text-input dependency for text input in ProjectsView
+- Files changed:
+  - src/cli/components/ProjectsView.tsx (new)
+  - src/cli/components/WorkersView.tsx (new)
+  - src/cli/dashboard.tsx (modified)
+  - package.json (modified - added ink-text-input)
+  - package-lock.json (modified)
+- **Learnings for future iterations:**
+  - ink-text-input provides TextInput component for text input in Ink
+  - Health score calculation: (completed / (completed + failed)) * 100
+  - Confirmation patterns: track confirmDeleteId state, require two presses
+  - Worker progress display: use ExecutionRepository.findRunning() for active workers
+  - Resolve task and project from execution for display context
+  - formatElapsed() helper for human-readable time since startedAt
+  - Progress bars: use '█' for filled and '░' for empty segments
+---
