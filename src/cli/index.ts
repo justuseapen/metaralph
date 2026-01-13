@@ -18,6 +18,7 @@ import { TaskRepository } from '../queue/task.js';
 import { ApprovalQueue } from '../queue/approval.js';
 import { getProject } from '../registry/index.js';
 import { ExecutionRepository } from '../workers/execution.js';
+import { startDashboard } from './dashboard.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,14 @@ program
       console.log('━━━━━━━━━━━━━━━━━━━━━━━');
       console.log(`Status:     Not running`);
     }
+  });
+
+// Dashboard command
+program
+  .command('dashboard')
+  .description('Launch the interactive terminal UI dashboard')
+  .action(() => {
+    startDashboard();
   });
 
 // Project management commands
@@ -441,6 +450,11 @@ function displayWorkersStatus(): void {
 
   console.log('──────────────────────────────────────────────────────────────────');
 }
+
+// Default action (no subcommand) - launch dashboard
+program.action(() => {
+  startDashboard();
+});
 
 // Parse arguments and run
 program.parse();
