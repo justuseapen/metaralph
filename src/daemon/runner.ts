@@ -8,6 +8,7 @@
 import { QueueManager } from '../queue/index.js';
 import { Logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config.js';
+import { registerSelfProjects } from '../self-improve/self-registration.js';
 import * as path from 'node:path';
 
 /**
@@ -29,6 +30,22 @@ export function startRunner(): void {
   });
 
   logger.info('Daemon runner starting');
+
+  // Auto-register self-managed projects (Ralph and MetaRalph)
+  if (config.selfImprovementEnabled) {
+    logger.info('Registering self-managed projects');
+    const selfRegResult = registerSelfProjects();
+
+    if (selfRegResult.ralphRegistered) {
+      logger.info('Ralph registered as self-managed project', { path: selfRegResult.ralphPath });
+    }
+    if (selfRegResult.metaRalphRegistered) {
+      logger.info('MetaRalph registered as self-managed project', { path: selfRegResult.metaRalphPath });
+    }
+    if (selfRegResult.errors.length > 0) {
+      logger.warn('Self-registration warnings', { errors: selfRegResult.errors });
+    }
+  }
 
   // Initialize QueueManager
   queueManager = new QueueManager();

@@ -14,6 +14,10 @@ export interface MetaRalphConfig {
   maxConcurrentWorkers: number;
   /** Whether self-improvement features are enabled */
   selfImprovementEnabled: boolean;
+  /** Path to the Ralph repository (optional, auto-detected if not set) */
+  ralphPath?: string;
+  /** Path to the MetaRalph repository (optional, auto-detected if not set) */
+  metaRalphPath?: string;
 }
 
 /**
@@ -80,6 +84,13 @@ function validateConfig(value: unknown): value is MetaRalphConfig {
   }
   if (typeof config.selfImprovementEnabled !== 'boolean') {
     throw new Error('Config selfImprovementEnabled must be a boolean');
+  }
+  // Optional paths - validate if present
+  if (config.ralphPath !== undefined && typeof config.ralphPath !== 'string') {
+    throw new Error('Config ralphPath must be a string if provided');
+  }
+  if (config.metaRalphPath !== undefined && typeof config.metaRalphPath !== 'string') {
+    throw new Error('Config metaRalphPath must be a string if provided');
   }
 
   return true;

@@ -20,6 +20,10 @@ export interface Project {
   group_id: string | null;
   added_at: string;
   updated_at: string;
+  /** Whether this is a self-managed project (Ralph or MetaRalph itself) */
+  is_self?: boolean;
+  /** Isolated branch for self-improvement work */
+  self_branch?: string;
 }
 
 /**
@@ -252,6 +256,131 @@ export function getProjectByPath(projectPath: string, db?: DatabaseInstance): Pr
     const absolutePath = path.resolve(projectPath);
     const project = database.prepare('SELECT * FROM projects WHERE path = ?').get(absolutePath) as Project | undefined;
     return project;
+  } finally {
+    if (shouldCloseDb) {
+      database.close();
+    }
+  }
+}
+
+/**
+ * Register a self-managed project (Ralph or MetaRalph)
+ * Self-managed projects are always enabled and use separate isolated branches.
+ *
+ * @param projectPath - Path to the project
+ * @param selfBranch - Branch name for self-improvement work
+ * @param db - Optional database instance (creates one if not provided)
+ * @returns Result of the registration
+ */
+export function registerSelfProject(
+  projectPath: string,
+  selfBranch: string,
+  db?: DatabaseInstance
+): RegistryResult {
+  const shouldCloseDb = !db;
+  const database = db ?? initDatabase();
+
+  try {
+    // Resolve to absolute path
+    const absolutePath = path.resolve(projectPath);
+
+    // Check if path exists
+    if (!fs.existsSync(absolutePath)) {
+      return {
+        success: false,
+        message: `Path does not exist: ${absolutePath}`,
+      };
+    }
+
+    // Check if it's a directory
+    const stat = fs.statSync(absolutePath);
+    if (!stat.isDirectory()) {
+      return {
+        success: false,
+        message: `Path is not a directory: ${absolutePath}`,
+      };
+    }
+
+    // Validate it's a git repository
+    if (!isGitRepository(absolutePath)) {
+      return {
+        success: false,
+        message: `Path is not a git repository: ${absolutePath}`,
+      };
+    }
+
+    // Check if project is already registered
+    const existing = database.prepare('SELECT * FROM projects WHERE path = ?').get(absolutePath) as Project | undefined;
+    if (existing) {
+      // Update existing project to mark it as self-managed
+      database.prepare(`
+        UPDATE projects SET is_self = 1, self_branch = ?, updated_at = ?
+        WHERE id = ?
+      `).run(selfBranch, new Date().toISOString(), existing.id);
+
+      return {
+        success: true,
+        message: `Project updated as self-managed: ${existing.name}`,
+        project: {
+          ...existing,
+          is_self: true,
+          self_branch: selfBranch,
+        },
+      };
+    }
+
+    // Extract project name
+    const name = extractProjectName(absolutePath);
+
+    // Create project record with is_self = true
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    database.prepare(`
+      INSERT INTO projects (id, name, path, is_self, self_branch, added_at, updated_at)
+      VALUES (?, ?, ?, 1, ?, ?, ?)
+    `).run(id, name, absolutePath, selfBranch, now, now);
+
+    const project: Project = {
+      id,
+      name,
+      path: absolutePath,
+      group_id: null,
+      added_at: now,
+      updated_at: now,
+      is_self: true,
+      self_branch: selfBranch,
+    };
+
+    return {
+      success: true,
+      message: `Self-managed project added: ${name}`,
+      project,
+    };
+  } finally {
+    if (shouldCloseDb) {
+      database.close();
+    }
+  }
+}
+
+/**
+ * Get all self-managed projects (Ralph and MetaRalph)
+ *
+ * @param db - Optional database instance (creates one if not provided)
+ * @returns Array of self-managed projects
+ */
+export function getSelfProjects(db?: DatabaseInstance): Project[] {
+  const shouldCloseDb = !db;
+  const database = db ?? initDatabase();
+
+  try {
+    const projects = database.prepare(`
+      SELECT * FROM projects WHERE is_self = 1
+      ORDER BY added_at DESC
+    `).all() as Project[];
+
+    return projects;
   } finally {
     if (shouldCloseDb) {
       database.close();

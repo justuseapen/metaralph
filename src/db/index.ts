@@ -52,6 +52,16 @@ function migrateProjectsTable(db: DatabaseInstance): void {
   if (!columnNames.has('last_analyzed')) {
     db.exec('ALTER TABLE projects ADD COLUMN last_analyzed TEXT');
   }
+
+  // Add is_self column if it doesn't exist (for self-managed projects)
+  if (!columnNames.has('is_self')) {
+    db.exec('ALTER TABLE projects ADD COLUMN is_self INTEGER NOT NULL DEFAULT 0');
+  }
+
+  // Add self_branch column if it doesn't exist (isolated branch for self-improvement)
+  if (!columnNames.has('self_branch')) {
+    db.exec('ALTER TABLE projects ADD COLUMN self_branch TEXT');
+  }
 }
 
 /**
