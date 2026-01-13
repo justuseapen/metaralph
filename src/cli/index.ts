@@ -17,6 +17,7 @@ import { createGroup, addToGroup, removeFromGroup, listGroups, deleteGroup } fro
 import { TaskRepository } from '../queue/task.js';
 import { ApprovalQueue } from '../queue/approval.js';
 import { getProject } from '../registry/index.js';
+import { ExecutionRepository } from '../workers/execution.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -391,8 +392,55 @@ program
   .command('workers')
   .description('View and manage worker processes')
   .action(() => {
-    console.log('Workers status... (not yet implemented)');
+    displayWorkersStatus();
   });
+
+/**
+ * Display active workers and recent executions
+ */
+function displayWorkersStatus(): void {
+  const config = loadConfig();
+  const runningExecutions = ExecutionRepository.findRunning();
+
+  console.log('Worker Status');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Max concurrent workers: ${config.maxConcurrentWorkers}`);
+  console.log(`Currently running: ${runningExecutions.length}`);
+  console.log('');
+
+  if (runningExecutions.length === 0) {
+    console.log('No workers currently running.');
+    console.log('');
+    console.log('Workers are spawned automatically when tasks are queued');
+    console.log('and the daemon is running. Use "metaralph start" to start');
+    console.log('the daemon, then "metaralph queue" to view pending tasks.');
+  } else {
+    console.log('Active Workers:');
+    console.log('Execution ID                          | Task ID                               | Status   | Started');
+    console.log('──────────────────────────────────────┼───────────────────────────────────────┼──────────┼──────────────────');
+
+    for (const execution of runningExecutions) {
+      const task = TaskRepository.findById(execution.taskId);
+      const project = task ? getProject(task.projectId) : undefined;
+      const projectName = project?.name ?? 'Unknown';
+      const startedAt = execution.startedAt
+        ? new Date(execution.startedAt).toLocaleTimeString()
+        : 'N/A';
+
+      console.log(`${execution.id.slice(0, 36)} | ${execution.taskId.slice(0, 36)} | ${execution.status.padEnd(8)} | ${startedAt}`);
+      if (task) {
+        console.log(`  Task: ${task.title}`);
+        console.log(`  Project: ${projectName}`);
+        if (execution.iterationsUsed > 0) {
+          console.log(`  Iterations: ${execution.iterationsUsed}`);
+        }
+      }
+      console.log('');
+    }
+  }
+
+  console.log('──────────────────────────────────────────────────────────────────');
+}
 
 // Parse arguments and run
 program.parse();
