@@ -63,3 +63,29 @@ Started: Mon Jan 12 17:23:45 EST 2026
   - findRalphScript() searches project-local and user-level locations for ralph.sh
   - Child process spawned with stdio: ['ignore', 'pipe', 'pipe'] to capture output
 ---
+
+## 2026-01-13 - US-013
+- What was implemented:
+  - Created src/workers/failure-handler.ts with retry logic:
+    - MAX_RETRIES = 2, exponential backoff (5s base, 10s for retry 2)
+    - handleFailure() determines if retry should happen
+    - FailureHandler class wraps functional API
+  - Created src/workers/index.ts with WorkerOrchestrator class:
+    - Enforces maxConcurrentWorkers from config
+    - One worker per project via projectLocks Set
+    - scheduleTask() checks capacity, spawns worker via RalphSpawner
+    - monitorWorker() handles completion, triggers retries on failure
+    - Emits events: worker:started, worker:completed, worker:failed, worker:retry
+  - Updated 'metaralph workers' CLI to show active workers from ExecutionRepository.findRunning()
+- Files changed:
+  - src/workers/failure-handler.ts (new)
+  - src/workers/index.ts (new)
+  - src/cli/index.ts (modified)
+- **Learnings for future iterations:**
+  - WorkerOrchestrator uses in-memory Maps/Sets for activeWorkers and projectLocks
+  - Retry counts are stored in-memory (resets on daemon restart)
+  - WorkerOrchestrator extends EventEmitter for events
+  - scheduleTask() returns ScheduleResult { success, message, worker? }
+  - ActiveWorker contains: task, project, execution, childProcess, startedAt, completionPromise
+  - Exponential backoff formula: BASE_DELAY * 2^(retryNumber - 1)
+---
