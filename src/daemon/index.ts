@@ -7,8 +7,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { getConfigDir } from '../utils/config.js';
 import { Logger } from '../utils/logger.js';
+
+// Get the directory of this module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Status information for the daemon
@@ -183,41 +188,24 @@ export function startDaemon(logger?: Logger): { success: boolean; message: strin
     };
   }
 
-  // Get the path to the daemon runner script
+  // Ensure config directory exists
   const configDir = getConfigDir();
   if (!fs.existsSync(configDir)) {
     fs.mkdirSync(configDir, { recursive: true });
   }
 
-  // Create a simple daemon process that just keeps running
-  // In a full implementation, this would run the task loop
-  const daemonScript = `
-    const fs = require('fs');
-    const path = require('path');
+  // Get the path to the runner module (compiled JS)
+  const runnerPath = path.join(__dirname, 'runner.js');
 
-    // Signal handlers
-    process.on('SIGTERM', () => {
-      process.exit(0);
-    });
-    process.on('SIGINT', () => {
-      process.exit(0);
-    });
-
-    // Keep the process alive
-    setInterval(() => {
-      // Daemon heartbeat - in a full implementation this would process the task queue
-    }, 10000);
-  `;
-
-  // Write the daemon script to a temp file
-  const daemonScriptPath = path.join(configDir, 'daemon.js');
-  fs.writeFileSync(daemonScriptPath, daemonScript, 'utf-8');
-
-  // Spawn detached process
-  const child = spawn('node', [daemonScriptPath], {
+  // Spawn the daemon runner as a detached process
+  const child = spawn('node', [runnerPath], {
     detached: true,
     stdio: 'ignore',
-    cwd: configDir,
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || 'production',
+    },
   });
 
   // Unref to allow parent to exit independently
@@ -355,3 +343,6 @@ export function formatUptime(seconds: number): string {
 
   return parts.join(' ');
 }
+
+// Re-export runner functions for programmatic use
+export { startRunner, stopRunner, getQueueManager } from './runner.js';
