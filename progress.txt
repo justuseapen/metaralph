@@ -580,3 +580,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - read column uses INTEGER (0/1) in SQLite, converted to boolean in interface
   - Repository includes utility methods: countUnread(), countBySeverity(), markAllAsRead(), deleteOld()
 ---
+
+## 2026-01-15 - US-127
+- What was implemented: Added full notification list view with database integration
+- Files changed:
+  - `src/cli/dashboard.tsx` - Enhanced NotificationListOverlay with:
+    - Database integration via NotificationRepository.findRecent(50)
+    - NotificationRow component with severity color coding and unread badge
+    - formatNotificationTime() for relative timestamps (just now, 5m ago, 2h ago, etc.)
+    - getSeverityColor() helper for consistent color theming
+    - Arrow key navigation with selectedIndex state
+    - Enter key marks selected notification as read
+    - 'd' key dismisses (deletes) selected notification
+    - Unread notifications highlighted with bold text and cyan [new] badge
+    - Message preview panel for selected notification
+    - Loading state while fetching from database
+    - Empty state with helpful message
+    - Unread count displayed in header
+- **Learnings for future iterations:**
+  - NotificationRepository.findRecent(limit) returns recent notifications sorted DESC
+  - Use try/catch when loading from database in overlay - table might not exist yet
+  - For relative timestamps: calculate diffMs, then convert to mins/hours/days
+  - Unread highlighting: use bold={isUnread} and dimColor={!isUnread} for contrast
+  - Selection adjustment on delete: check if selectedIndex >= length - 1 before adjusting
+  - Import Notification type from notifications/index.js (not repository.js directly)
+---

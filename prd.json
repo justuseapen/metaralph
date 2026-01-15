@@ -417,8 +417,8 @@
         "Typecheck passes"
       ],
       "priority": 27,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Enhanced NotificationListOverlay with database integration, arrow key navigation, Enter to mark read, 'd' to dismiss, unread highlighting with [new] badge"
     },
     {
       "id": "US-128",
