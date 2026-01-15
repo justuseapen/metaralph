@@ -364,3 +364,31 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - When nesting Text elements, can't put Box inside Text - use string padding or separate layout
   - Reset selectedIndex when filteredTasks.length changes to avoid out-of-bounds
 ---
+
+## 2026-01-14 - US-118
+- What was implemented: Added quick task creation dialog to QueueView
+- Files changed:
+  - `src/cli/components/QueueView.tsx` - Major additions:
+    - inferTaskType() function to auto-detect type from title keywords
+    - QUICK_CREATE_FIELDS, EFFORT_OPTIONS, TASK_TYPE_OPTIONS constants
+    - QuickCreateDialog component with multi-field form
+    - 'c' key handler to open quick create dialog
+    - showQuickCreate, projects state management
+    - Title field with required indicator, project selector with dropdown
+    - Type and effort selectors with arrow key cycling
+    - Tab/Shift+Tab navigation between fields
+    - Enter submits, Escape cancels
+    - Auto-infer type from title keywords (fix/bug -> bug_fix, test -> test, etc.)
+    - Auto-select project if only one registered
+    - Updated header hints to show 'c: Create'
+    - Updated empty state to show create shortcut
+- **Learnings for future iterations:**
+  - Type inference: use title.toLowerCase() and check for keyword includes()
+  - Multi-field dialogs: track activeField state, use Tab to cycle FIELDS array
+  - For required fields: show asterisk with color="red" when empty
+  - Project dropdown: use separate showDropdown state, not part of activeField
+  - useEffect for auto-infer: only infer when title.length > 3 to avoid rapid changes
+  - TaskRepository.create() takes source: 'manual' for user-created tasks
+  - Import EffortLevel type from queue module for type safety
+  - Import Project type from registry module for project list typing
+---

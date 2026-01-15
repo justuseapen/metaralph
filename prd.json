@@ -281,8 +281,8 @@
         "Typecheck passes"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "QuickCreateDialog with Tab cycling, type inference from title keywords, auto-project selection, smart defaults"
     },
     {
       "id": "US-119",
