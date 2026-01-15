@@ -954,6 +954,7 @@ function QuickCreateDialog({ projects, onClose, onCreate }: QuickCreateDialogPro
             <TextInput
               value={title}
               onChange={setTitle}
+              onSubmit={handleCreate}
               placeholder="Enter task title (required)..."
             />
           ) : (
