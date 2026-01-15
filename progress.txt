@@ -1,521 +1,761 @@
 # Ralph Progress Log
-Started: Mon Jan 12 17:23:45 EST 2026
+Started: Wed Jan 14 20:48:19 EST 2026
 ---
 
 ## Codebase Patterns
-- Database operations use optional `db` parameter; if not provided, creates and closes connection
-- Use `uuidv4()` for generating IDs
-- Use ES module imports with `.js` extension even for `.ts` files
-- Row-to-model conversion: database uses snake_case, models use camelCase
-- Database migrations use `ALTER TABLE ADD COLUMN IF NOT EXISTS` pattern via PRAGMA table_info check
-- Index naming convention: `idx_<table>_<column>`
+- Dashboard tabs are defined in `src/cli/dashboard.tsx` in the `TABS` array with `TabId` type union
+- Tab views are React components in `src/cli/components/` named `*View.tsx`
+- Footer component shows keyboard shortcuts - update when adding new tabs
+- Ink library used for terminal UI - Box, Text, useInput from 'ink'
+- Ink's Key type has: upArrow, downArrow, leftArrow, rightArrow, pageUp, pageDown, return, escape, ctrl, shift, tab, backspace, delete, meta
+- Use `Text inverse={selected}` for selection highlighting (not backgroundColor)
+- Database access via *Repository classes in `src/collaboration/`, `src/queue/`, and `src/loops/`
+- Repository pattern: use `interface XRow` (snake_case) and `interface X` (camelCase), convert with `rowToX` functions
+- Repositories are const objects with methods, not classes (e.g., `export const XRepository = { create(), findAll(), ... }`)
+- 2-second refresh interval for real-time dashboard updates
+- Anthropic SDK streaming: use `client.messages.stream()` and `stream.on('text', callback)`
+- For spinners in Ink, use text-based frames (e.g., SPINNER_FRAMES array) with setInterval
+- **Color scheme**: Use `src/cli/components/ColorScheme.tsx` for all colors - STATUS_COLORS, TASK_TYPE_COLORS, etc.
 
 ---
 
-## 2026-01-12 18:45 - US-010
-- What was implemented:
-  - Created src/queue/task.ts with Task interface and TaskRepository
-  - Created src/queue/prioritizer.ts with calculatePriorityScore() and categorizeTask()
-  - Updated src/db/index.ts with extended task schema and migration function
+## 2026-01-14 - US-101
+- What was implemented: Added Chat tab to dashboard navigation
 - Files changed:
-  - src/queue/task.ts (new)
-  - src/queue/prioritizer.ts (new)
-  - src/db/index.ts (modified)
+  - `src/cli/dashboard.tsx` - Added 'chat' to TabId, added Chat tab to TABS array, added ChatView to TabContent switch, updated Footer
+  - `src/cli/components/ChatView.tsx` - Created new component (placeholder)
 - **Learnings for future iterations:**
-  - Task types: bug_fix, test, docs, refactor, feature (with scores 100, 90, 85, 70, 50)
-  - Effort multipliers: quick_win=2.0, small=1.5, medium=1.0, large=0.5
-  - Auto-approve logic: (bug_fix OR docs OR test) AND (quick_win OR small)
-  - Task statuses: pending, approved, queued, running, completed, failed
-  - TaskRepository methods: create(), findById(), findPending(), getNextTasks(), updateStatus(), updateApprovalStatus(), findByProject(), updatePrdJson()
+  - Tab navigation is handled automatically by useInput hook that reads from TABS array
+  - Each tab needs: TabId type member, TABS array entry, TabContent case, Footer shortcut
+  - View components follow pattern: export function XView(): React.ReactElement
 ---
 
-## 2026-01-12 19:30 - US-011
-- What was implemented:
-  - Created src/queue/approval.ts with ApprovalQueue class and categorizeTask() re-export
-  - ApprovalQueue has: submit(), approve(), reject(), getPending() methods
-  - Updated src/cli/index.ts with queue commands: 'metaralph queue', 'metaralph approve <id>', 'metaralph reject <id>'
-  - Queue display shows tasks grouped by approval status
+## 2026-01-14 - US-102
+- What was implemented: Enhanced ChatView component with full message display functionality
 - Files changed:
-  - src/queue/approval.ts (new)
-  - src/cli/index.ts (modified)
+  - `src/cli/components/ChatView.tsx` - Complete rewrite with:
+    - Message history display with timestamps (formatted dates/times)
+    - Role-specific styling (user=cyan, assistant=green, system=yellow)
+    - Arrow key scrolling with auto-scroll to bottom on new messages
+    - Loading state and empty state handling
+    - Conversation list sidebar for multiple conversations
+    - Date grouping headers (Today, Yesterday, dates)
 - **Learnings for future iterations:**
-  - categorizeTask() is in prioritizer.ts; approval.ts re-exports it for API clarity
-  - ApprovalQueue follows same db pattern as TaskRepository (optional db param)
-  - CLI commands can be top-level (approve/reject) or nested (queue list)
-  - getProject() imported from registry for task display
+  - ConversationRepository.findActive() gets active conversations
+  - ConversationRepository.getMessages(convId) gets messages for a conversation
+  - Ink's Key type doesn't include 'end' or 'home' - use input string checks instead (e.g., 'g' for start, 'G' for end)
+  - Use Text inverse={selected} for selection highlighting, not backgroundColor (Box doesn't have that prop)
+  - 2-second refresh interval is the standard pattern for dashboard views
 ---
 
-## 2026-01-12 20:00 - US-012
-- What was implemented:
-  - Created src/workers/execution.ts with Execution interface and ExecutionRepository
-  - Created src/workers/ralph-spawner.ts with RalphSpawner class
-  - RalphSpawner.spawn(task, project) creates prd.json and spawns ralph.sh subprocess
-  - RalphSpawner.monitor(execution, childProcess) tracks process and collects output
-  - Detects '<promise>COMPLETE</promise>' for success
+## 2026-01-14 - US-103
+- What was implemented: Added chat input with multi-line support to ChatView
 - Files changed:
-  - src/workers/execution.ts (new)
-  - src/workers/ralph-spawner.ts (new)
+  - `src/cli/components/ChatView.tsx` - Added:
+    - ChatInput component with ink-text-input for message entry
+    - Ctrl+Enter or Cmd+Enter (key.meta) submits the prompt
+    - Escape clears current input
+    - Character count displayed (e.g., '150/4000')
+    - Input disabled state while waiting for response
+    - MAX_INPUT_LENGTH constant (4000 chars)
+    - isProcessing state for managing disabled state
+    - handleSubmitMessage placeholder (actual API integration in US-104)
 - **Learnings for future iterations:**
-  - Execution statuses: pending, running, completed, failed
-  - ExecutionRepository methods: create(), update(), findById(), findRunning(), findByTask(), findByProject()
-  - RalphSpawner.spawn() returns { success, execution, childProcess, error? }
-  - RalphSpawner.monitor() returns Promise<CompletionResult> with output, exitCode, iterationsUsed
+  - ink-text-input is already available in package.json
+  - TextInput from 'ink-text-input' handles basic text input with Enter to submit
+  - Use key.meta for Cmd key on Mac, key.ctrl for Ctrl key
+  - key.return is used for Enter key in Ink
+  - For simulating async operations, useState with setTimeout works for placeholder behavior
+  - Input appears in both empty state and main view to allow starting conversations
+---
+
+## 2026-01-14 - US-104
+- What was implemented: Streaming Claude responses in chat with real-time display
+- Files changed:
+  - `src/cli/components/ChatView.tsx` - Major enhancements:
+    - Streaming response integration using Anthropic SDK `client.messages.stream()`
+    - StreamingIndicator component with animated spinner (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+    - StreamingMessage interface to track streaming state
+    - Token-by-token response display as stream.on('text') events fire
+    - Auto-scroll that follows new streaming content
+    - Scroll-up pauses auto-scroll, scroll to bottom or 'G' re-enables
+    - Streaming status indicator in header showing "⠋ Streaming..."
+    - Auto-scroll paused indicator shown when paused
+- **Learnings for future iterations:**
+  - Anthropic SDK has `client.messages.stream()` for streaming responses
+  - MessageStream emits 'text' event with (textDelta, textSnapshot) - use textDelta to accumulate
+  - Use `stream.finalMessage()` to await completion and get full response
+  - Use `stream.on('text', callback)` to handle streaming text deltas
+  - For spinner animation, use setInterval with ~100ms delay and cycle through frames
+  - Track auto-scroll state separately - disable on user scroll up, re-enable at bottom
+  - Use useRef for AbortController to allow stream cancellation
+  - Keep message history for context (slice last 10 messages to avoid context limits)
+---
+
+## 2026-01-14 - US-105
+- What was implemented: Project context selector for chat
+- Files changed:
+  - `src/cli/components/ChatView.tsx` - Added:
+    - ProjectSelector component with dropdown/selector UI
+    - 'p' key opens/closes project selector
+    - Arrow keys navigate the project list
+    - Enter confirms selection, Escape cancels
+    - "No project" option at index 0
+    - Selected project indicator shown in header (e.g., "[metaralph]")
+    - Project context now comes from selected project, not conversation
+    - Auto-select project from conversation on load if no manual selection
+    - Navigation hints updated to include 'p' shortcut
+- **Learnings for future iterations:**
+  - listProjects() returns all registered projects from the registry
+  - Keep both projectMap (for lookups) and projectList (for iteration) for different use cases
+  - Use separate state for selector: selectedProjectId, projectSelectorOpen, projectSelectorIndex
+  - Block other key handlers when selector is open (return early after handling)
+  - Use useCallback for selection handler to avoid stale closures
+  - Project context is passed to buildSystemPrompt() which includes project name, path, README, and structure
+---
+
+## 2026-01-14 - US-106
+- What was implemented: Added Loops tab to dashboard navigation
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added 'loops' to TabId, added Loops tab to TABS array with shortcut '0', added LoopsView to TabContent switch, updated Footer
+  - `src/cli/components/LoopsView.tsx` - Created new component with placeholder content
+- **Learnings for future iterations:**
+  - Adding a new tab requires 4 changes: TabId type, TABS array, TabContent case, Footer shortcut
+  - Loops tab uses shortcut '0' (zero) - consistent with pattern of single-digit shortcuts
+  - LoopsView follows same pattern as other views: export function XView(): React.ReactElement
+---
+
+## 2026-01-14 - US-107
+- What was implemented: Created loops and loop_iterations database tables
+- Files changed:
+  - `src/db/index.ts` - Added two new table definitions in createTables():
+    - `loops` table: id, project_id, branch_name, prd_path, status, max_iterations, current_iteration, started_at, completed_at, created_at
+    - `loop_iterations` table: id, loop_id, iteration_number, story_id, status, output, commit_sha, started_at, completed_at
+    - Added 4 indexes: idx_loops_project_id, idx_loops_status, idx_loop_iterations_loop_id, idx_loop_iterations_status
+- **Learnings for future iterations:**
+  - Database tables use CREATE TABLE IF NOT EXISTS for idempotent creation
+  - Foreign keys reference projects(id) and loops(id) with ON DELETE CASCADE
+  - Status columns use TEXT type with DEFAULT values (status tracking: pending/running/paused/completed/failed/stopped)
+  - Indexes follow naming pattern: idx_{table}_{column}
+  - No separate migration files - all schema lives in src/db/index.ts createTables()
+---
+
+## 2026-01-14 - US-108
+- What was implemented: Created LoopsView component with loop list display
+- Files changed:
+  - `src/loops/repository.ts` - New file with:
+    - LoopRepository: create, findById, findAll, findByProject, findByStatus, updateStatus, updateCurrentIteration, delete
+    - LoopIterationRepository: create, findByLoop, update
+    - Types: Loop, LoopIteration, LoopStatus, IterationStatus, CreateLoopInput
+    - Database row to interface converters following snake_case to camelCase pattern
+  - `src/loops/index.ts` - New module entry point exporting all types and repositories
+  - `src/cli/components/LoopsView.tsx` - Enhanced with full loop list:
+    - LoopRow component showing status, project, branch, progress, duration
+    - Status color-coded: running=green, paused=yellow, completed=cyan, failed/stopped=red
+    - LoopListHeader component for table columns
+    - Arrow key navigation with selectedIndex state
+    - Enter opens LoopDetailView showing iteration history
+    - LoopDetailView with expandable iteration output
+    - 2-second refresh interval for real-time updates
+- **Learnings for future iterations:**
+  - Repository pattern: create a new `src/<module>/repository.ts` for database operations
+  - Use `interface XRow` for database rows (snake_case) and `interface X` for app types (camelCase)
+  - Row to interface conversion functions follow `rowToX` naming
+  - Repositories are exported as const objects with methods, not classes
+  - `findAll` can use CASE expressions in ORDER BY to sort by status priority
+  - LoopWithProject interface extends Loop with projectName for display convenience
+  - Detail views can be shown conditionally by setting a state (detailLoop) and returning early
+---
+
+## 2026-01-14 - US-109
+- What was implemented: Added new loop creation dialog to LoopsView
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - CreateLoopDialog component with multi-field form
+    - Project selector dropdown with arrow key navigation
+    - PRD path input with default 'prd.json'
+    - Max iterations input with default 10 (numeric only)
+    - Branch name input with auto-generation from PRD path
+    - Tab key cycles through fields, Shift+Tab goes back
+    - Enter submits the form, Escape cancels
+    - generateBranchName() helper for auto-generating branch names
+    - showCreateDialog state and 'n' key handler
+    - loadProjects() to fetch available projects
+    - handleCreateLoop() to create loop via LoopRepository
+- **Learnings for future iterations:**
+  - Multi-field forms in Ink: use activeField state to track which field is focused
+  - TextInput from ink-text-input handles text entry, but needs isActive-like conditional rendering
+  - For numeric inputs, filter with `value.replace(/[^0-9]/g, '')` in onChange
+  - Tab navigation: use field array and index math for cycling
+  - Project selector: show dropdown only when field active, show selected value otherwise
+  - Auto-generate related fields: update branch name when PRD path changes
+  - Loading projects: call listProjects() from registry module
+---
+
+## 2026-01-14 - US-110
+- What was implemented: Loop start functionality with LoopRunner module
+- Files changed:
+  - `src/loops/runner.ts` - New file with LoopRunner module:
+    - start() - Spawns ralph.sh subprocess for a loop
+    - pause() - Marks loop as paused (takes effect after current iteration)
+    - resume() - Restarts a paused loop
+    - stop() - Kills running loop process immediately
+    - getActive() - Get active loop info
+    - isRunning() - Check if loop is running
+    - monitorLoopProcess() - Monitors stdout for iteration markers, story IDs, commits
+    - Tracks active loops in memory Map for process management
+  - `src/loops/index.ts` - Export LoopRunner and related types
+  - `src/cli/components/LoopsView.tsx` - Wire up handleCreateLoop to call LoopRunner.start()
+- **Learnings for future iterations:**
+  - Use spawn() from child_process with stdio: ['ignore', 'pipe', 'pipe'] for subprocess control
+  - Track active processes in a Map<id, ActiveLoop> for pause/stop functionality
+  - Parse iteration markers from Ralph output: /Ralph Iteration (\d+) of (\d+)/
+  - Detect story IDs with patterns like /Working on (US-\d+)/i or /"id":\s*"(US-\d+)"/
+  - Detect commits with /\[([a-f0-9]{7,40})\]/ or /commit ([a-f0-9]{7,40})/i
+  - Use process.on('close', callback) for exit handling, process.on('error', callback) for errors
   - findRalphScript() searches project-local and user-level locations for ralph.sh
-  - Child process spawned with stdio: ['ignore', 'pipe', 'pipe'] to capture output
+  - Keep only last 10KB of output when storing in database: output.slice(-10000)
 ---
 
-## 2026-01-13 - US-013
-- What was implemented:
-  - Created src/workers/failure-handler.ts with retry logic:
-    - MAX_RETRIES = 2, exponential backoff (5s base, 10s for retry 2)
-    - handleFailure() determines if retry should happen
-    - FailureHandler class wraps functional API
-  - Created src/workers/index.ts with WorkerOrchestrator class:
-    - Enforces maxConcurrentWorkers from config
-    - One worker per project via projectLocks Set
-    - scheduleTask() checks capacity, spawns worker via RalphSpawner
-    - monitorWorker() handles completion, triggers retries on failure
-    - Emits events: worker:started, worker:completed, worker:failed, worker:retry
-  - Updated 'metaralph workers' CLI to show active workers from ExecutionRepository.findRunning()
+## 2026-01-14 - US-111
+- What was implemented: Added loop progress display with real-time updates
 - Files changed:
-  - src/workers/failure-handler.ts (new)
-  - src/workers/index.ts (new)
-  - src/cli/index.ts (modified)
+  - `src/cli/components/LoopsView.tsx` - Major enhancements:
+    - Added PrdStory, PrdFile, StoryProgress interfaces for PRD data
+    - Added readPrdProgress() function to read PRD and get story completion status
+    - Added ProgressBar component with filled/empty characters and percentage
+    - Added LoopProgressDisplay component showing detailed progress for selected loop
+    - Updated LoopWithProject interface to include projectPath and storyProgress
+    - Updated LoopRow to show story progress count and current story for running loops
+    - Updated LoopListHeader with Iterations and Stories columns
+    - Enhanced LoopDetailView with spinner animation, progress bar, and current story display
+    - Added spinner animation (SPINNER_FRAMES) for running loops
+    - Story progress refreshes every 2 seconds via existing loadLoops interval
 - **Learnings for future iterations:**
-  - WorkerOrchestrator uses in-memory Maps/Sets for activeWorkers and projectLocks
-  - Retry counts are stored in-memory (resets on daemon restart)
-  - WorkerOrchestrator extends EventEmitter for events
-  - scheduleTask() returns ScheduleResult { success, message, worker? }
-  - ActiveWorker contains: task, project, execution, childProcess, startedAt, completionPromise
-  - Exponential backoff formula: BASE_DELAY * 2^(retryNumber - 1)
+  - Read PRD file with fs.readFileSync and JSON.parse to get story data
+  - Use path.join(projectPath, prdPath) to construct full path to PRD
+  - Progress bar: use '█' for filled and '░' for empty characters
+  - Find current story by filtering userStories.find(s => !s.passes)
+  - For real-time updates, store projectPath in LoopWithProject and re-read PRD in loadLoops
+  - Spinner frames work best with 100ms interval: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 ---
 
-## 2026-01-13 - US-014
-- What was implemented:
-  - Created src/queue/index.ts with QueueManager class:
-    - start() begins scheduling loop running every 5 seconds (SCHEDULING_INTERVAL_MS = 5000)
-    - stop() and stopAll() for graceful shutdown
-    - scheduleNextTasks() checks capacity, gets next tasks, schedules via WorkerOrchestrator
-    - Emits events: 'task:scheduled', 'task:completed', 'task:failed'
-    - Re-exports all queue module exports (Task, TaskRepository, ApprovalQueue, etc.)
-  - Created src/daemon/runner.ts as the daemon process entry point:
-    - Initializes QueueManager and starts scheduling loop
-    - Sets up event listeners for logging
-    - Handles SIGTERM/SIGINT for graceful shutdown
-  - Updated src/daemon/index.ts to spawn runner.ts instead of inline script
+## 2026-01-14 - US-112
+- What was implemented: Added pause and resume loop controls to LoopsView
 - Files changed:
-  - src/queue/index.ts (new)
-  - src/daemon/runner.ts (new)
-  - src/daemon/index.ts (modified)
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - handlePauseLoop callback using LoopRunner.pause() for 'p' key
+    - handleResumeLoop callback using LoopRunner.resume() for 'r' key
+    - Updated useInput handler to respond to 'p' and 'r' keys
+    - Updated navigation hints to include 'p pause' and 'r resume'
+    - Added pause hint in running loop row: '(press p to pause)'
+    - Added resume hint in paused loop row: 'Paused - press r to resume'
 - **Learnings for future iterations:**
-  - QueueManager extends EventEmitter like WorkerOrchestrator
-  - QueueManager wraps WorkerOrchestrator (composition pattern)
-  - scheduleNextTasks() updates task status to 'running' before scheduling
-  - Daemon lifecycle: startDaemon() spawns runner.js as detached process
-  - Runner module checks process.argv to detect direct execution
-  - QueueManager tracks stats: tasksScheduled, tasksCompleted, tasksFailed, lastScheduleCheck
+  - LoopRunner.pause() marks loop as paused (takes effect after current iteration)
+  - LoopRunner.resume() restarts a paused loop - Ralph continues from prd.json state
+  - Use useCallback for handlers that reference state to avoid stale closures
+  - Status-specific visual hints help users discover available actions
+  - Pause/resume controls should check loop.status before taking action
 ---
 
-## 2026-01-13 - US-015
-- What was implemented:
-  - Created src/cli/dashboard.tsx with Ink-based terminal UI:
-    - Dashboard component with tab navigation: Queue, Approvals, Projects, Workers
-    - Header component showing version and daemon status (refreshes every 2s)
-    - TabBar component with [1] [2] [3] [4] shortcut indicators
-    - TabContent placeholder component (will be implemented in US-016/US-017)
-    - Footer component showing keyboard shortcuts
-    - useInput hook handles keyboard: q quits, 1-4 switches tabs
-  - Updated src/cli/index.ts:
-    - Added 'metaralph dashboard' command
-    - Added default action so 'metaralph' (no args) launches dashboard
+## 2026-01-14 - US-113
+- What was implemented: Added stop loop control with confirmation dialog
 - Files changed:
-  - src/cli/dashboard.tsx (new)
-  - src/cli/index.ts (modified)
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - StopConfirmationDialog component with loop info, warning, and reason input
+    - 's' key handler to open stop confirmation dialog
+    - handleStopLoop callback that calls LoopRunner.stop(loopId, reason)
+    - showStopDialog state to manage dialog visibility
+    - Updated navigation hints to include 's stop'
+    - Updated visual hints in LoopRow for running/paused loops to show stop option
 - **Learnings for future iterations:**
-  - Ink uses React 18 with hooks (useState, useEffect, useInput, useApp)
-  - useApp().exit() exits the Ink app
-  - Tab type uses discriminated union pattern with TabId
-  - getDaemonStatus() imported from daemon/index.js for header display
-  - Package version read from package.json via fileURLToPath
-  - TSX files work due to "jsx": "react-jsx" in tsconfig.json
+  - LoopRunner.stop() already existed - just needed UI integration
+  - Stop confirmation dialog pattern: show context info, warning, optional reason input
+  - TextInput handles optional input - use placeholder and default value
+  - Block parent useInput when dialog is open by adding to early return condition
+  - Stop can apply to both 'running' and 'paused' loops (status check in handler)
 ---
 
-## 2026-01-13 - US-016
-- What was implemented:
-  - Created src/cli/components/QueueView.tsx showing task queue:
-    - Table with columns: Priority, ID, Project, Type, Status, Title
-    - Auto-refreshes every 2 seconds via useEffect interval
-    - Uses TaskRepository.findPending() for data
-    - Shows loading state and empty state messages
-  - Created src/cli/components/ApprovalView.tsx for approval management:
-    - Split view: task list on left (40%), details panel on right (60%)
-    - Arrow keys (up/down) navigate between pending tasks
-    - 'a' key approves selected task, 'r' key rejects
-    - Shows full task details: ID, Title, Project, Type, Effort, Priority, Source, Description
-    - Success/error messages with 3-second auto-dismiss
-    - Uses ApprovalQueue class for approve/reject operations
-  - Updated src/cli/dashboard.tsx:
-    - Integrated QueueView and ApprovalView components
-    - TabContent now uses switch statement to render appropriate view
+## 2026-01-14 - US-114
+- What was implemented: Enhanced loop iteration history view with full functionality
 - Files changed:
-  - src/cli/components/QueueView.tsx (new)
-  - src/cli/components/ApprovalView.tsx (new)
-  - src/cli/dashboard.tsx (modified)
+  - `src/cli/components/LoopsView.tsx` - Enhanced LoopDetailView:
+    - Added getStoryTitle() helper to look up story titles from PRD by storyId
+    - Added getIterationStatusColor() helper for consistent status coloring
+    - Iteration table now shows story title column (looked up from PRD stories)
+    - Failed iterations highlighted in red with bold status and red text on all fields
+    - Full output display with vertical scrolling (arrows, PgUp/PgDn, g/G for start/end)
+    - Output header shows line count and scroll position when content exceeds MAX_OUTPUT_LINES
+    - Added outputScrollOffset state for managing scroll position
+    - Escape first collapses expanded output, then second Escape returns to loop list
+    - Failed iteration output boxes have red border for emphasis
 - **Learnings for future iterations:**
-  - Ink components go in src/cli/components/ directory
-  - useInput hook is used for keyboard handling in approval view
-  - Views should auto-refresh with setInterval + useEffect pattern
-  - useCallback for functions referenced in useEffect dependencies
-  - Task display helpers: formatStatus(), formatType(), formatEffort(), truncate()
-  - Split layouts use Box with percentage widths (width="40%")
-  - Border styles: 'single', 'round' for different visual treatments
+  - To show related data (like story title from storyId), look up from available data (storyProgress.stories)
+  - Use array.find() with object property match for simple lookups
+  - For scrollable content: track offset state, slice array with offset/limit, show scroll info in header
+  - Multiple escape handling: check current state and collapse inner views first before outer navigation
+  - Red highlighting for failures: use both color="red" on Text and borderColor="red" on Box
 ---
 
-## 2026-01-13 - US-017
-- What was implemented:
-  - Created src/cli/components/ProjectsView.tsx for project management:
-    - Shows projects in a table with: Name, Health Score, Tasks count, Path
-    - Health score calculated from completed vs failed task ratio (0-100%)
-    - Selected project shows details panel on right side
-    - 'a' key opens text input to add new project by path
-    - 'd' key deletes project with confirmation (press twice)
-    - Arrow keys (up/down) navigate between projects
-    - Auto-refreshes every 2 seconds
-    - Uses ink-text-input for path input
-  - Created src/cli/components/WorkersView.tsx for worker monitoring:
-    - Summary stats bar showing running/completed/failed counts
-    - Worker cards show: project name, task title, progress bar, elapsed time
-    - Progress bar based on iterations used (iterations/10 max)
-    - Last 3 output lines displayed for each worker
-    - Empty state with instructions for starting daemon and creating tasks
-    - Auto-refreshes every 2 seconds
-  - Updated src/cli/dashboard.tsx to integrate ProjectsView and WorkersView
-  - Added ink-text-input dependency for text input in ProjectsView
+## 2026-01-14 - US-115
+- What was implemented: Added task search functionality to QueueView
 - Files changed:
-  - src/cli/components/ProjectsView.tsx (new)
-  - src/cli/components/WorkersView.tsx (new)
-  - src/cli/dashboard.tsx (modified)
-  - package.json (modified - added ink-text-input)
-  - package-lock.json (modified)
+  - `src/cli/components/QueueView.tsx` - Major enhancements:
+    - Added '/' key handler to activate search mode
+    - Created SearchInput component with TextInput, result count, and ESC hint
+    - Implemented search filtering by title, project name, or task type (case-insensitive)
+    - Added 150ms debounce using useRef timer to avoid excessive re-renders
+    - Escape key clears search and exits search mode
+    - Created HighlightedText component for search term highlighting (yellow background)
+    - Added TaskWithProject interface to cache resolved project names
+    - Updated TaskRow to accept searchTerm and projectName props
+    - Shows "X of Y" count when filtering vs total count when not
+    - Shows "No tasks match..." message when search has no results
 - **Learnings for future iterations:**
-  - ink-text-input provides TextInput component for text input in Ink
-  - Health score calculation: (completed / (completed + failed)) * 100
-  - Confirmation patterns: track confirmDeleteId state, require two presses
-  - Worker progress display: use ExecutionRepository.findRunning() for active workers
-  - Resolve task and project from execution for display context
-  - formatElapsed() helper for human-readable time since startedAt
-  - Progress bars: use '█' for filled and '░' for empty segments
+  - Debounce pattern: use useRef for timer, clear on new input, set searchTerm in setTimeout callback
+  - HighlightedText: split text at match index, render match with backgroundColor="yellow" color="black"
+  - Cache derived data (projectName) alongside source data to avoid repeated lookups
+  - For search UX: show immediate input feedback, debounce the expensive filter operation
+  - When search is active, return early from other key handlers to avoid conflicts
 ---
 
-## 2026-01-13 - US-018
-- What was implemented:
-  - Created src/onboarding/analyzer.ts with CodebaseAnalyzer class:
-    - analyze(projectPath) returns ImprovementOpportunity[] array
-    - detectOutdatedDeps() runs `npm outdated --json` and parses results
-    - detectTypeErrors() runs `tsc --noEmit` and parses error output
-    - detectLintIssues() runs `eslint . --format json` if eslint config exists
-    - runCommand() helper spawns child processes and captures stdout/stderr
-    - hasPackageJson(), hasTsConfig(), hasEslintConfig() detect available tools
-    - commandExists() checks for local node_modules/.bin commands
-  - Created src/onboarding/todo-extractor.ts with TodoExtractor:
-    - extract(projectPath) returns TodoComment[] with tag, content, file, line
-    - extractAsOpportunities() converts TODOs to ImprovementOpportunity[]
-    - getSummary() returns counts by TODO/FIXME/XXX/HACK tag
-    - Scans common file extensions, skips node_modules/dist/build etc.
-    - tagToTaskType() maps FIXME->bug_fix, HACK->refactor, TODO/XXX->feature
-    - estimateEffort() keyword-based effort estimation from comment content
+## 2026-01-14 - US-116
+- What was implemented: Added task filter controls to QueueView
 - Files changed:
-  - src/onboarding/analyzer.ts (new)
-  - src/onboarding/todo-extractor.ts (new)
+  - `src/cli/components/QueueView.tsx` - Major enhancements:
+    - Added STATUS_FILTERS and TYPE_FILTERS arrays with filter options
+    - Created FilterBar component showing status and type filters side by side
+    - Status filter: All | Pending | Running | Completed | Failed
+    - Type filter: All | Feature | Bug | Test | Docs | Refactor
+    - Tab key cycles through filter fields (null -> status -> type -> null)
+    - Arrow keys (left/right) change filter values when field is active
+    - Filter count shows "Showing X of Y" in filter bar
+    - Filters combine with existing search - all are applied together
+    - Active filter field highlighted with cyan, selected value highlighted green with inverse
+    - Escape deactivates current filter field
+    - Updated empty message to show active filter details
 - **Learnings for future iterations:**
-  - ImprovementOpportunity interface: type, title, description, file?, line?, severity, suggestedTaskType, suggestedEffort
-  - OpportunityType: 'outdated_dep' | 'type_error' | 'lint_issue' | 'todo_comment'
-  - TodoExtractor tags: TODO, FIXME, XXX, HACK (searched with regex in comments)
-  - Severity mapping: FIXME=high, HACK/XXX=medium, TODO=low
-  - npm outdated --json returns {pkgName: {current, wanted, latest, dependent, location}}
-  - TypeScript error format: path/file.ts(line,col): error TS####: message
-  - ESLint JSON format: [{filePath, messages: [{line, column, severity, message, ruleId}]}]
-  - SKIP_DIRS for file scanning: node_modules, .git, dist, build, out, etc.
-  - MAX_FILE_SIZE = 1MB to avoid memory issues on large files
+  - Filter cycling pattern: use activeFilterField state that cycles through null -> field1 -> field2 -> null
+  - Define filter options as const arrays: `{ value: FilterValue; label: string }[]` for easy iteration
+  - Arrow key navigation within filter: find current index in array, calculate new index with modulo
+  - Combine multiple filter conditions in single filter() call with early returns for each condition
+  - Use inverse={isSelected && isActive} for current selection highlight in filter bars
+  - TypeFilter and StatusFilter types use union: `'all' | ActualType` to include "all" option
 ---
 
-## 2026-01-13 - US-019
-- What was implemented:
-  - Created src/onboarding/proposal-generator.ts with ProposalGenerator:
-    - generate() creates Task objects from ImprovementOpportunity findings
-    - createTask() for single opportunity to task conversion
-    - preview() to preview proposals without creating tasks
-    - Generates PRD JSON with acceptance criteria based on opportunity type
-    - Returns ProposalGenerationResult with summary statistics
-  - Created src/onboarding/index.ts with OnboardingEngine:
-    - onboard(projectPath) - full pipeline: validate git -> analyze -> extract TODOs -> generate proposals
-    - analyze(projectId) - re-analyze existing project by ID
-    - preview(projectPath) - analysis without creating tasks
-    - Creates initial conversation with analysis summary
-    - Updates project.lastAnalyzed timestamp
-  - Added last_analyzed column to projects table via migration
-  - Added CLI command: 'metaralph projects analyze <id>' with --preview option
+## 2026-01-14 - US-117
+- What was implemented: Enhanced task detail view in QueueView
 - Files changed:
-  - src/onboarding/proposal-generator.ts (new)
-  - src/onboarding/index.ts (new)
-  - src/db/index.ts (modified - added migrateProjectsTable)
-  - src/cli/index.ts (modified - added analyze command)
+  - `src/cli/components/QueueView.tsx` - Major additions:
+    - TaskDetailView component showing full task information
+    - formatEffort(), formatApprovalStatus(), formatSource(), formatDate(), formatDuration() helpers
+    - getExecutionStatusColor() for status color coding
+    - parseAcceptanceCriteria() to extract AC from prdJson (handles direct AC or userStories format)
+    - Selection state (selectedIndex, detailTask) for list navigation
+    - Enter key opens detail view, Escape closes it
+    - Arrow key navigation for task list and execution history
+    - Execution output scrolling with ↑↓, PgUp/PgDn, g/G
+    - Error log display for failed executions
 - **Learnings for future iterations:**
-  - ProposalGenerator creates PRD JSON with userStories structure matching ralph.sh expectations
-  - Proposal interface: id, projectId, opportunity, taskInput, createdAt
-  - OnboardingEngine uses isGitRepository() from registry to validate projects
-  - Conversations and messages are stored in DB for project onboarding summaries
-  - migrateProjectsTable follows same pattern as migrateTasksTable for column additions
-  - CLI async actions supported by commander - use async/await in action handler
-  - getProjectById aliased import pattern to avoid naming conflicts with getProject
+  - ExecutionRepository.findByTask(taskId) retrieves execution history for a task
+  - Execution interface has: id, taskId, status, iterationsUsed, ralphOutput, errorLog, exitCode, startedAt, completedAt
+  - For detail views: use conditional rendering - check for detailTask state, return early if set
+  - PRD JSON may have acceptanceCriteria at top level or nested in userStories[0].acceptanceCriteria
+  - Use Text inverse={selected} for selection highlighting in lists
+  - When nesting Text elements, can't put Box inside Text - use string padding or separate layout
+  - Reset selectedIndex when filteredTasks.length changes to avoid out-of-bounds
 ---
 
-## 2026-01-13 - US-020
-- What was implemented:
-  - Created src/collaboration/conversation.ts with Conversation and Message models:
-    - Conversation interface with: id, projectId, title, status, createdAt, updatedAt
-    - Message interface with: id, conversationId, role (user/assistant/system), content, createdAt
-    - ConversationRepository with: create(), findById(), findByProject(), findActive()
-    - Message operations: addMessage(), getMessages(), getWithMessages()
-    - Status/title updates: updateStatus(), updateTitle(), delete()
-  - Created src/collaboration/discussion.ts with Claude-powered discussion engine:
-    - DiscussionEngine.respond() generates contextual responses in a conversation
-    - DiscussionEngine.startConversation() creates new conversation with initial response
-    - Builds project context from README, directory structure, package.json
-    - Uses @anthropic-ai/sdk for Claude API integration (claude-sonnet-4-20250514)
-    - System prompt includes project context for intelligent, project-aware responses
-  - Added @anthropic-ai/sdk dependency for Claude integration
+## 2026-01-14 - US-118
+- What was implemented: Added quick task creation dialog to QueueView
 - Files changed:
-  - src/collaboration/conversation.ts (new)
-  - src/collaboration/discussion.ts (new)
-  - package.json (modified - added @anthropic-ai/sdk)
-  - package-lock.json (modified)
+  - `src/cli/components/QueueView.tsx` - Major additions:
+    - inferTaskType() function to auto-detect type from title keywords
+    - QUICK_CREATE_FIELDS, EFFORT_OPTIONS, TASK_TYPE_OPTIONS constants
+    - QuickCreateDialog component with multi-field form
+    - 'c' key handler to open quick create dialog
+    - showQuickCreate, projects state management
+    - Title field with required indicator, project selector with dropdown
+    - Type and effort selectors with arrow key cycling
+    - Tab/Shift+Tab navigation between fields
+    - Enter submits, Escape cancels
+    - Auto-infer type from title keywords (fix/bug -> bug_fix, test -> test, etc.)
+    - Auto-select project if only one registered
+    - Updated header hints to show 'c: Create'
+    - Updated empty state to show create shortcut
 - **Learnings for future iterations:**
-  - Collaboration module lives in src/collaboration/ directory
-  - Conversation and Message use same row-to-model pattern as other repositories (snake_case to camelCase)
-  - DiscussionEngine requires ANTHROPIC_API_KEY env variable for Claude API
-  - Project context includes: README (truncated to 5000 chars), directory structure (2 levels), package.json
-  - Claude messages format: filter out 'system' role, keep only 'user' and 'assistant'
-  - getDirectoryStructure() uses tree-like format with └── and ├── connectors
-  - Discussion responses are automatically stored as messages in the conversation
+  - Type inference: use title.toLowerCase() and check for keyword includes()
+  - Multi-field dialogs: track activeField state, use Tab to cycle FIELDS array
+  - For required fields: show asterisk with color="red" when empty
+  - Project dropdown: use separate showDropdown state, not part of activeField
+  - useEffect for auto-infer: only infer when title.length > 3 to avoid rapid changes
+  - TaskRepository.create() takes source: 'manual' for user-created tasks
+  - Import EffortLevel type from queue module for type safety
+  - Import Project type from registry module for project list typing
 ---
 
-## 2026-01-13 - US-021
-- What was implemented:
-  - Created src/collaboration/prd-builder.ts with PrdBuilder class for interactive PRD creation:
-    - PrdBuilder.start() begins a new PRD building session with Claude
-    - PrdBuilder.continue() continues an existing session with user messages
-    - PrdBuilder.buildPrd() generates complete PRD from description using AI
-    - createTaskFromPrd() auto-creates Task when PRD is finalized
-    - Parses PRD JSON from Claude response using <prd></prd> tags
-    - In-memory session store (activeSessions Map) tracks ongoing PRD conversations
-    - Prd and UserStory interfaces match Ralph's expected prd.json format
-  - Created src/cli/chat.ts with interactive terminal chat implementation:
-    - startChatSession() opens interactive readline-based chat with MetaRalph
-    - Detects PRD-related requests and switches to PrdBuilder mode
-    - Falls back to DiscussionEngine for general questions
-    - Auto-displays task details when PRD is finalized
-  - Added startProposeSession() for automated improvement proposals:
-    - Runs OnboardingEngine.preview() for concrete analysis
-    - Uses Claude to generate higher-level improvement proposals
-    - Displays analysis summary and proposal recommendations
-  - Updated src/cli/index.ts with new CLI commands:
-    - 'metaralph chat <project>' opens interactive chat session
-    - 'metaralph propose <project>' with --auto-queue option
-    - Both commands accept project ID or name
+## 2026-01-14 - US-119
+- What was implemented: Added worker log search functionality to WorkersView
 - Files changed:
-  - src/collaboration/prd-builder.ts (new)
-  - src/cli/chat.ts (new)
-  - src/cli/index.ts (modified - added chat and propose commands)
+  - `src/cli/components/WorkersView.tsx` - Major enhancements:
+    - Added WorkerRow and WorkerListHeader components for selectable worker list
+    - Added selection state (selectedIndex) and navigation (↑/↓ arrow keys)
+    - Enter opens WorkerDetailView for selected worker
+    - Added WorkerDetailView component with full output display
+    - Added '/' key handler to open search input
+    - Added HighlightedLine component for search match highlighting
+    - Yellow background for matches, cyan for current match
+    - 'n' jumps to next match, 'N' to previous match
+    - Match count displayed with current position (e.g., "3/12")
+    - Auto-scroll to first match when search is submitted
+    - Scroll navigation: ↑/↓, PgUp/PgDn, g/G for start/end
+    - Line numbers displayed in output view
 - **Learnings for future iterations:**
-  - PrdBuilder uses session-based approach with in-memory Map for active sessions
-  - Claude response parsing: look for <prd></prd> tags or raw JSON with "project" key
-  - Interactive CLI uses node:readline createInterface for terminal input
-  - Task source for PRD-created tasks is 'conversation' (vs 'onboarding' for analysis)
-  - inferTaskType() maps keywords like 'bug'/'fix' -> bug_fix, 'test' -> test, etc.
-  - inferEffortLevel() based on story count: 1=quick_win, 2-3=small, 4-5=medium, 6+=large
-  - PRD_BUILDER_SYSTEM_PROMPT emphasizes small tasks, verifiable criteria, proper sequencing
-  - Chat session cleanup: handle SIGINT, close readline on exit
+  - For search highlighting: create HighlightedLine component that splits text at matches
+  - Use backgroundColor="yellow" color="black" for highlight, backgroundColor="cyan" for current match
+  - Track matchIndices[] as array of line numbers containing matches
+  - currentMatchIndex tracks position in matchIndices for n/N navigation
+  - Auto-scroll to match: calculate target offset as Math.max(0, Math.min(matchLine - 5, maxOffset))
+  - For live search input: keep separate searchInputValue state for TextInput, set searchTerm on submit
+  - When searchActive, block other useInput handlers with early return
+  - visibleMatchLineNumbers Set for efficient lookup of which visible lines have matches
 ---
 
-## 2026-01-13 - US-022
-- What was implemented:
-  - Created src/learning/learning.ts with Learning model and LearningRepository:
-    - Learning interface with: id, executionId, projectId, category, content, confidence, timesApplied, timesSuccessful, tags
-    - LearningCategory types: pattern, gotcha, dependency, testing, architecture, workflow, environment, general
-    - LearningRepository with: create(), findById(), findAll(), findByProject(), findByCategory(), findByExecution(), search(), update(), recordApplication(), delete(), findHighConfidence()
-    - Metadata (tags, timesSuccessful) stored in content field with ---METADATA--- separator
-    - recordApplication() recalculates confidence based on success rate formula
-  - Created src/learning/cross-project.ts with CrossProjectPatternExtractor:
-    - extractFromExecution(executionId) parses progress.txt for patterns
-    - extractPatternsFromContent() parses "Codebase Patterns" and "Learnings for future iterations" sections
-    - inferCategory() maps content keywords to LearningCategory
-    - extractTags() extracts technology-related tags from content
-    - Similarity-based deduplication to avoid duplicate learnings
-    - extractFromProject() processes all completed executions for a project
-    - extractFromProgressFile() for direct file processing
-  - Created src/learning/outcome-tracker.ts with OutcomeTracker:
-    - analyzeOutcomes() correlates execution outcomes with task attributes (type, effort, source)
-    - AttributeCorrelation tracks success rates per attribute value
-    - OutcomeInsight generates high_success, low_success, trend, and recommendation insights
-    - createLearningsFromAnalysis() creates Learning objects from outcome insights
-    - getHighSuccessTaskTypes() and getHighSuccessEffortLevels() for quick queries
+## 2026-01-14 - US-120
+- What was implemented: Added worker output level filtering to WorkerDetailView
 - Files changed:
-  - src/learning/learning.ts (new)
-  - src/learning/cross-project.ts (new)
-  - src/learning/outcome-tracker.ts (new)
+  - `src/cli/components/WorkersView.tsx` - Major enhancements:
+    - Added OutputLevelFilter type and OUTPUT_LEVEL_FILTERS array
+    - Added isErrorLine(), isWarningLine(), getLineLevel(), countLinesByLevel() helper functions
+    - Added levelFilter and filterActive state variables
+    - 'f' key opens filter selector mode
+    - Left/right arrows cycle through filter options (All | Errors | Warnings | Info)
+    - Enter/ESC closes filter selector
+    - Level counts header shows: X errors | Y warnings | Z info
+    - Filter info bar shows current filter and line count when not 'all'
+    - Error lines (containing 'error', 'failed', 'exception') highlighted red
+    - Warning lines (containing 'warn', 'warning') highlighted yellow
+    - Filtering works with search - both are applied together
+    - Added filteredLinesWithIndex to preserve original line numbers when filtering
 - **Learnings for future iterations:**
-  - Learning module lives in src/learning/ directory
-  - Metadata stored in content field using ---METADATA--- separator (avoids schema changes)
-  - LearningRepository follows same optional db parameter pattern as other repositories
-  - Confidence recalculation formula: min(1.0, 0.5 + (successRate * 0.5))
-  - Pattern extraction uses regex to find "Codebase Patterns" and "Learnings for future iterations" sections
-  - Similarity check uses word overlap ratio (threshold 0.7) to detect duplicate patterns
-  - OutcomeTracker minSampleSize default is 3 for statistical significance
-  - Insight confidence increases with sample size: min(0.9, 0.5 + (samples/20) * 0.4)
+  - For level detection: check line.toLowerCase().includes() for error/warning keywords
+  - Filter + search combo: apply filter first, then search on filtered results
+  - Track original line numbers: use `{ line, originalIndex }` objects in filtered array
+  - When filtering changes, reset scrollOffset to 0 to avoid out-of-bounds
+  - Level color coding: error=red, warning=yellow, info=default
+  - Filter mode pattern: similar to search mode with active state and key handlers
 ---
 
-## 2026-01-13 - US-023
-- What was implemented:
-  - Created src/learning/index.ts with LearningSystem class:
-    - LearningSystem.findApplicableLearnings(task) finds relevant learnings by context matching
-    - Context matching uses: project match, category relevance, tag overlap, content keywords, confidence
-    - LearningSystem.injectLearnings(task, learnings) adds learnings to progress.txt Codebase Patterns section
-    - recordOutcome(taskId, wasSuccessful) updates learning success metrics after task execution
-    - getAppliedLearnings(taskId) retrieves which learnings were applied for tracking
-    - extractFromExecution() and analyzeAndCreateLearnings() delegate to submodules
-  - Re-exports all types from learning.ts, cross-project.ts, and outcome-tracker.ts
-  - Singleton instance exported as learningSystem
+## 2026-01-14 - US-121
+- What was implemented: Added self-improvement status section to new Health tab
 - Files changed:
-  - src/learning/index.ts (new)
+  - `src/cli/components/HealthView.tsx` - New file with:
+    - SelfImprovementSection component showing status metrics
+    - Shows: self-managed projects count, last analysis time, proposals in queue, pending approvals
+    - Recent results list with status icons (completed/failed/running)
+    - HealthOverviewSection placeholder for future project health metrics
+    - 10-second refresh interval for real-time updates
+    - 'r' key to manually refresh
+  - `src/cli/dashboard.tsx` - Added Health tab:
+    - Added 'health' to TabId type union
+    - Added Health tab to TABS array with shortcut '5'
+    - Added HealthView case in TabContent switch
+    - Updated Footer with Health shortcut
 - **Learnings for future iterations:**
-  - LearningSystem uses applicationRecords Map to track which learnings were applied to which tasks
-  - Relevance scoring uses weighted sum: project(3), category(2), tags(2), content(2), confidence(1)
-  - Minimum relevance threshold is 0.3 (learnings below this are not applied)
-  - Max 10 learnings are applied per task to avoid overwhelming context
-  - Learnings are injected into progress.txt Codebase Patterns section (not CLAUDE.md)
-  - Category relevance map determines which learning types are most useful for which task types
-  - Tag extraction looks for common tech keywords (typescript, react, etc.)
-  - Content relevance uses keyword extraction with stop word filtering
+  - Health tab uses shortcut '5' - between Workers (4) and Chat (9)
+  - HealthDashboard.js exists in dist but not src - source files may need recreation
+  - Self-improvement data comes from tasks table with source='self_improvement'
+  - Use getRegisteredSelfProjects(db) from self-improve module to get self-managed projects
+  - Text component doesn't have marginTop prop in Ink - use Box wrapper instead
+  - Border styles available: 'round', 'single', etc. - use 'round' for sections
 ---
 
-## 2026-01-13 - US-024
-- What was implemented:
-  - Added is_self and self_branch columns to projects table via migration:
-    - is_self: INTEGER flag (1 for self-managed projects)
-    - self_branch: TEXT for isolated branch name
-  - Created src/self-improve/ralph-analyzer.ts with RalphAnalyzer:
-    - SelfImprovementOpportunity extends ImprovementOpportunity with category, riskLevel, requiresApproval
-    - detectMissingTests() scans src/ for files without corresponding test files
-    - detectMissingDocs() finds exported functions/classes without JSDoc
-    - detectOptimizations() finds N+1 queries, excessive sync file ops, large switch statements
-    - checkStrictMode() checks tsconfig.json for strict mode settings
-    - runLintCheck() runs eslint and reports error counts
-    - Results sorted by risk level (low first) then severity (high first)
-    - getSafeOpportunities() filters for auto-executable changes (low risk, no approval)
-  - Created src/self-improve/self-registration.ts:
-    - findRalphPath() and findMetaRalphPath() search known locations
-    - generateSelfBranch() creates timestamped branch names: self-improve/<project>-YYYYMMDD
-    - registerSelfProjects() auto-registers both projects with is_self=true
-    - getRegisteredSelfProjects() returns all self-managed projects
-    - isSelfProject() helper to check is_self flag
-  - Updated src/registry/index.ts:
-    - Extended Project interface with is_self and self_branch optional fields
-    - Added registerSelfProject() for registering self-managed projects
-    - Added getSelfProjects() to list all self-managed projects
-  - Updated src/daemon/runner.ts:
-    - On startup, calls registerSelfProjects() if selfImprovementEnabled
-    - Logs registration results
-  - Updated src/utils/config.ts:
-    - Added optional ralphPath and metaRalphPath config options
+## 2026-01-14 - US-122
+- What was implemented: Added self-improvement proposal list to HealthView
 - Files changed:
-  - src/self-improve/ralph-analyzer.ts (new)
-  - src/self-improve/self-registration.ts (new)
-  - src/db/index.ts (modified - added is_self, self_branch columns)
-  - src/registry/index.ts (modified - added registerSelfProject, getSelfProjects)
-  - src/daemon/runner.ts (modified - auto-register self projects)
-  - src/utils/config.ts (modified - added optional path configs)
+  - `src/cli/components/HealthView.tsx` - Major enhancements:
+    - Added ProposalWithRisk interface for proposals with RiskAssessment data
+    - Added ProposalListHeader component for table header
+    - Added ProposalRow component with risk-based color coding
+    - Added ProposalDetailView component showing full proposal details
+    - Added ProposalListSection with loading, empty, list, and detail states
+    - Risk color coding: green (<40), yellow (40-70), red (>70)
+    - Arrow key navigation for proposal selection
+    - Enter opens detail view, ESC returns to list
+    - Shows title, type, risk score, project in list view
+    - Detail view shows risk factors, affected files, description
+    - Integrated Guardrails.assessTaskRisk() for risk assessment
+    - Loads proposals from tasks table with source='self_improvement' and approval_status='pending'
 - **Learnings for future iterations:**
-  - Self-improvement module lives in src/self-improve/ directory
-  - Self projects use is_self=1 in database (SQLite stores booleans as integers)
-  - generateSelfBranch() format: self-improve/<project>-YYYYMMDD
-  - RALPH_SEARCH_PATHS and METARALPH_SEARCH_PATHS define common install locations
-  - RalphAnalyzer categories: optimization, test, documentation, refactor, feature
-  - Risk levels: low (auto-execute), medium (review suggested), high (approval required)
-  - detectMissingTests() skips index.ts, test files, and type declarations
-  - detectMissingDocs() limits to 10 results to avoid overwhelming
-  - findMetaRalphPath() also checks current working directory for metaralph package
+  - Use Guardrails.assessTaskRisk(task, projectPath) from self-improve module for risk scoring
+  - RiskAssessment has: score (0-100), level ('low'|'medium'|'high'|'critical'), reasons[], affectedFiles[]
+  - Color coding pattern: green for low risk, yellow for medium, red for high - same as getRiskColor()
+  - For proposal lists: store projectName with proposal for display, get via projectMap lookup
+  - Detail views can share state with parent (showDetail) or use callback pattern
+  - Import Key type from 'ink' for proper type checking of useInput key parameter
 ---
 
-## 2026-01-13 - US-025
-- What was implemented:
-  - Created src/self-improve/safe-executor.ts with SafeExecutor module:
-    - generateIsolatedBranchName() creates branches: self-improve/<feature>-<timestamp>
-    - createIsolatedBranch() creates/checks out isolated branches from main
-    - execute() full execution flow: checkpoint -> branch -> spawn Ralph -> validate -> rollback on failure
-    - runValidation() runs both typecheck and tests
-    - runTypecheck() runs tsc --noEmit if available
-    - runTests() detects and runs npm test with passWithNoTests
-    - handleFailure() performs rollback and updates task status
-    - mergeBranch() merges successful branches back to main
-    - cleanupBranch() removes branches after execution
-  - Created src/self-improve/rollback.ts with Rollback module:
-    - Checkpoint interface: id, commitSha, branchName, description, createdAt, hadUncommittedChanges, stashRef
-    - createCheckpoint() saves current state and stashes uncommitted changes
-    - rollbackToCheckpoint() restores to checkpoint: abort ops, clean, checkout, reset, restore stash
-    - immediateRollback() quick reset to HEAD discarding all changes
-    - verifyRollback() confirms current SHA matches checkpoint
-    - cleanupBranches() deletes branches matching pattern
-    - listMetaRalphStashes() and cleanupStashes() for stash management
+## 2026-01-14 - US-123
+- What was implemented: Added proposal approve/reject controls to HealthView
 - Files changed:
-  - src/self-improve/safe-executor.ts (new)
-  - src/self-improve/rollback.ts (new)
+  - `src/cli/components/HealthView.tsx` - Major enhancements:
+    - Added TextInput import from 'ink-text-input'
+    - Created RejectDialog component with reason input field
+    - Added showRejectDialog state to manage dialog visibility
+    - Added actionMessage state for showing approve/reject feedback banners
+    - Added handleApprove callback using TaskRepository.updateApprovalStatus('approved')
+    - Added handleReject callback using TaskRepository.updateApprovalStatus('rejected') and updateStatus('failed')
+    - Added handleCancelReject callback to close reject dialog
+    - Updated ProposalDetailView to accept onApprove, onReject, showRejectDialog, onCancelReject props
+    - Updated ProposalListSection to pass approve/reject handlers to detail view
+    - 'a' key approves selected proposal and queues for execution
+    - 'r' key opens RejectDialog for entering rejection reason
+    - Enter submits rejection with reason, ESC cancels
+    - Action message banner shows feedback with 3-second auto-dismiss
+    - Context-aware footer hints based on view state
 - **Learnings for future iterations:**
-  - SafeExecutor.execute() flow: checkpoint -> branch -> spawn -> monitor -> validate -> success OR rollback
-  - SafeExecutionResult includes: success, branchName, checkpoint, execution, completionResult, validationPassed, error, wasRolledBack
-  - SafeExecutionOptions: featureName (required), runTests, runTypecheck, autoMerge, maxIterations
-  - Checkpoint stores stashRef if uncommitted changes were present at checkpoint time
-  - Rollback.rollbackToCheckpoint() aborts any in-progress git operations (merge, rebase, cherry-pick)
-  - Rollback.cleanupBranches() sorts deletion by index (highest first) to avoid index shifting
-  - runCommand() helper is defined in both files (could be refactored to shared util)
-  - SafeExecutor integrates with RalphSpawner.spawn() and RalphSpawner.monitor() for execution
-  - Validation runs both typecheck and tests by default (can be disabled via options)
+  - TaskRepository.updateApprovalStatus('approved') also sets status to 'queued' automatically
+  - For rejection, need to also call updateStatus('failed') to properly mark task as rejected
+  - Use action message banner pattern for user feedback: { text, color } state with setTimeout to clear
+  - Block parent useInput when dialog is open by early return at top of handler
+  - Pass callbacks through component hierarchy: parent -> list section -> detail view -> dialog
+  - RejectDialog uses its own useInput for Enter/ESC handling
 ---
 
-## 2026-01-13 - US-026
-- What was implemented:
-  - Created src/self-improve/guardrails.ts with safety guardrails:
-    - CORE_SAFETY_PATTERNS defines protected files (guardrails, rollback, safe-executor, etc.)
-    - Risk scoring (0-100) based on: core safety impact, high-risk files, keywords, task type, effort
-    - Risk levels: low (0-39), medium (40-69), high (70-79), critical (80-100)
-    - assessTaskRisk() and assessOpportunityRisk() for comprehensive risk assessment
-    - validateChange() blocks high-risk/critical changes without approval
-    - filterSafeOpportunities() returns only low-risk auto-executable changes
-  - Created src/self-improve/index.ts with SelfImprovementEngine:
-    - analyze() scans project for improvement opportunities using RalphAnalyzer
-    - propose() creates tasks from opportunities with risk-based auto-approval
-    - executeApproved() runs approved tasks via SafeExecutor
-    - run() orchestrates full pipeline: analyze -> propose -> (approve) -> execute -> validate -> merge/rollback
-    - preview() for dry-run analysis without making changes
-    - Re-exports all types from submodules for convenient API
-  - Added CLI command 'metaralph self-improve':
-    - --dry-run: Only analyze and propose, no execution
-    - --auto-only: Execute only auto-approved (low-risk) changes
-    - --max-executions <n>: Limit concurrent changes (default 1)
-    - --auto-merge: Auto-merge successful changes to main
-    - --project <id>: Target specific self-managed project
-    - Displays analysis summary, proposals, and execution results
+## 2026-01-14 - US-124
+- What was implemented: Added keyboard shortcut help overlay accessible from any screen
 - Files changed:
-  - src/self-improve/guardrails.ts (new)
-  - src/self-improve/index.ts (new)
-  - src/cli/index.ts (modified - added self-improve command)
+  - `src/cli/dashboard.tsx` - Major additions:
+    - ShortcutGroup interface and SHORTCUT_GROUPS constant with all shortcuts grouped by context
+    - ShortcutHelpOverlay component displaying shortcuts in a grid layout
+    - Shortcuts for all 8 contexts: Global, Queue, Approvals, Projects, Workers, Health, Chat, Loops
+    - '?' key handler in Dashboard to toggle help overlay
+    - showHelp state to track overlay visibility
+    - Current tab's shortcuts highlighted with cyan border and inverse text
+    - Global shortcuts highlighted with green border
+    - Yellow text for key combinations, dimColor for inactive context descriptions
+    - ESC or '?' closes the overlay
+    - Updated Footer to show '?' Help shortcut
 - **Learnings for future iterations:**
-  - Self-improvement module has full pipeline: analyze -> propose -> approve -> execute -> validate
-  - CORE_SAFETY_PATTERNS includes: guardrails, rollback, safe-executor, approval, config files
-  - High-risk keywords (delete, force, bypass, etc.) contribute to risk score
-  - Risk score formula: coreImpact(50) + highRiskFiles(10ea) + keywords(5ea) + taskType(0-15) + effort(0-20)
-  - Tasks created from opportunities use 'self_improvement' as TaskSource
-  - SelfImprovementEngine.run() returns comprehensive result with analysis, proposals, executions
-  - CLI displays top 5 opportunities with risk level and auto-approve status
-  - Guardrails.validateChange() is the main entry point for safety checks
+  - Overlay pattern: use conditional return in main component to show full-screen overlay instead of tab content
+  - For multi-context shortcuts, use array of groups with tabId to identify which is current
+  - Use inverse={isCurrentTab} on Text to highlight the active section
+  - Block other key handlers when overlay is open by checking showHelp state first
+  - ShortcutHelpOverlay has its own useInput for '?' and ESC handling
+  - flexWrap="wrap" on Box allows groups to flow to next row on small terminals
+---
+
+## 2026-01-14 - US-125
+- What was implemented: Added notification bell to header with count display
+- Files changed:
+  - `src/cli/dashboard.tsx` - Major additions:
+    - NotificationCounts interface for tracking pending approvals, failed tasks, critical alerts
+    - getNotificationCounts() function to query database for notification counts
+    - NotificationBell component with unicode bell icons (1F514 for active, 1F515 for muted)
+    - Color coding: red for critical alerts, yellow for failed tasks, cyan for approvals
+    - Tooltip showing count breakdown (e.g., "3 approvals, 2 failed")
+    - NotificationListOverlay component showing notification categories
+    - '!' key handler to toggle notifications overlay
+    - Updated Footer to show '!' Alerts shortcut
+    - Updated SHORTCUT_GROUPS to include '!' for notifications
+    - Header and Dashboard both track notification counts with 2-second refresh
+- **Learnings for future iterations:**
+  - Use unicode escapes for emoji in terminal: '\u{1F514}' for bell, '\u{1F515}' for muted bell
+  - Check if table exists before querying: `SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'`
+  - Multiple overlays: track each with separate state (showHelp, showNotifications) and check both in useInput
+  - Notification counts aggregated from multiple sources: tasks table for approvals/failures, notifications table for alerts
+  - NotificationListOverlay follows same pattern as ShortcutHelpOverlay: conditional render in Dashboard
+---
+
+## 2026-01-15 - US-126
+- What was implemented: Created notifications database table and NotificationRepository
+- Files changed:
+  - `src/db/index.ts` - Added notifications table with columns: id, type, title, message, severity, read, created_at
+  - Added indexes: idx_notifications_type, idx_notifications_read, idx_notifications_severity
+  - `src/notifications/repository.ts` - New file with NotificationRepository providing CRUD operations
+  - `src/notifications/index.ts` - Module exports for Notification types and repository
+- **Learnings for future iterations:**
+  - Notification types: 'task_complete' | 'task_failed' | 'loop_complete' | 'approval_needed' | 'alert'
+  - Notification severity: 'info' | 'warning' | 'critical'
+  - NotificationRepository follows same pattern as LoopRepository - const object with methods
+  - read column uses INTEGER (0/1) in SQLite, converted to boolean in interface
+  - Repository includes utility methods: countUnread(), countBySeverity(), markAllAsRead(), deleteOld()
+---
+
+## 2026-01-15 - US-127
+- What was implemented: Added full notification list view with database integration
+- Files changed:
+  - `src/cli/dashboard.tsx` - Enhanced NotificationListOverlay with:
+    - Database integration via NotificationRepository.findRecent(50)
+    - NotificationRow component with severity color coding and unread badge
+    - formatNotificationTime() for relative timestamps (just now, 5m ago, 2h ago, etc.)
+    - getSeverityColor() helper for consistent color theming
+    - Arrow key navigation with selectedIndex state
+    - Enter key marks selected notification as read
+    - 'd' key dismisses (deletes) selected notification
+    - Unread notifications highlighted with bold text and cyan [new] badge
+    - Message preview panel for selected notification
+    - Loading state while fetching from database
+    - Empty state with helpful message
+    - Unread count displayed in header
+- **Learnings for future iterations:**
+  - NotificationRepository.findRecent(limit) returns recent notifications sorted DESC
+  - Use try/catch when loading from database in overlay - table might not exist yet
+  - For relative timestamps: calculate diffMs, then convert to mins/hours/days
+  - Unread highlighting: use bold={isUnread} and dimColor={!isUnread} for contrast
+  - Selection adjustment on delete: check if selectedIndex >= length - 1 before adjusting
+  - Import Notification type from notifications/index.js (not repository.js directly)
+---
+
+## 2026-01-15 - US-128
+- What was implemented: Added consistent loading states to all view components
+- Files changed:
+  - `src/cli/components/LoadingStates.tsx` - New file with:
+    - LoadingSpinner component with animated frames (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+    - RefreshingIndicator component for background updates
+    - LoadingView component for full initial loading state
+    - ViewHeader component with optional refreshing indicator
+    - useLoadingState hook for managing loading/refreshing states
+  - `src/cli/components/QueueView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/LoopsView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/WorkersView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/ProjectsView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/ApprovalView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/HealthView.tsx` - Added isRefreshing/hasLoaded state, LoadingSpinner, RefreshingIndicator
+  - `src/cli/components/ChatView.tsx` - Added isRefreshing/hasLoaded state, RefreshingIndicator (already had spinner for streaming)
+- **Learnings for future iterations:**
+  - Use consistent SPINNER_FRAMES array across all views: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  - Pattern for loading vs refreshing: hasLoaded tracks first load, isRefreshing shows indicator for background updates
+  - Loading state blocks content display, refreshing indicator appears in header without blocking interaction
+  - 80ms interval for spinner animation provides smooth visual feedback
+  - Import from './LoadingStates.js' with .js extension for ESM compatibility
+---
+
+## 2026-01-15 - US-129
+- What was implemented: Added consistent empty states to all dashboard views
+- Files changed:
+  - `src/cli/components/LoadingStates.tsx` - Added EmptyState component with message and optional shortcut hint
+  - `src/cli/components/QueueView.tsx` - Updated empty state to "No tasks yet." with 'c' shortcut
+  - `src/cli/components/LoopsView.tsx` - Updated empty state to use EmptyState component with 'n' shortcut
+  - `src/cli/components/WorkersView.tsx` - Simplified empty state to "No active workers."
+- **Learnings for future iterations:**
+  - Use EmptyState component from './LoadingStates.js' for consistent empty state UI
+  - EmptyState takes: message (required), shortcutKey (optional), shortcutAction (optional)
+  - Format: "Press [key] to [action]." appears below the message when shortcuts are provided
+  - Workers don't have a shortcut since they start automatically when daemon processes tasks
+---
+
+## 2026-01-15 - US-130
+- What was implemented: Added error handling wrapper for all dashboard views
+- Files changed:
+  - `src/cli/components/LoadingStates.tsx` - Added:
+    - ErrorBoundary class component that catches JavaScript errors in child components
+    - ErrorDisplay functional component showing user-friendly error messages
+    - useErrorHandler hook for async operation error handling
+    - getUserFriendlyMessage() function to detect error types (database, network, file, JSON)
+    - 'd' key toggles error details (name, message, stack trace)
+    - 'r' key retries if onRetry handler is provided
+  - `src/cli/dashboard.tsx` - Added:
+    - Import ErrorBoundary from LoadingStates.js
+    - getViewName() helper function for view names
+    - Each view wrapped in ErrorBoundary with appropriate viewName
+- **Learnings for future iterations:**
+  - React ErrorBoundary must be a class component (functional components can't catch errors)
+  - Use static getDerivedStateFromError() to update state on error
+  - componentDidCatch() for logging error info
+  - User-friendly messages: detect error patterns with message.toLowerCase().includes()
+  - Common error patterns: sqlite/database, network/fetch/timeout, enoent/permission, json/parse
+  - Stack trace display: slice first 6 lines to show relevant info without overwhelming
+  - ErrorBoundary needs key prop if you want it to reset when switching tabs
+---
+
+## 2026-01-15 - US-131
+- What was implemented: Added tab badges showing attention item counts
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added:
+    - TabBadgeCounts interface for queue/approvals/workers/health counts
+    - getTabBadgeCounts() function to query database for badge counts
+    - getBadgeColor() helper for consistent tab-specific badge colors
+    - Updated TabBar to accept badgeCounts prop and display badges
+    - Updated Dashboard to fetch and pass badge counts with 2-second refresh
+    - Badge colors: queue=cyan, approvals=yellow, workers=green, health=red
+- **Learnings for future iterations:**
+  - Badge counts query multiple tables: tasks for queue/approvals, workers for workers, notifications for health
+  - Use `status = 'pending' OR status = 'queued'` for pending task count
+  - Use `status = 'running' OR status = 'busy'` for running worker count
+  - Check if table exists before querying (notifications table may not exist)
+  - Badge display: `({count})` format with conditional rendering for count > 0
+  - When tab is active, badge inherits active color; inactive tabs use getBadgeColor()
+---
+
+## 2026-01-15 - US-132
+- What was implemented: Reorganized dashboard tabs for better workflow
+- Files changed:
+  - `src/cli/dashboard.tsx` - Updated TABS array order, Footer shortcuts, and SHORTCUT_GROUPS global help
+- **Learnings for future iterations:**
+  - Tab order reflects usage frequency: Queue > Loops > Workers > Chat > Projects > Health > Approvals
+  - When changing tab shortcuts, update 3 places: TABS array, Footer component, SHORTCUT_GROUPS global
+  - Sequential shortcuts (1-7) are easier to remember than scattered numbers (1-5, 9, 0)
+  - Costs and Debug tabs mentioned in acceptance criteria don't exist yet - focus on existing tabs
+---
+
+## 2026-01-15 - US-133
+- What was implemented: Standardized navigation patterns across all dashboard views
+- Files changed:
+  - `src/cli/components/NavigationPatterns.tsx` - Created new module with:
+    - Comprehensive documentation of standard keyboard navigation patterns
+    - List navigation utilities: handleListNavigation, useListSelection
+    - Scroll navigation utilities: handleScrollNavigation, useScrollNavigation
+    - Filter cycling utility: handleFilterCycling
+    - Standard navigation hint text constants
+    - Documented patterns: list nav, dialog nav, tab nav, global shortcuts, action keys
+- **Learnings for future iterations:**
+  - All views already follow consistent patterns from prior implementations
+  - Arrow keys for list navigation, Enter for detail view, Escape for back/close
+  - Tab cycles filters/sections, number keys switch main tabs (dashboard.tsx)
+  - useInput in dialogs/overlays should return early to block parent handlers
+  - Search mode should block navigation keys while input is active
+  - ApprovalView uses split-pane layout (detail always visible) - valid pattern
+---
+
+## 2026-01-15 - US-134
+- What was implemented: Added consistent color coding across all dashboard views
+- Files changed:
+  - `src/cli/components/ColorScheme.tsx` - New centralized color scheme module with:
+    - STATUS_COLORS: green=running, red=failed, yellow=paused/warning, cyan=completed, gray=pending
+    - TASK_TYPE_COLORS: magenta=feature, red=bug_fix, cyan=test, blue=docs, yellow=refactor
+    - RISK_COLORS, SEVERITY_COLORS, EFFORT_COLORS for other color needs
+    - UI_COLORS for headers, highlights, action keys
+    - Helper functions: getTaskStatusColor, getLoopStatusColor, getExecutionStatusColor
+    - Format functions: formatTaskType, formatTaskStatus, formatEffort with color
+  - `src/cli/components/QueueView.tsx` - Updated to use ColorScheme for status, type colors
+  - `src/cli/components/LoopsView.tsx` - Updated getStatusColor and getIterationStatusColor
+  - `src/cli/components/HealthView.tsx` - Updated getRiskColor and formatTaskType with type color
+  - `src/cli/components/ApprovalView.tsx` - Updated formatType and formatEffort with type color
+  - `src/cli/dashboard.tsx` - Updated getBadgeColor and getSeverityColor
+- **Learnings for future iterations:**
+  - Centralize color constants in ColorScheme.tsx - import from there for consistency
+  - STATUS_COLORS uses semantic names: running, completed, failed, pending, paused, etc.
+  - TASK_TYPE_COLORS assigns distinct colors per type: feature=magenta, bug=red, test=cyan
+  - Wrap existing color functions to use centralized scheme: `return getXFromScheme(x)`
+  - Task types now show with color throughout: QueueView list, detail, ApprovalView, HealthView
+  - Import with alias to avoid name conflicts: `formatTaskType as formatTypeWithColor`
+---
+
+## 2026-01-15 - US-135
+- What was implemented: Added context-specific footer hints based on active tab
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added:
+    - TAB_SHORTCUTS constant mapping TabId to array of { key, label } shortcuts
+    - Footer component now accepts activeTab prop
+    - Context-specific shortcuts highlighted in cyan
+    - Common shortcuts (q:Quit ?:Help !:Alerts) always shown at start
+    - Tab numbers (1-7) shown at end
+    - React.Fragment used for mapping shortcut items with keys
+- **Learnings for future iterations:**
+  - Footer context hints pattern: define TAB_SHORTCUTS record with per-tab arrays
+  - Use cyan color for tab-specific shortcuts to distinguish from global shortcuts
+  - Common shortcuts should be shown first, then context-specific, then tab numbers
+  - Use key:Label format (e.g., "c:Create") for compact shortcut display
+  - React.Fragment is needed for proper key handling when mapping JSX elements
 ---

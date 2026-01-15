@@ -1,0 +1,16 @@
+# Ralph Progress Log
+Started: Tue Jan 14 2026
+Feature: CLI Dashboard Production Ready
+---
+
+## Codebase Patterns
+- Database uses better-sqlite3 with inline migrations (ALTER TABLE ADD COLUMN with existence checks)
+- Dashboard uses Ink (React for CLI) with tabbed navigation (number key shortcuts 1-N)
+- Dashboard components follow pattern: state hooks + loadData callback + useEffect refresh interval
+- Export new types and functions from module index.ts files when adding to a module
+- TypeScript union narrowing: cast to specific type after 'in' check for proper type access
+- Use useInput hook from Ink for keyboard handling in dashboard components
+- Color codes: bug_fix=red(31), test=blue(34), docs=cyan(36), refactor=yellow(33), feature=green(32)
+- Status colors: green=running/success, red=failed, yellow=paused/warning, cyan=completed, gray=pending
+
+---

@@ -15,7 +15,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -31,7 +31,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "ChatView component already exists - enhance it for dashboard integration"
     },
     {
@@ -47,8 +47,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "ChatInput component added with ink-text-input, enter/ctrl+enter submit, escape clear, character count"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-104",
@@ -62,8 +62,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Streaming implemented with Anthropic SDK MessageStream, spinner animation, auto-scroll with pause on user scroll up"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-105",
@@ -77,8 +77,8 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "ProjectSelector component with 'p' key toggle, arrow keys for navigation, Enter to confirm, selected project shown in header and used for context"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-106",
@@ -92,8 +92,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Loops tab with shortcut '0' added to dashboard, LoopsView component created"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-107",
@@ -107,8 +107,8 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "loops and loop_iterations tables added to src/db/index.ts with indexes for project_id, status, loop_id"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-108",
@@ -123,8 +123,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "LoopRepository and LoopIterationRepository created in src/loops/, LoopsView with list and detail view"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-109",
@@ -140,8 +140,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": "CreateLoopDialog with Tab navigation, auto-generated branch name from PRD path"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-110",
@@ -155,8 +155,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "LoopRunner module created with start/pause/resume/stop, output monitoring with iteration tracking"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-111",
@@ -170,8 +170,8 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "ProgressBar component with PRD reading, spinner animation, LoopProgressDisplay for detail view"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-112",
@@ -185,8 +185,8 @@
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": true,
-      "notes": "'p' pauses running loops, 'r' resumes paused loops, visual indicators added"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-113",
@@ -200,8 +200,8 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": true,
-      "notes": "'s' key opens StopConfirmationDialog, Enter confirms with reason, LoopRunner.stop() kills process and records reason"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-114",
@@ -216,8 +216,8 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": true,
-      "notes": "Enhanced LoopDetailView with story title lookup, red highlighting for failed iterations, scrollable full output display"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-115",
@@ -232,8 +232,8 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": true,
-      "notes": "'/' opens search, filters by title/project/type, 150ms debounce, ESC clears, yellow highlight on matches"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-116",
@@ -248,8 +248,8 @@
         "Typecheck passes"
       ],
       "priority": 16,
-      "passes": true,
-      "notes": "FilterBar component with Tab cycling, arrow keys for value change, combines with search"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-117",
@@ -264,8 +264,8 @@
         "Typecheck passes"
       ],
       "priority": 17,
-      "passes": true,
-      "notes": "TaskDetailView component with full task info, parsed acceptance criteria from prdJson, execution history with expandable output"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-118",
@@ -281,8 +281,8 @@
         "Typecheck passes"
       ],
       "priority": 18,
-      "passes": true,
-      "notes": "QuickCreateDialog with Tab cycling, type inference from title keywords, auto-project selection, smart defaults"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-119",
@@ -296,8 +296,8 @@
         "Typecheck passes"
       ],
       "priority": 19,
-      "passes": true,
-      "notes": "WorkerDetailView with '/' search, HighlightedLine component, n/N match navigation, match count display"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-120",
@@ -311,8 +311,8 @@
         "Typecheck passes"
       ],
       "priority": 20,
-      "passes": true,
-      "notes": "'f' key opens filter selector, ←/→ cycles options, level counts in header, red/yellow line coloring"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-121",
@@ -326,8 +326,8 @@
         "Typecheck passes"
       ],
       "priority": 21,
-      "passes": true,
-      "notes": "New HealthView.tsx with SelfImprovementSection component, Health tab added with shortcut '5'"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-122",
@@ -341,8 +341,8 @@
         "Typecheck passes"
       ],
       "priority": 22,
-      "passes": true,
-      "notes": "ProposalListSection, ProposalRow, ProposalDetailView components added with Guardrails.assessTaskRisk() integration"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-123",
@@ -356,8 +356,8 @@
         "Typecheck passes"
       ],
       "priority": 23,
-      "passes": true,
-      "notes": "'a' key approves and queues for execution, 'r' opens RejectDialog with reason prompt, action message banner shows feedback"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-124",
@@ -371,8 +371,8 @@
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": true,
-      "notes": "'?' toggles ShortcutHelpOverlay with all shortcuts grouped by tab context, current tab highlighted with cyan inverse, ESC or '?' closes"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-125",
@@ -386,8 +386,8 @@
         "Typecheck passes"
       ],
       "priority": 25,
-      "passes": true,
-      "notes": "NotificationBell component with unicode bell icons, NotificationCounts from database, NotificationListOverlay with '!' key toggle"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-126",
@@ -401,8 +401,8 @@
         "Typecheck passes"
       ],
       "priority": 26,
-      "passes": true,
-      "notes": "notifications table added to src/db/index.ts with indexes, NotificationRepository created in src/notifications/"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-127",
@@ -417,8 +417,8 @@
         "Typecheck passes"
       ],
       "priority": 27,
-      "passes": true,
-      "notes": "Enhanced NotificationListOverlay with database integration, arrow key navigation, Enter to mark read, 'd' to dismiss, unread highlighting with [new] badge"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-128",
@@ -432,8 +432,8 @@
         "Typecheck passes"
       ],
       "priority": 28,
-      "passes": true,
-      "notes": "LoadingStates.tsx with reusable LoadingSpinner and RefreshingIndicator, consistent animated spinner across all views, refreshing state never blocks tab switching"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-129",
@@ -447,8 +447,8 @@
         "Typecheck passes"
       ],
       "priority": 29,
-      "passes": true,
-      "notes": "EmptyState component in LoadingStates.tsx with message and optional shortcut hint, QueueView/LoopsView/WorkersView updated"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-130",
@@ -462,8 +462,8 @@
         "Typecheck passes"
       ],
       "priority": 30,
-      "passes": true,
-      "notes": "ErrorBoundary class component in LoadingStates.tsx, ErrorDisplay with 'd' key for details, 'r' for retry, user-friendly messages for DB/network/file errors, all views wrapped in dashboard.tsx"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-131",
@@ -478,8 +478,8 @@
         "Typecheck passes"
       ],
       "priority": 31,
-      "passes": true,
-      "notes": "TabBadgeCounts interface, getTabBadgeCounts() function, badge colors: cyan/yellow/green/red by tab, 2-second refresh interval"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-132",
@@ -492,8 +492,8 @@
         "Typecheck passes"
       ],
       "priority": 32,
-      "passes": true,
-      "notes": "Tabs reordered: 1-Queue, 2-Loops, 3-Workers, 4-Chat, 5-Projects, 6-Health, 7-Approvals (Costs/Debug tabs not implemented yet - only existing tabs reordered)"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-133",
@@ -508,8 +508,8 @@
         "Typecheck passes"
       ],
       "priority": 33,
-      "passes": true,
-      "notes": "NavigationPatterns.tsx created with documented standard patterns, utility functions, and hooks. Audit confirmed all views follow consistent patterns."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-134",
@@ -522,8 +522,8 @@
         "Typecheck passes"
       ],
       "priority": 34,
-      "passes": true,
-      "notes": "Created ColorScheme.tsx with centralized color constants, updated QueueView, LoopsView, HealthView, ApprovalView, and dashboard.tsx to use consistent colors"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-135",
@@ -537,8 +537,8 @@
         "Typecheck passes"
       ],
       "priority": 35,
-      "passes": true,
-      "notes": "TAB_SHORTCUTS constant with per-tab shortcuts, Footer accepts activeTab prop, cyan color for tab-specific shortcuts, common shortcuts (q/? /!) always shown"
+      "passes": false,
+      "notes": ""
     }
   ]
 }

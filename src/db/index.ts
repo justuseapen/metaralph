@@ -212,6 +212,54 @@ function createTables(db: DatabaseInstance): void {
     )
   `);
 
+  // Loops table - Ralph loop instances for managing autonomous execution
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS loops (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      branch_name TEXT NOT NULL,
+      prd_path TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      max_iterations INTEGER NOT NULL DEFAULT 10,
+      current_iteration INTEGER NOT NULL DEFAULT 0,
+      started_at TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Loop Iterations table - individual iterations within a Ralph loop
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS loop_iterations (
+      id TEXT PRIMARY KEY,
+      loop_id TEXT NOT NULL,
+      iteration_number INTEGER NOT NULL,
+      story_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      output TEXT,
+      commit_sha TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      FOREIGN KEY (loop_id) REFERENCES loops(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Notifications table - user notifications for important events
+  // type: 'task_complete' | 'task_failed' | 'loop_complete' | 'approval_needed' | 'alert'
+  // severity: 'info' | 'warning' | 'critical'
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'alert',
+      title TEXT NOT NULL,
+      message TEXT,
+      severity TEXT NOT NULL DEFAULT 'info',
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Create indexes for common queries
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_projects_group_id ON projects(group_id);
@@ -227,6 +275,13 @@ function createTables(db: DatabaseInstance): void {
     CREATE INDEX IF NOT EXISTS idx_executions_status ON executions(status);
     CREATE INDEX IF NOT EXISTS idx_learnings_project_id ON learnings(project_id);
     CREATE INDEX IF NOT EXISTS idx_learnings_category ON learnings(category);
+    CREATE INDEX IF NOT EXISTS idx_loops_project_id ON loops(project_id);
+    CREATE INDEX IF NOT EXISTS idx_loops_status ON loops(status);
+    CREATE INDEX IF NOT EXISTS idx_loop_iterations_loop_id ON loop_iterations(loop_id);
+    CREATE INDEX IF NOT EXISTS idx_loop_iterations_status ON loop_iterations(status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+    CREATE INDEX IF NOT EXISTS idx_notifications_severity ON notifications(severity);
   `);
 }
 
