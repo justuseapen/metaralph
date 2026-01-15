@@ -768,22 +768,81 @@ function NotificationListOverlay({
 }
 
 /**
- * Footer component showing keyboard shortcuts
+ * Context-specific shortcuts for each tab
  */
-function Footer(): React.ReactElement {
+const TAB_SHORTCUTS: Record<TabId, { key: string; label: string }[]> = {
+  queue: [
+    { key: 'c', label: 'Create' },
+    { key: '/', label: 'Search' },
+    { key: 'Tab', label: 'Filter' },
+    { key: 'Enter', label: 'Detail' },
+  ],
+  loops: [
+    { key: 'n', label: 'New' },
+    { key: 'p', label: 'Pause' },
+    { key: 'r', label: 'Resume' },
+    { key: 's', label: 'Stop' },
+    { key: 'Enter', label: 'Detail' },
+  ],
+  workers: [
+    { key: '/', label: 'Search' },
+    { key: 'f', label: 'Filter' },
+    { key: 'n/N', label: 'Next/Prev' },
+    { key: 'Enter', label: 'Detail' },
+  ],
+  chat: [
+    { key: 'p', label: 'Project' },
+    { key: 'Ctrl+↵', label: 'Send' },
+    { key: '↑/↓', label: 'Scroll' },
+  ],
+  projects: [
+    { key: 'a', label: 'Add' },
+    { key: 'd', label: 'Delete' },
+    { key: '↑/↓', label: 'Navigate' },
+  ],
+  health: [
+    { key: 'r', label: 'Refresh' },
+    { key: 'a', label: 'Approve' },
+    { key: 'r', label: 'Reject' },
+    { key: 'Enter', label: 'Detail' },
+  ],
+  approvals: [
+    { key: 'a', label: 'Approve' },
+    { key: 'r', label: 'Reject' },
+    { key: '↑/↓', label: 'Navigate' },
+  ],
+};
+
+/**
+ * Footer component showing keyboard shortcuts
+ * Shows common shortcuts plus context-specific shortcuts for the active tab
+ */
+function Footer({ activeTab }: { activeTab: TabId }): React.ReactElement {
+  const tabShortcuts = TAB_SHORTCUTS[activeTab] || [];
+
   return (
     <Box borderStyle="single" borderColor="gray" paddingX={1}>
       <Text dimColor>
+        {/* Common shortcuts always shown */}
         <Text bold>q</Text> Quit  |
         <Text bold> ?</Text> Help  |
-        <Text bold> !</Text> Alerts  |
-        <Text bold> 1</Text> Queue  |
-        <Text bold> 2</Text> Loops  |
-        <Text bold> 3</Text> Workers  |
-        <Text bold> 4</Text> Chat  |
-        <Text bold> 5</Text> Projects  |
-        <Text bold> 6</Text> Health  |
-        <Text bold> 7</Text> Approvals
+        <Text bold> !</Text> Alerts
+        {/* Context-specific shortcuts for active tab */}
+        {tabShortcuts.length > 0 && (
+          <>
+            <Text>  |  </Text>
+            {tabShortcuts.map((shortcut, idx) => (
+              <React.Fragment key={shortcut.key}>
+                <Text bold color="cyan">{shortcut.key}</Text>
+                <Text>:{shortcut.label}</Text>
+                {idx < tabShortcuts.length - 1 && <Text> </Text>}
+              </React.Fragment>
+            ))}
+          </>
+        )}
+        {/* Tab numbers shown at the end */}
+        <Text>  |  </Text>
+        <Text bold>1-7</Text> Tabs
       </Text>
     </Box>
   );
@@ -868,7 +927,7 @@ function Dashboard(): React.ReactElement {
       <Header />
       <TabBar activeTab={activeTab} badgeCounts={tabBadgeCounts} />
       <TabContent tab={activeTab} />
-      <Footer />
+      <Footer activeTab={activeTab} />
     </Box>
   );
 }
