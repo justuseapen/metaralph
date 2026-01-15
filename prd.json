@@ -248,8 +248,8 @@
         "Typecheck passes"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "FilterBar component with Tab cycling, arrow keys for value change, combines with search"
     },
     {
       "id": "US-117",

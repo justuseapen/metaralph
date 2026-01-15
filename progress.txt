@@ -317,3 +317,27 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - For search UX: show immediate input feedback, debounce the expensive filter operation
   - When search is active, return early from other key handlers to avoid conflicts
 ---
+
+## 2026-01-14 - US-116
+- What was implemented: Added task filter controls to QueueView
+- Files changed:
+  - `src/cli/components/QueueView.tsx` - Major enhancements:
+    - Added STATUS_FILTERS and TYPE_FILTERS arrays with filter options
+    - Created FilterBar component showing status and type filters side by side
+    - Status filter: All | Pending | Running | Completed | Failed
+    - Type filter: All | Feature | Bug | Test | Docs | Refactor
+    - Tab key cycles through filter fields (null -> status -> type -> null)
+    - Arrow keys (left/right) change filter values when field is active
+    - Filter count shows "Showing X of Y" in filter bar
+    - Filters combine with existing search - all are applied together
+    - Active filter field highlighted with cyan, selected value highlighted green with inverse
+    - Escape deactivates current filter field
+    - Updated empty message to show active filter details
+- **Learnings for future iterations:**
+  - Filter cycling pattern: use activeFilterField state that cycles through null -> field1 -> field2 -> null
+  - Define filter options as const arrays: `{ value: FilterValue; label: string }[]` for easy iteration
+  - Arrow key navigation within filter: find current index in array, calculate new index with modulo
+  - Combine multiple filter conditions in single filter() call with early returns for each condition
+  - Use inverse={isSelected && isActive} for current selection highlight in filter bars
+  - TypeFilter and StatusFilter types use union: `'all' | ActualType` to include "all" option
+---
