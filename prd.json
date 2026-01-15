@@ -356,8 +356,8 @@
         "Typecheck passes"
       ],
       "priority": 23,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "'a' key approves and queues for execution, 'r' opens RejectDialog with reason prompt, action message banner shows feedback"
     },
     {
       "id": "US-124",

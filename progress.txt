@@ -493,3 +493,30 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Detail views can share state with parent (showDetail) or use callback pattern
   - Import Key type from 'ink' for proper type checking of useInput key parameter
 ---
+
+## 2026-01-14 - US-123
+- What was implemented: Added proposal approve/reject controls to HealthView
+- Files changed:
+  - `src/cli/components/HealthView.tsx` - Major enhancements:
+    - Added TextInput import from 'ink-text-input'
+    - Created RejectDialog component with reason input field
+    - Added showRejectDialog state to manage dialog visibility
+    - Added actionMessage state for showing approve/reject feedback banners
+    - Added handleApprove callback using TaskRepository.updateApprovalStatus('approved')
+    - Added handleReject callback using TaskRepository.updateApprovalStatus('rejected') and updateStatus('failed')
+    - Added handleCancelReject callback to close reject dialog
+    - Updated ProposalDetailView to accept onApprove, onReject, showRejectDialog, onCancelReject props
+    - Updated ProposalListSection to pass approve/reject handlers to detail view
+    - 'a' key approves selected proposal and queues for execution
+    - 'r' key opens RejectDialog for entering rejection reason
+    - Enter submits rejection with reason, ESC cancels
+    - Action message banner shows feedback with 3-second auto-dismiss
+    - Context-aware footer hints based on view state
+- **Learnings for future iterations:**
+  - TaskRepository.updateApprovalStatus('approved') also sets status to 'queued' automatically
+  - For rejection, need to also call updateStatus('failed') to properly mark task as rejected
+  - Use action message banner pattern for user feedback: { text, color } state with setTimeout to clear
+  - Block parent useInput when dialog is open by early return at top of handler
+  - Pass callbacks through component hierarchy: parent -> list section -> detail view -> dialog
+  - RejectDialog uses its own useInput for Enter/ESC handling
+---
