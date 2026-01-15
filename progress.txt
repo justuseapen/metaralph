@@ -1,31 +1,15 @@
 # Ralph Progress Log
-Started: Thu Jan 15 14:00:34 EST 2026
+Started: Thu Jan 15 14:28:37 EST 2026
 ---
 
-## Codebase Patterns
-- Use Vitest for testing TypeScript/ESM projects (vitest.config.ts at root)
-- Mock external dependencies using vi.mock() at top of test files
-- Use vi.mocked() for type-safe mock assertions
-- Use `as any` for complex mock return types when exact type is cumbersome
-- Analysis objects from OnboardingEngine.preview require: opportunities, todos, todoSummary (with total)
-- OpportunityType is union: 'outdated_dep' | 'type_error' | 'lint_issue' | 'todo_comment'
-
----
-
-## 2026-01-15 14:04 - SI-1768503633937
-- What was implemented:
-  - Added Vitest testing framework with coverage support
-  - Created comprehensive test suite for src/cli/chat.ts with 9 tests
-  - Tests cover: error handling, OnboardingEngine integration, analysis scenarios, API key validation, system prompt
+## 2026-01-15 14:30 - SI-1768504596179
+- What was implemented: Comprehensive tests for src/deploy/providers/coolify.ts
 - Files changed:
-  - NEW: src/cli/chat.test.ts - Test file with 9 tests for chat.ts
-  - NEW: vitest.config.ts - Vitest configuration
-  - MODIFIED: package.json - Added test scripts and vitest dependencies
-  - MODIFIED: package-lock.json - Updated dependencies
+  - src/deploy/providers/coolify.test.ts (new file - 986 lines, 59 tests)
 - **Learnings for future iterations:**
-  - chat.ts has two main exports: startChatSession (interactive readline) and startProposeSession (AI proposals)
-  - startChatSession throws immediately if project not found, making it testable without mocking readline
-  - startProposeSession depends on OnboardingEngine.preview, DiscussionEngine.getProjectContext, and Anthropic API
-  - When mocking analysis results, must include all fields: opportunities (with full ImprovementOpportunity shape), todos, todoSummary (with total)
-  - Tests can verify console output using vi.spyOn(console, 'log').mockImplementation()
+  - This codebase uses Vitest with `vi.fn()` for mocking
+  - Global fetch can be mocked with `global.fetch = vi.fn()`
+  - Follow existing test patterns in src/cli/chat.test.ts
+  - Tests cover: CoolifyProvider constructor, initWithDeployConfig, fromProject, deploy (webhook & UUID modes), getStatus, getLogs, start, stop, restart, validateConnection, getDeploymentType, isDockerCompose, isDockerfile, createCoolifyProviderFromEnv
+  - The coolify.ts file uses private methods accessed indirectly through public API testing
 ---
