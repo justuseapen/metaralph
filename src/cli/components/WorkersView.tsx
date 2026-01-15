@@ -266,6 +266,64 @@ function HighlightedLine({ text, searchTerm, isMatch, isCurrentMatch }: Highligh
 }
 
 /**
+ * Output level filter type
+ */
+type OutputLevelFilter = 'all' | 'errors' | 'warnings' | 'info';
+
+/**
+ * Output level filter options
+ */
+const OUTPUT_LEVEL_FILTERS: { value: OutputLevelFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'errors', label: 'Errors' },
+  { value: 'warnings', label: 'Warnings' },
+  { value: 'info', label: 'Info' },
+];
+
+/**
+ * Check if a line contains error keywords
+ */
+function isErrorLine(line: string): boolean {
+  const lower = line.toLowerCase();
+  return lower.includes('error') || lower.includes('failed') || lower.includes('exception');
+}
+
+/**
+ * Check if a line contains warning keywords
+ */
+function isWarningLine(line: string): boolean {
+  const lower = line.toLowerCase();
+  return lower.includes('warn') || lower.includes('warning');
+}
+
+/**
+ * Get the level of a line
+ */
+function getLineLevel(line: string): 'error' | 'warning' | 'info' {
+  if (isErrorLine(line)) return 'error';
+  if (isWarningLine(line)) return 'warning';
+  return 'info';
+}
+
+/**
+ * Count lines by level
+ */
+function countLinesByLevel(lines: string[]): { errors: number; warnings: number; info: number } {
+  let errors = 0;
+  let warnings = 0;
+  let info = 0;
+
+  for (const line of lines) {
+    const level = getLineLevel(line);
+    if (level === 'error') errors++;
+    else if (level === 'warning') warnings++;
+    else info++;
+  }
+
+  return { errors, warnings, info };
+}
+
+/**
  * Worker detail view props
  */
 interface WorkerDetailViewProps {
@@ -284,16 +342,34 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
   const [searchInputValue, setSearchInputValue] = useState('');
   const [matchIndices, setMatchIndices] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [levelFilter, setLevelFilter] = useState<OutputLevelFilter>('all');
+  const [filterActive, setFilterActive] = useState(false);
 
   // Maximum visible lines
   const MAX_OUTPUT_LINES = 20;
 
   // Parse output lines
-  const outputLines = execution.ralphOutput?.split('\n') || [];
-  const totalLines = outputLines.length;
+  const allOutputLines = execution.ralphOutput?.split('\n') || [];
+
+  // Count lines by level
+  const levelCounts = countLinesByLevel(allOutputLines);
+
+  // Filter lines by level
+  const outputLinesWithIndex = allOutputLines.map((line, index) => ({ line, originalIndex: index }));
+  const filteredLinesWithIndex = levelFilter === 'all'
+    ? outputLinesWithIndex
+    : outputLinesWithIndex.filter(({ line }) => {
+        const level = getLineLevel(line);
+        if (levelFilter === 'errors') return level === 'error';
+        if (levelFilter === 'warnings') return level === 'warning';
+        if (levelFilter === 'info') return level === 'info';
+        return true;
+      });
+
+  const totalLines = filteredLinesWithIndex.length;
   const maxOffset = Math.max(0, totalLines - MAX_OUTPUT_LINES);
 
-  // Update match indices when search term changes
+  // Update match indices when search term changes (works on filtered lines)
   useEffect(() => {
     if (!searchTerm) {
       setMatchIndices([]);
@@ -304,9 +380,9 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
     const lowerSearch = searchTerm.toLowerCase();
     const indices: number[] = [];
 
-    outputLines.forEach((line, index) => {
+    filteredLinesWithIndex.forEach(({ line }, filteredIndex) => {
       if (line.toLowerCase().includes(lowerSearch)) {
-        indices.push(index);
+        indices.push(filteredIndex);
       }
     });
 
@@ -319,7 +395,7 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
       const targetOffset = Math.max(0, Math.min(firstMatchLine - 5, maxOffset));
       setScrollOffset(targetOffset);
     }
-  }, [searchTerm, outputLines.join('\n'), maxOffset]);
+  }, [searchTerm, filteredLinesWithIndex.map(l => l.line).join('\n'), maxOffset]);
 
   // Jump to match by index
   const jumpToMatch = useCallback((index: number) => {
@@ -347,6 +423,24 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
       return;
     }
 
+    // Handle filter mode
+    if (filterActive) {
+      if (key.escape || key.return) {
+        setFilterActive(false);
+        return;
+      }
+      // Left/right arrow cycle through filter options
+      if (key.leftArrow || key.rightArrow) {
+        const currentIndex = OUTPUT_LEVEL_FILTERS.findIndex(f => f.value === levelFilter);
+        const direction = key.rightArrow ? 1 : -1;
+        const newIndex = (currentIndex + direction + OUTPUT_LEVEL_FILTERS.length) % OUTPUT_LEVEL_FILTERS.length;
+        setLevelFilter(OUTPUT_LEVEL_FILTERS[newIndex].value);
+        setScrollOffset(0); // Reset scroll when filter changes
+        return;
+      }
+      return;
+    }
+
     // Normal mode key handling
     if (key.escape) {
       onClose();
@@ -356,6 +450,12 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
     // '/' opens search
     if (input === '/') {
       setSearchActive(true);
+      return;
+    }
+
+    // 'f' opens filter
+    if (input === 'f') {
+      setFilterActive(true);
       return;
     }
 
@@ -420,7 +520,7 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
       <Box marginBottom={1} flexDirection="column">
         <Box>
           <Text bold color="cyan">Worker Detail</Text>
-          <Text dimColor> - Press Escape to go back, / to search</Text>
+          <Text dimColor> - Press Escape to go back, / to search, f to filter</Text>
         </Box>
         <Box marginTop={1}>
           <Text bold>Project: </Text>
@@ -442,6 +542,45 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
           <Text dimColor> {iterations}/{maxIterations} iterations</Text>
         </Box>
       </Box>
+
+      {/* Level counts header */}
+      <Box marginBottom={1}>
+        <Text dimColor>Lines: </Text>
+        <Text color="red">{levelCounts.errors} errors</Text>
+        <Text dimColor> | </Text>
+        <Text color="yellow">{levelCounts.warnings} warnings</Text>
+        <Text dimColor> | </Text>
+        <Text>{levelCounts.info} info</Text>
+      </Box>
+
+      {/* Filter bar */}
+      {filterActive && (
+        <Box marginBottom={1} borderStyle="single" borderColor="cyan" paddingX={1}>
+          <Text bold color="cyan">Filter: </Text>
+          {OUTPUT_LEVEL_FILTERS.map((filter, index) => (
+            <Box key={filter.value} marginRight={1}>
+              <Text
+                inverse={filter.value === levelFilter}
+                color={filter.value === levelFilter ? 'cyan' : undefined}
+              >
+                {filter.label}
+              </Text>
+            </Box>
+          ))}
+          <Text dimColor> (←/→ to change, Enter/ESC to close)</Text>
+        </Box>
+      )}
+
+      {/* Filter info bar - show when not 'all' */}
+      {!filterActive && levelFilter !== 'all' && (
+        <Box marginBottom={1}>
+          <Text color="cyan">Filter: </Text>
+          <Text bold color={levelFilter === 'errors' ? 'red' : levelFilter === 'warnings' ? 'yellow' : undefined}>
+            {OUTPUT_LEVEL_FILTERS.find(f => f.value === levelFilter)?.label}
+          </Text>
+          <Text dimColor> ({totalLines} lines shown) - press f to change</Text>
+        </Box>
+      )}
 
       {/* Search bar */}
       {searchActive && (
@@ -495,23 +634,31 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
         paddingX={1}
         flexGrow={1}
       >
-        {outputLines.length === 0 ? (
-          <Text dimColor>No output recorded yet.</Text>
+        {filteredLinesWithIndex.length === 0 ? (
+          <Text dimColor>{levelFilter === 'all' ? 'No output recorded yet.' : `No ${levelFilter} found.`}</Text>
         ) : (
-          outputLines.slice(scrollOffset, scrollOffset + MAX_OUTPUT_LINES).map((line, idx) => {
-            const lineNumber = scrollOffset + idx;
-            const isMatch = visibleMatchLineNumbers.has(lineNumber);
-            const isCurrentMatch = lineNumber === currentMatchLine;
+          filteredLinesWithIndex.slice(scrollOffset, scrollOffset + MAX_OUTPUT_LINES).map(({ line, originalIndex }, filteredIdx) => {
+            const displayIndex = scrollOffset + filteredIdx;
+            const isMatch = visibleMatchLineNumbers.has(displayIndex);
+            const isCurrentMatch = displayIndex === currentMatchLine;
+            const lineLevel = getLineLevel(line);
+
+            // Color code based on level
+            const levelColor = lineLevel === 'error' ? 'red' : lineLevel === 'warning' ? 'yellow' : undefined;
 
             return (
-              <Box key={idx}>
-                <Text dimColor>{String(lineNumber + 1).padStart(4)} </Text>
-                <HighlightedLine
-                  text={line}
-                  searchTerm={searchTerm}
-                  isMatch={isMatch}
-                  isCurrentMatch={isCurrentMatch}
-                />
+              <Box key={filteredIdx}>
+                <Text dimColor>{String(originalIndex + 1).padStart(4)} </Text>
+                {searchTerm && isMatch ? (
+                  <HighlightedLine
+                    text={line}
+                    searchTerm={searchTerm}
+                    isMatch={isMatch}
+                    isCurrentMatch={isCurrentMatch}
+                  />
+                ) : (
+                  <Text color={levelColor}>{line}</Text>
+                )}
               </Box>
             );
           })
@@ -520,7 +667,7 @@ function WorkerDetailView({ worker, onClose }: WorkerDetailViewProps): React.Rea
 
       {/* Navigation hints */}
       <Box marginTop={1}>
-        <Text dimColor>↑/↓ scroll | PgUp/PgDn page | g/G start/end | / search | ESC back</Text>
+        <Text dimColor>↑/↓ scroll | PgUp/PgDn page | g/G start/end | / search | f filter | ESC back</Text>
       </Box>
     </Box>
   );
