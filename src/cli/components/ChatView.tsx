@@ -19,6 +19,7 @@ import {
 } from '../../collaboration/conversation.js';
 import { listProjects, getProject, type Project } from '../../registry/index.js';
 import { DiscussionEngine, type ProjectContext } from '../../collaboration/discussion.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 // Maximum character limit for chat input
 const MAX_INPUT_LENGTH = 4000;
@@ -167,7 +168,7 @@ function LoadingState(): React.ReactElement {
       alignItems="center"
       justifyContent="center"
     >
-      <Text color="blue">Loading chat history...</Text>
+      <LoadingSpinner message="Loading chat history..." />
     </Box>
   );
 }
@@ -459,6 +460,8 @@ function ChatInput({
  */
 export function ChatView(): React.ReactElement {
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvIndex, setSelectedConvIndex] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -495,6 +498,11 @@ export function ChatView(): React.ReactElement {
   // Load conversations and projects
   useEffect(() => {
     const loadData = () => {
+      // Show refreshing indicator for subsequent loads
+      if (hasLoaded) {
+        setIsRefreshing(true);
+      }
+
       try {
         // Load all active conversations
         const convs = ConversationRepository.findActive();
@@ -534,9 +542,12 @@ export function ChatView(): React.ReactElement {
         }
 
         setLoading(false);
+        setHasLoaded(true);
+        setIsRefreshing(false);
       } catch (error) {
         console.error('Failed to load chat data:', error);
         setLoading(false);
+        setIsRefreshing(false);
       }
     };
 
@@ -546,7 +557,7 @@ export function ChatView(): React.ReactElement {
     // Refresh every 2 seconds
     const interval = setInterval(loadData, 2000);
     return () => clearInterval(interval);
-  }, [selectedConvIndex, autoScroll, selectedProjectId]);
+  }, [selectedConvIndex, autoScroll, selectedProjectId, hasLoaded]);
 
   /**
    * Build system prompt for Claude with project context
@@ -902,6 +913,12 @@ Be concise but thorough. Focus on practical, actionable advice.
             [{projectList.find((p) => p.id === selectedProjectId)?.name || 'Unknown'}]
           </Text>
         )}
+        {/* US-128: Refreshing indicator */}
+        {isRefreshing && !streamingMessage && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
         {/* US-104: Streaming status indicator */}
         {streamingMessage && !streamingMessage.isComplete && (
           <Text color="cyan">
@@ -909,7 +926,7 @@ Be concise but thorough. Focus on practical, actionable advice.
             {SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]} Streaming...
           </Text>
         )}
-        {!autoScroll && !streamingMessage && (
+        {!autoScroll && !streamingMessage && !isRefreshing && (
           <Text color="yellow"> (auto-scroll paused)</Text>
         )}
       </Box>

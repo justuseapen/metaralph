@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ApprovalQueue, type Task } from '../../queue/index.js';
 import { getProject } from '../../registry/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * Format a task type for display
@@ -159,6 +160,8 @@ export function ApprovalView(): React.ReactElement {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [message, setMessage] = useState<{ text: string; color: string } | null>(null);
 
   // Create approval queue instance
@@ -166,6 +169,11 @@ export function ApprovalView(): React.ReactElement {
 
   // Load pending tasks
   const loadTasks = useCallback(() => {
+    // Show refreshing indicator for subsequent loads
+    if (hasLoaded) {
+      setIsRefreshing(true);
+    }
+
     try {
       const pendingTasks = approvalQueue.getPending();
       setTasks(pendingTasks);
@@ -174,11 +182,14 @@ export function ApprovalView(): React.ReactElement {
         setSelectedIndex(pendingTasks.length - 1);
       }
       setLoading(false);
+      setHasLoaded(true);
+      setIsRefreshing(false);
     } catch (error) {
       console.error('Failed to load pending tasks:', error);
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, [selectedIndex]);
+  }, [selectedIndex, hasLoaded]);
 
   // Load tasks and set up refresh interval
   useEffect(() => {
@@ -242,7 +253,10 @@ export function ApprovalView(): React.ReactElement {
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text dimColor>Loading approval queue...</Text>
+        <Box marginBottom={1}>
+          <Text bold color="blue">Approval Queue</Text>
+        </Box>
+        <LoadingSpinner message="Loading approval queue..." />
       </Box>
     );
   }
@@ -268,6 +282,11 @@ export function ApprovalView(): React.ReactElement {
       <Box paddingX={1} marginBottom={1}>
         <Text bold color="blue">Approval Queue</Text>
         <Text dimColor> ({tasks.length} pending)</Text>
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
       </Box>
 
       {/* Status message */}

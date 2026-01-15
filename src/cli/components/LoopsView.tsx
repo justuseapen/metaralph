@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { LoopRepository, LoopIterationRepository, LoopRunner, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * User story from PRD
@@ -870,6 +871,8 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
 export function LoopsView(): React.ReactElement {
   const [loops, setLoops] = useState<LoopWithProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailLoop, setDetailLoop] = useState<LoopWithProject | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -893,6 +896,11 @@ export function LoopsView(): React.ReactElement {
 
   // Load loops with project names and story progress
   const loadLoops = useCallback(() => {
+    // Show refreshing indicator for subsequent loads
+    if (hasLoaded) {
+      setIsRefreshing(true);
+    }
+
     try {
       const allLoops = LoopRepository.findAll();
       const loopsWithProjects: LoopWithProject[] = allLoops.map(loop => {
@@ -913,11 +921,14 @@ export function LoopsView(): React.ReactElement {
       });
       setLoops(loopsWithProjects);
       setLoading(false);
+      setHasLoaded(true);
+      setIsRefreshing(false);
     } catch (error) {
       console.error('Failed to load loops:', error);
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [hasLoaded]);
 
   // Load projects for create dialog
   const loadProjects = useCallback(() => {
@@ -1089,7 +1100,7 @@ export function LoopsView(): React.ReactElement {
         <Box marginBottom={1}>
           <Text bold color="cyan">Ralph Loops</Text>
         </Box>
-        <Text dimColor>Loading loops...</Text>
+        <LoadingSpinner message="Loading loops..." />
       </Box>
     );
   }
@@ -1114,7 +1125,15 @@ export function LoopsView(): React.ReactElement {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">Ralph Loops</Text>
-        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ navigate, Enter view, n new, p pause, r resume, s stop</Text>
+        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''})</Text>
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
+        {!isRefreshing && (
+          <Text dimColor> - ↑/↓ navigate, Enter view, n new, p pause, r resume, s stop</Text>
+        )}
       </Box>
 
       <LoopListHeader />

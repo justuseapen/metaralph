@@ -12,6 +12,7 @@ import TextInput from 'ink-text-input';
 import { TaskRepository, type Task, type TaskStatus, type TaskType, type EffortLevel } from '../../queue/index.js';
 import { ExecutionRepository, type Execution } from '../../workers/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * Status filter options for the filter bar
@@ -1065,6 +1066,8 @@ function QuickCreateDialog({ projects, onClose, onCreate }: QuickCreateDialogPro
 export function QueueView(): React.ReactElement {
   const [tasks, setTasks] = useState<TaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState(''); // Debounced search term
@@ -1086,6 +1089,11 @@ export function QueueView(): React.ReactElement {
   // Load tasks and project names, set up refresh interval
   useEffect(() => {
     const loadTasks = () => {
+      // Show refreshing indicator for subsequent loads
+      if (hasLoaded) {
+        setIsRefreshing(true);
+      }
+
       try {
         const pendingTasks = TaskRepository.findPending();
         const projectList = listProjects();
@@ -1099,9 +1107,12 @@ export function QueueView(): React.ReactElement {
         setTasks(tasksWithProjects);
         setProjects(projectList);
         setLoading(false);
+        setHasLoaded(true);
+        setIsRefreshing(false);
       } catch (error) {
         console.error('Failed to load tasks:', error);
         setLoading(false);
+        setIsRefreshing(false);
       }
     };
 
@@ -1109,7 +1120,7 @@ export function QueueView(): React.ReactElement {
 
     const interval = setInterval(loadTasks, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [hasLoaded]);
 
   // Handle search input changes with debounce
   const handleSearchChange = useCallback((value: string) => {
@@ -1258,7 +1269,10 @@ export function QueueView(): React.ReactElement {
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text dimColor>Loading task queue...</Text>
+        <Box marginBottom={1}>
+          <Text bold color="blue">Task Queue</Text>
+        </Box>
+        <LoadingSpinner message="Loading task queue..." />
       </Box>
     );
   }
@@ -1332,7 +1346,12 @@ export function QueueView(): React.ReactElement {
       {/* Header */}
       <Box paddingX={1} marginBottom={0}>
         <Text bold color="blue">Task Queue</Text>
-        {!searchActive && (
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
+        {!searchActive && !isRefreshing && (
           <Text dimColor> — /: Search  c: Create  Tab: filters  ↑↓: select  Enter: details</Text>
         )}
       </Box>

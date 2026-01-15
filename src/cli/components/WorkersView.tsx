@@ -12,6 +12,7 @@ import TextInput from 'ink-text-input';
 import { ExecutionRepository, type Execution } from '../../workers/execution.js';
 import { TaskRepository, type Task } from '../../queue/index.js';
 import { getProject, type Project } from '../../registry/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * Get the last N lines from output
@@ -680,11 +681,18 @@ export function WorkersView(): React.ReactElement {
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [stats, setStats] = useState({ running: 0, completed: 0, failed: 0 });
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailWorker, setDetailWorker] = useState<WorkerInfo | null>(null);
 
   // Load running workers and calculate stats
   const loadWorkers = useCallback(() => {
+    // Show refreshing indicator for subsequent loads
+    if (hasLoaded) {
+      setIsRefreshing(true);
+    }
+
     try {
       // Get running executions
       const runningExecutions = ExecutionRepository.findRunning();
@@ -706,11 +714,14 @@ export function WorkersView(): React.ReactElement {
       });
 
       setLoading(false);
+      setHasLoaded(true);
+      setIsRefreshing(false);
     } catch (error) {
       console.error('Failed to load workers:', error);
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [hasLoaded]);
 
   // Load workers and set up refresh interval
   useEffect(() => {
@@ -757,7 +768,10 @@ export function WorkersView(): React.ReactElement {
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text dimColor>Loading workers...</Text>
+        <Box marginBottom={1}>
+          <Text bold color="blue">Active Workers</Text>
+        </Box>
+        <LoadingSpinner message="Loading workers..." />
       </Box>
     );
   }
@@ -767,7 +781,12 @@ export function WorkersView(): React.ReactElement {
       <Box paddingX={1} marginBottom={1}>
         <Text bold color="blue">Active Workers</Text>
         <Text dimColor> ({workers.length} running)</Text>
-        {workers.length > 0 && (
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
+        {workers.length > 0 && !isRefreshing && (
           <Text dimColor> - ↑/↓ navigate, Enter: view details</Text>
         )}
       </Box>

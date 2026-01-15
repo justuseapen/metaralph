@@ -11,6 +11,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { listProjects, addProject, removeProject, type Project } from '../../registry/index.js';
 import { TaskRepository } from '../../queue/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * Calculate a simple health score for a project based on task metrics
@@ -278,12 +279,19 @@ export function ProjectsView(): React.ReactElement {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [message, setMessage] = useState<{ text: string; color: string } | null>(null);
   const [showAddInput, setShowAddInput] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Load projects
   const loadProjects = useCallback(() => {
+    // Show refreshing indicator for subsequent loads
+    if (hasLoaded) {
+      setIsRefreshing(true);
+    }
+
     try {
       const allProjects = listProjects();
       setProjects(allProjects);
@@ -292,11 +300,14 @@ export function ProjectsView(): React.ReactElement {
         setSelectedIndex(allProjects.length - 1);
       }
       setLoading(false);
+      setHasLoaded(true);
+      setIsRefreshing(false);
     } catch (error) {
       console.error('Failed to load projects:', error);
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, [selectedIndex]);
+  }, [selectedIndex, hasLoaded]);
 
   // Load projects and set up refresh interval
   useEffect(() => {
@@ -386,7 +397,10 @@ export function ProjectsView(): React.ReactElement {
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text dimColor>Loading projects...</Text>
+        <Box marginBottom={1}>
+          <Text bold color="blue">Projects</Text>
+        </Box>
+        <LoadingSpinner message="Loading projects..." />
       </Box>
     );
   }
@@ -435,6 +449,11 @@ export function ProjectsView(): React.ReactElement {
       <Box paddingX={1} marginBottom={1}>
         <Text bold color="blue">Projects</Text>
         <Text dimColor> ({projects.length} registered)</Text>
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
       </Box>
 
       {/* Status message */}

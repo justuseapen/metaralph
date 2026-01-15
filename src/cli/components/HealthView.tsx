@@ -14,6 +14,7 @@ import { initDatabase, type DatabaseInstance } from '../../db/index.js';
 import { listProjects, type Project } from '../../registry/index.js';
 import { TaskRepository, type Task, type TaskType } from '../../queue/task.js';
 import { getRegisteredSelfProjects, Guardrails, type RiskAssessment } from '../../self-improve/index.js';
+import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
 
 /**
  * Self-improvement status data
@@ -86,7 +87,7 @@ function SelfImprovementSection({
     return (
       <Box flexDirection="column" marginBottom={1}>
         <Text bold color="magenta">Self-Improvement Status</Text>
-        <Text color="gray">Loading...</Text>
+        <LoadingSpinner message="Loading status..." color="magenta" />
       </Box>
     );
   }
@@ -422,7 +423,7 @@ function ProposalListSection({
     return (
       <Box flexDirection="column" marginBottom={1} borderStyle="round" borderColor="yellow" paddingX={1}>
         <Text bold color="yellow">Pending Proposals</Text>
-        <Text color="gray">Loading...</Text>
+        <LoadingSpinner message="Loading proposals..." color="yellow" />
       </Box>
     );
   }
@@ -501,6 +502,8 @@ function HealthOverviewSection(): React.ReactElement {
 export function HealthView(): React.ReactElement {
   const [selfImprovementStatus, setSelfImprovementStatus] = useState<SelfImprovementStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [proposals, setProposals] = useState<ProposalWithRisk[]>([]);
   const [proposalsLoading, setProposalsLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -649,10 +652,19 @@ export function HealthView(): React.ReactElement {
 
   // Load all data
   const loadAllData = useCallback(() => {
+    // Show refreshing indicator for subsequent loads
+    if (hasLoaded) {
+      setIsRefreshing(true);
+    }
+
     const map = loadProjects();
     loadSelfImprovementData();
     loadProposals(map);
-  }, [loadProjects, loadSelfImprovementData, loadProposals]);
+
+    // Finish refreshing after data loads
+    setHasLoaded(true);
+    setIsRefreshing(false);
+  }, [loadProjects, loadSelfImprovementData, loadProposals, hasLoaded]);
 
   // Handle approve action
   const handleApprove = useCallback(() => {
@@ -802,6 +814,16 @@ export function HealthView(): React.ReactElement {
 
   return (
     <Box flexDirection="column" padding={1} flexGrow={1}>
+      {/* Header with refreshing indicator */}
+      <Box marginBottom={1}>
+        <Text bold color="blue">Health</Text>
+        {isRefreshing && (
+          <Box marginLeft={2}>
+            <RefreshingIndicator visible={isRefreshing} />
+          </Box>
+        )}
+      </Box>
+
       {/* Action message banner */}
       {actionMessage && (
         <Box marginBottom={1} borderStyle="round" borderColor={actionMessage.color} paddingX={1}>
