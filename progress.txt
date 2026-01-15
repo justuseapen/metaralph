@@ -543,3 +543,25 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - ShortcutHelpOverlay has its own useInput for '?' and ESC handling
   - flexWrap="wrap" on Box allows groups to flow to next row on small terminals
 ---
+
+## 2026-01-14 - US-125
+- What was implemented: Added notification bell to header with count display
+- Files changed:
+  - `src/cli/dashboard.tsx` - Major additions:
+    - NotificationCounts interface for tracking pending approvals, failed tasks, critical alerts
+    - getNotificationCounts() function to query database for notification counts
+    - NotificationBell component with unicode bell icons (1F514 for active, 1F515 for muted)
+    - Color coding: red for critical alerts, yellow for failed tasks, cyan for approvals
+    - Tooltip showing count breakdown (e.g., "3 approvals, 2 failed")
+    - NotificationListOverlay component showing notification categories
+    - '!' key handler to toggle notifications overlay
+    - Updated Footer to show '!' Alerts shortcut
+    - Updated SHORTCUT_GROUPS to include '!' for notifications
+    - Header and Dashboard both track notification counts with 2-second refresh
+- **Learnings for future iterations:**
+  - Use unicode escapes for emoji in terminal: '\u{1F514}' for bell, '\u{1F515}' for muted bell
+  - Check if table exists before querying: `SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'`
+  - Multiple overlays: track each with separate state (showHelp, showNotifications) and check both in useInput
+  - Notification counts aggregated from multiple sources: tasks table for approvals/failures, notifications table for alerts
+  - NotificationListOverlay follows same pattern as ShortcutHelpOverlay: conditional render in Dashboard
+---
