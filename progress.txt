@@ -1,23 +1,24 @@
 # Ralph Progress Log
-Started: Thu Jan 15 14:38:16 EST 2026
+Started: Thu Jan 15 14:44:19 EST 2026
 ---
 
 ## Codebase Patterns
-- Tests use Vitest with vi.mock() for mocking dependencies
-- Database operations use better-sqlite3 with prepare().run/get/all pattern
-- Repository pattern: functions accept optional db parameter, close db only if not provided
-- Test files are co-located with source files (e.g., conversation.test.ts next to conversation.ts)
-- Use mockPrepare/mockRun/mockGet/mockAll pattern for mocking database operations
+- Use `vi.hoisted()` to declare mock functions that will be used in `vi.mock()` factories - this ensures they are available during hoisting
+- Mock Anthropic SDK client by spying on `createClient` method and returning mock objects, rather than trying to mock the entire SDK
+- Project type uses snake_case properties: `added_at`, `updated_at`, `group_id`, `deploy_config`
+- Use `as unknown as typeof X` casting pattern for complex mock implementations when TypeScript's inference doesn't match
 
 ---
 
-## 2026-01-15T14:40:00Z - SI-1768505895992
-- What was implemented: Comprehensive test suite for src/collaboration/conversation.ts
-- Files changed:
-  - src/collaboration/conversation.test.ts (new file, 514 lines, 36 tests)
+## 2026-01-15 14:49 - SI-1768506258724
+- What was implemented
+  - Added comprehensive tests for `src/collaboration/discussion.ts`
+  - Created 30 tests covering: createClient, respond, startConversation, getProjectContext, project context building, message formatting, error handling, and type exports
+- Files changed
+  - Created: `src/collaboration/discussion.test.ts`
 - **Learnings for future iterations:**
-  - Patterns discovered: ConversationRepository uses a pattern where db connection is managed via optional param - if not provided, it initializes and closes; if provided, caller manages lifecycle
-  - The codebase uses snake_case for DB columns and camelCase for TypeScript interfaces, with rowTo* conversion functions
-  - Test mocking pattern: mock prepare() to return {run, get, all} object
-  - All repository methods follow the same shouldCloseDb pattern for proper cleanup
+  - Mocking the Anthropic SDK requires using `vi.spyOn` on the `createClient` method rather than trying to mock the entire module due to hoisting complexities
+  - The Project interface uses `added_at` and `updated_at` (not camelCase), also includes `group_id` and `deploy_config` fields
+  - For complex function mock implementations with TypeScript, use double casting: `as unknown as typeof fs.readdirSync`
+  - Test file for `discussion.ts` follows same patterns as `conversation.test.ts` - mock database, conversation repository, registry, and fs module
 ---
