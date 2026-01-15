@@ -478,8 +478,8 @@
         "Typecheck passes"
       ],
       "priority": 31,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TabBadgeCounts interface, getTabBadgeCounts() function, badge colors: cyan/yellow/green/red by tab, 2-second refresh interval"
     },
     {
       "id": "US-132",

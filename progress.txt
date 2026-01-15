@@ -667,3 +667,22 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Stack trace display: slice first 6 lines to show relevant info without overwhelming
   - ErrorBoundary needs key prop if you want it to reset when switching tabs
 ---
+
+## 2026-01-15 - US-131
+- What was implemented: Added tab badges showing attention item counts
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added:
+    - TabBadgeCounts interface for queue/approvals/workers/health counts
+    - getTabBadgeCounts() function to query database for badge counts
+    - getBadgeColor() helper for consistent tab-specific badge colors
+    - Updated TabBar to accept badgeCounts prop and display badges
+    - Updated Dashboard to fetch and pass badge counts with 2-second refresh
+    - Badge colors: queue=cyan, approvals=yellow, workers=green, health=red
+- **Learnings for future iterations:**
+  - Badge counts query multiple tables: tasks for queue/approvals, workers for workers, notifications for health
+  - Use `status = 'pending' OR status = 'queued'` for pending task count
+  - Use `status = 'running' OR status = 'busy'` for running worker count
+  - Check if table exists before querying (notifications table may not exist)
+  - Badge display: `({count})` format with conditional rendering for count > 0
+  - When tab is active, badge inherits active color; inactive tabs use getBadgeColor()
+---
