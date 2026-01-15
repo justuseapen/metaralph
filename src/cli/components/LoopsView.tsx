@@ -8,8 +8,73 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { LoopRepository, LoopIterationRepository, LoopRunner, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
+
+/**
+ * User story from PRD
+ */
+interface PrdStory {
+  id: string;
+  title: string;
+  passes: boolean;
+}
+
+/**
+ * PRD file structure
+ */
+interface PrdFile {
+  project: string;
+  branchName: string;
+  description: string;
+  userStories: PrdStory[];
+}
+
+/**
+ * Story progress information
+ */
+interface StoryProgress {
+  completed: number;
+  total: number;
+  currentStory: PrdStory | null;
+  stories: PrdStory[];
+}
+
+/**
+ * Read PRD file and extract story progress
+ */
+function readPrdProgress(projectPath: string, prdPath: string): StoryProgress | null {
+  try {
+    const fullPath = path.join(projectPath, prdPath);
+    if (!fs.existsSync(fullPath)) {
+      return null;
+    }
+
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const prd = JSON.parse(content) as PrdFile;
+
+    if (!prd.userStories || !Array.isArray(prd.userStories)) {
+      return null;
+    }
+
+    const completed = prd.userStories.filter(s => s.passes).length;
+    const total = prd.userStories.length;
+
+    // Find the first story with passes: false (current story being worked on)
+    const currentStory = prd.userStories.find(s => !s.passes) || null;
+
+    return {
+      completed,
+      total,
+      currentStory,
+      stories: prd.userStories,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Get color for loop status
@@ -65,10 +130,44 @@ function truncate(str: string, maxLength: number): string {
 }
 
 /**
- * Loop with project name for display
+ * Loop with project name and progress for display
  */
 interface LoopWithProject extends Loop {
   projectName: string;
+  projectPath: string;
+  storyProgress: StoryProgress | null;
+}
+
+/**
+ * Spinner frames for animation
+ */
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+/**
+ * Progress bar component
+ */
+interface ProgressBarProps {
+  completed: number;
+  total: number;
+  width?: number;
+}
+
+function ProgressBar({ completed, total, width = 20 }: ProgressBarProps): React.ReactElement {
+  const percentage = total > 0 ? completed / total : 0;
+  const filledWidth = Math.round(percentage * width);
+  const emptyWidth = width - filledWidth;
+
+  const filled = '█'.repeat(filledWidth);
+  const empty = '░'.repeat(emptyWidth);
+  const percentText = `${Math.round(percentage * 100)}%`;
+
+  return (
+    <Text>
+      <Text color="green">{filled}</Text>
+      <Text dimColor>{empty}</Text>
+      <Text> {percentText}</Text>
+    </Text>
+  );
 }
 
 /**
@@ -84,18 +183,101 @@ interface LoopRowProps {
  */
 function LoopRow({ loop, selected }: LoopRowProps): React.ReactElement {
   const statusColor = getStatusColor(loop.status);
-  const progress = `${loop.currentIteration}/${loop.maxIterations}`;
+  const iterProgress = `${loop.currentIteration}/${loop.maxIterations}`;
   const duration = formatDuration(loop.startedAt, loop.completedAt);
 
+  // Get story progress if available
+  const storyProgress = loop.storyProgress;
+  const storyProgressText = storyProgress
+    ? `${storyProgress.completed}/${storyProgress.total}`
+    : '-';
+
   return (
-    <Box paddingX={1}>
+    <Box paddingX={1} flexDirection="column">
       <Text inverse={selected}>
         <Text color={statusColor}>{formatStatus(loop.status).padEnd(10)}</Text>
-        <Text>{truncate(loop.projectName, 16).padEnd(18)}</Text>
-        <Text>{truncate(loop.branchName, 24).padEnd(26)}</Text>
-        <Text>{progress.padEnd(8)}</Text>
+        <Text>{truncate(loop.projectName, 14).padEnd(16)}</Text>
+        <Text>{truncate(loop.branchName, 20).padEnd(22)}</Text>
+        <Text>{('Iter ' + iterProgress).padEnd(12)}</Text>
+        <Text>{('Stories ' + storyProgressText).padEnd(14)}</Text>
         <Text dimColor>{duration}</Text>
       </Text>
+
+      {/* Show current story for running loops when selected */}
+      {selected && loop.status === 'running' && storyProgress?.currentStory && (
+        <Box marginLeft={2} marginTop={0}>
+          <Text dimColor>
+            └ Working on: <Text color="cyan">{storyProgress.currentStory.id}</Text>
+            {' - '}{truncate(storyProgress.currentStory.title, 40)}
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Loop progress display component for running loops
+ */
+interface LoopProgressDisplayProps {
+  loop: LoopWithProject;
+  spinnerFrame: number;
+}
+
+function LoopProgressDisplay({ loop, spinnerFrame }: LoopProgressDisplayProps): React.ReactElement | null {
+  const storyProgress = loop.storyProgress;
+
+  if (!storyProgress) {
+    return null;
+  }
+
+  const isRunning = loop.status === 'running';
+
+  return (
+    <Box flexDirection="column" marginY={1} paddingX={1} borderStyle="single">
+      {/* Header with spinner for running loops */}
+      <Box marginBottom={1}>
+        {isRunning && (
+          <Text color="green">{SPINNER_FRAMES[spinnerFrame]} </Text>
+        )}
+        <Text bold color="cyan">Loop Progress</Text>
+        <Text dimColor> - {loop.branchName}</Text>
+      </Box>
+
+      {/* Progress bar */}
+      <Box marginBottom={1}>
+        <Text>Stories: </Text>
+        <ProgressBar completed={storyProgress.completed} total={storyProgress.total} width={25} />
+        <Text dimColor> ({storyProgress.completed}/{storyProgress.total})</Text>
+      </Box>
+
+      {/* Iteration count */}
+      <Box marginBottom={1}>
+        <Text>Iteration: </Text>
+        <Text bold color={isRunning ? 'green' : 'cyan'}>
+          {loop.currentIteration}
+        </Text>
+        <Text dimColor>/{loop.maxIterations}</Text>
+      </Box>
+
+      {/* Current story info for running loops */}
+      {isRunning && storyProgress.currentStory && (
+        <Box flexDirection="column">
+          <Box>
+            <Text>Current: </Text>
+            <Text color="yellow">{storyProgress.currentStory.id}</Text>
+            <Text> - </Text>
+            <Text>{truncate(storyProgress.currentStory.title, 50)}</Text>
+          </Box>
+        </Box>
+      )}
+
+      {/* Completion message */}
+      {loop.status === 'completed' && (
+        <Box>
+          <Text color="cyan">✓ All stories completed!</Text>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -108,9 +290,10 @@ function LoopListHeader(): React.ReactElement {
     <Box paddingX={1} marginBottom={0}>
       <Text bold color="cyan">
         <Text>{'Status'.padEnd(10)}</Text>
-        <Text>{'Project'.padEnd(18)}</Text>
-        <Text>{'Branch'.padEnd(26)}</Text>
-        <Text>{'Progress'.padEnd(8)}</Text>
+        <Text>{'Project'.padEnd(16)}</Text>
+        <Text>{'Branch'.padEnd(22)}</Text>
+        <Text>{'Iterations'.padEnd(12)}</Text>
+        <Text>{'Stories'.padEnd(14)}</Text>
         <Text>Duration</Text>
       </Text>
     </Box>
@@ -334,21 +517,40 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
   const [iterations, setIterations] = useState<LoopIteration[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const [storyProgress, setStoryProgress] = useState<StoryProgress | null>(loop.storyProgress);
+
+  // Spinner animation for running loops
+  useEffect(() => {
+    if (loop.status !== 'running') return;
+
+    const interval = setInterval(() => {
+      setSpinnerFrame(prev => (prev + 1) % SPINNER_FRAMES.length);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [loop.status]);
 
   useEffect(() => {
-    const loadIterations = () => {
+    const loadData = () => {
       try {
         const iters = LoopIterationRepository.findByLoop(loop.id);
         setIterations(iters);
+
+        // Refresh story progress from PRD file
+        if (loop.projectPath) {
+          const progress = readPrdProgress(loop.projectPath, loop.prdPath);
+          setStoryProgress(progress);
+        }
       } catch (error) {
         console.error('Failed to load iterations:', error);
       }
     };
 
-    loadIterations();
-    const interval = setInterval(loadIterations, 2000);
+    loadData();
+    const interval = setInterval(loadData, 2000);
     return () => clearInterval(interval);
-  }, [loop.id]);
+  }, [loop.id, loop.projectPath, loop.prdPath]);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -364,12 +566,16 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
   });
 
   const statusColor = getStatusColor(loop.status);
+  const isRunning = loop.status === 'running';
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
       {/* Header */}
       <Box marginBottom={1} flexDirection="column">
         <Box>
+          {isRunning && (
+            <Text color="green">{SPINNER_FRAMES[spinnerFrame]} </Text>
+          )}
           <Text bold color="cyan">Loop Detail</Text>
           <Text dimColor> - Press Escape to go back</Text>
         </Box>
@@ -382,11 +588,31 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
         <Box>
           <Text bold>Status: </Text>
           <Text color={statusColor}>{formatStatus(loop.status)}</Text>
-          <Text bold>  Progress: </Text>
-          <Text>{loop.currentIteration}/{loop.maxIterations}</Text>
+          <Text bold>  Iteration: </Text>
+          <Text color={isRunning ? 'green' : 'cyan'}>{loop.currentIteration}</Text>
+          <Text dimColor>/{loop.maxIterations}</Text>
           <Text bold>  Duration: </Text>
           <Text>{formatDuration(loop.startedAt, loop.completedAt)}</Text>
         </Box>
+
+        {/* Story progress bar */}
+        {storyProgress && (
+          <Box marginTop={1}>
+            <Text bold>Stories: </Text>
+            <ProgressBar completed={storyProgress.completed} total={storyProgress.total} width={30} />
+            <Text dimColor> ({storyProgress.completed}/{storyProgress.total})</Text>
+          </Box>
+        )}
+
+        {/* Current story for running loops */}
+        {isRunning && storyProgress?.currentStory && (
+          <Box marginTop={0}>
+            <Text bold>Current: </Text>
+            <Text color="yellow">{storyProgress.currentStory.id}</Text>
+            <Text> - </Text>
+            <Text>{truncate(storyProgress.currentStory.title, 50)}</Text>
+          </Box>
+        )}
       </Box>
 
       {/* Iterations list */}
@@ -464,15 +690,39 @@ export function LoopsView(): React.ReactElement {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Load loops with project names
+  // Spinner frame state for running loops indicator
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+
+  // Update spinner frame for running loops
+  useEffect(() => {
+    const hasRunningLoop = loops.some(l => l.status === 'running');
+    if (!hasRunningLoop) return;
+
+    const interval = setInterval(() => {
+      setSpinnerFrame(prev => (prev + 1) % SPINNER_FRAMES.length);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [loops]);
+
+  // Load loops with project names and story progress
   const loadLoops = useCallback(() => {
     try {
       const allLoops = LoopRepository.findAll();
       const loopsWithProjects: LoopWithProject[] = allLoops.map(loop => {
         const project = getProject(loop.projectId);
+        const projectPath = project?.path || '';
+
+        // Read PRD to get story progress
+        const storyProgress = projectPath
+          ? readPrdProgress(projectPath, loop.prdPath)
+          : null;
+
         return {
           ...loop,
           projectName: project?.name || 'Unknown',
+          projectPath,
+          storyProgress,
         };
       });
       setLoops(loopsWithProjects);
@@ -597,6 +847,9 @@ export function LoopsView(): React.ReactElement {
     );
   }
 
+  // Get the selected loop for progress display
+  const selectedLoop = loops[selectedIndex];
+
   return (
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
@@ -615,6 +868,14 @@ export function LoopsView(): React.ReactElement {
           />
         ))}
       </Box>
+
+      {/* Show progress display for selected loop if it has story progress */}
+      {selectedLoop && selectedLoop.storyProgress && (
+        <LoopProgressDisplay
+          loop={selectedLoop}
+          spinnerFrame={spinnerFrame}
+        />
+      )}
     </Box>
   );
 }
