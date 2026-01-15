@@ -5,6 +5,7 @@
  * US-102: Message display with user/assistant styling and scroll support.
  * US-103: Multi-line chat input with Ctrl+Enter submit.
  * US-104: Streaming Claude responses with real-time display.
+ * US-105: Project context selector for targeted AI assistance.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -206,6 +207,83 @@ function ConversationList({
 }
 
 /**
+ * Project context selector dropdown
+ * US-105: Allows selecting which project Claude should know about
+ */
+function ProjectSelector({
+  projects,
+  selectedProjectId,
+  onSelect,
+  isOpen,
+  onToggle,
+  selectedIndex,
+}: {
+  projects: Project[];
+  selectedProjectId: string | null;
+  onSelect: (projectId: string | null) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  selectedIndex: number;
+}): React.ReactElement {
+  const selectedProject = selectedProjectId
+    ? projects.find((p) => p.id === selectedProjectId)
+    : null;
+  const displayName = selectedProject ? selectedProject.name : 'No project';
+
+  return (
+    <Box flexDirection="column">
+      <Box
+        borderStyle="single"
+        borderColor={isOpen ? 'cyan' : 'gray'}
+        paddingX={1}
+      >
+        <Text color="cyan" bold>
+          Project:{' '}
+        </Text>
+        <Text color={selectedProject ? 'green' : 'gray'}>
+          [{displayName}]
+        </Text>
+        <Text dimColor> (p to change)</Text>
+      </Box>
+
+      {isOpen && (
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor="cyan"
+          marginTop={0}
+        >
+          {/* No project option */}
+          <Box paddingX={1}>
+            <Text inverse={selectedIndex === 0} bold={selectedIndex === 0}>
+              {selectedIndex === 0 ? ' ▸ ' : '   '}
+              No project
+            </Text>
+          </Box>
+          {/* Project list */}
+          {projects.map((project, index) => {
+            const itemIndex = index + 1;
+            const isSelected = itemIndex === selectedIndex;
+            return (
+              <Box key={project.id} paddingX={1}>
+                <Text inverse={isSelected} bold={isSelected}>
+                  {isSelected ? ' ▸ ' : '   '}
+                  {project.name}
+                </Text>
+                <Text dimColor> ({project.path.split('/').pop()})</Text>
+              </Box>
+            );
+          })}
+          <Box paddingX={1} marginTop={1}>
+            <Text dimColor>↑↓ Select • Enter Confirm • Esc Cancel</Text>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+/**
  * Message list with scroll support
  * US-104: Includes streaming message display
  */
@@ -377,6 +455,7 @@ function ChatInput({
 /**
  * ChatView component - main chat interface for the dashboard
  * US-104: Enhanced with streaming Claude responses
+ * US-105: Enhanced with project context selector
  */
 export function ChatView(): React.ReactElement {
   const [loading, setLoading] = useState(true);
@@ -385,6 +464,7 @@ export function ChatView(): React.ReactElement {
   const [messages, setMessages] = useState<Message[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [projects, setProjects] = useState<Map<string, Project>>(new Map());
+  const [projectList, setProjectList] = useState<Project[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -392,6 +472,11 @@ export function ChatView(): React.ReactElement {
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const streamAbortRef = useRef<AbortController | null>(null);
+
+  // US-105: Project selector state
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectSelectorOpen, setProjectSelectorOpen] = useState(false);
+  const [projectSelectorIndex, setProjectSelectorIndex] = useState(0);
 
   // Number of messages visible at once (adjust based on terminal size)
   const visibleMessageCount = 10;
@@ -415,13 +500,14 @@ export function ChatView(): React.ReactElement {
         const convs = ConversationRepository.findActive();
         setConversations(convs);
 
-        // Load all projects for display
-        const projectList = listProjects();
+        // Load all projects for display - US-105
+        const allProjects = listProjects();
         const projectMap = new Map<string, Project>();
-        for (const project of projectList) {
+        for (const project of allProjects) {
           projectMap.set(project.id, project);
         }
         setProjects(projectMap);
+        setProjectList(allProjects);
 
         // Load messages for selected conversation
         if (convs.length > 0 && selectedConvIndex < convs.length) {
@@ -431,6 +517,17 @@ export function ChatView(): React.ReactElement {
           // Auto-scroll to bottom on new messages
           if (autoScroll && msgs.length > visibleMessageCount) {
             setScrollOffset(msgs.length - visibleMessageCount);
+          }
+
+          // US-105: Auto-select project from conversation if not manually set
+          const currentConv = convs[selectedConvIndex];
+          if (currentConv && currentConv.projectId && selectedProjectId === null) {
+            setSelectedProjectId(currentConv.projectId);
+            // Update selector index
+            const projIndex = allProjects.findIndex((p) => p.id === currentConv.projectId);
+            if (projIndex >= 0) {
+              setProjectSelectorIndex(projIndex + 1); // +1 because 0 is "No project"
+            }
           }
         } else {
           setMessages([]);
@@ -449,7 +546,7 @@ export function ChatView(): React.ReactElement {
     // Refresh every 2 seconds
     const interval = setInterval(loadData, 2000);
     return () => clearInterval(interval);
-  }, [selectedConvIndex, autoScroll]);
+  }, [selectedConvIndex, autoScroll, selectedProjectId]);
 
   /**
    * Build system prompt for Claude with project context
@@ -487,6 +584,7 @@ Be concise but thorough. Focus on practical, actionable advice.
   /**
    * Handle message submission with Claude streaming
    * US-104: Implements streaming responses from Claude
+   * US-105: Uses selected project context from project selector
    */
   const handleSubmitMessage = useCallback(
     async (message: string) => {
@@ -507,10 +605,10 @@ Be concise but thorough. Focus on practical, actionable advice.
       const currentConversation =
         conversations.length > 0 ? conversations[selectedConvIndex] : null;
 
-      // Get project context if we have a conversation
+      // US-105: Get project context from the selected project (not conversation)
       let projectContext: ProjectContext | null = null;
-      if (currentConversation) {
-        const project = getProject(currentConversation.projectId);
+      if (selectedProjectId) {
+        const project = getProject(selectedProjectId);
         if (project) {
           projectContext = DiscussionEngine.getProjectContext(project);
         }
@@ -606,6 +704,7 @@ Be concise but thorough. Focus on practical, actionable advice.
       isProcessing,
       conversations,
       selectedConvIndex,
+      selectedProjectId,
       messages,
       autoScroll,
       visibleMessageCount,
@@ -613,8 +712,58 @@ Be concise but thorough. Focus on practical, actionable advice.
     ]
   );
 
+  // US-105: Handle project selection
+  const handleProjectSelect = useCallback((projectId: string | null) => {
+    setSelectedProjectId(projectId);
+    setProjectSelectorOpen(false);
+    // Update index for next open
+    if (projectId === null) {
+      setProjectSelectorIndex(0);
+    } else {
+      const idx = projectList.findIndex((p) => p.id === projectId);
+      setProjectSelectorIndex(idx >= 0 ? idx + 1 : 0);
+    }
+  }, [projectList]);
+
   // Handle keyboard input for navigation and scrolling
   useInput((input, key) => {
+    // US-105: Project selector keyboard handling when open
+    if (projectSelectorOpen) {
+      const totalItems = projectList.length + 1; // +1 for "No project"
+
+      if (key.upArrow) {
+        setProjectSelectorIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setProjectSelectorIndex((prev) => Math.min(totalItems - 1, prev + 1));
+        return;
+      }
+      if (key.return) {
+        // Select the project at current index
+        if (projectSelectorIndex === 0) {
+          handleProjectSelect(null);
+        } else {
+          const selectedProject = projectList[projectSelectorIndex - 1];
+          if (selectedProject) {
+            handleProjectSelect(selectedProject.id);
+          }
+        }
+        return;
+      }
+      if (key.escape) {
+        setProjectSelectorOpen(false);
+        return;
+      }
+      return; // Block other keys when selector is open
+    }
+
+    // US-105: Open project selector with 'p'
+    if (input === 'p' && !isProcessing) {
+      setProjectSelectorOpen(true);
+      return;
+    }
+
     // Conversation selection (when in conversation list)
     if (key.leftArrow || key.rightArrow) {
       // Reserved for future: switch between conv list and message pane
@@ -713,6 +862,15 @@ Be concise but thorough. Focus on practical, actionable advice.
             Chat
           </Text>
         </Box>
+        {/* US-105: Project selector available even with no conversations */}
+        <ProjectSelector
+          projects={projectList}
+          selectedProjectId={selectedProjectId}
+          onSelect={handleProjectSelect}
+          isOpen={projectSelectorOpen}
+          onToggle={() => setProjectSelectorOpen((prev) => !prev)}
+          selectedIndex={projectSelectorIndex}
+        />
         <EmptyState />
         {/* Chat input available even with no history - US-103 */}
         <ChatInput onSubmit={handleSubmitMessage} disabled={isProcessing} />
@@ -737,6 +895,13 @@ Be concise but thorough. Focus on practical, actionable advice.
           {' '}
           ({messages.length} message{messages.length !== 1 ? 's' : ''})
         </Text>
+        {/* US-105: Selected project indicator in header */}
+        {selectedProjectId && (
+          <Text color="green">
+            {' '}
+            [{projectList.find((p) => p.id === selectedProjectId)?.name || 'Unknown'}]
+          </Text>
+        )}
         {/* US-104: Streaming status indicator */}
         {streamingMessage && !streamingMessage.isComplete && (
           <Text color="cyan">
@@ -748,6 +913,16 @@ Be concise but thorough. Focus on practical, actionable advice.
           <Text color="yellow"> (auto-scroll paused)</Text>
         )}
       </Box>
+
+      {/* US-105: Project context selector */}
+      <ProjectSelector
+        projects={projectList}
+        selectedProjectId={selectedProjectId}
+        onSelect={handleProjectSelect}
+        isOpen={projectSelectorOpen}
+        onToggle={() => setProjectSelectorOpen((prev) => !prev)}
+        selectedIndex={projectSelectorIndex}
+      />
 
       <Box flexGrow={1} flexDirection="row">
         {/* Conversation list sidebar */}
@@ -796,6 +971,7 @@ Be concise but thorough. Focus on practical, actionable advice.
             </>
           )}
           {' '}| <Text bold>g/G</Text> Start/End
+          {' '}| <Text bold>p</Text> Project
         </Text>
       </Box>
     </Box>
