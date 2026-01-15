@@ -1,15 +1,23 @@
 # Ralph Progress Log
-Started: Thu Jan 15 14:28:37 EST 2026
+Started: Thu Jan 15 14:38:16 EST 2026
 ---
 
-## 2026-01-15 14:30 - SI-1768504596179
-- What was implemented: Comprehensive tests for src/deploy/providers/coolify.ts
+## Codebase Patterns
+- Tests use Vitest with vi.mock() for mocking dependencies
+- Database operations use better-sqlite3 with prepare().run/get/all pattern
+- Repository pattern: functions accept optional db parameter, close db only if not provided
+- Test files are co-located with source files (e.g., conversation.test.ts next to conversation.ts)
+- Use mockPrepare/mockRun/mockGet/mockAll pattern for mocking database operations
+
+---
+
+## 2026-01-15T14:40:00Z - SI-1768505895992
+- What was implemented: Comprehensive test suite for src/collaboration/conversation.ts
 - Files changed:
-  - src/deploy/providers/coolify.test.ts (new file - 986 lines, 59 tests)
+  - src/collaboration/conversation.test.ts (new file, 514 lines, 36 tests)
 - **Learnings for future iterations:**
-  - This codebase uses Vitest with `vi.fn()` for mocking
-  - Global fetch can be mocked with `global.fetch = vi.fn()`
-  - Follow existing test patterns in src/cli/chat.test.ts
-  - Tests cover: CoolifyProvider constructor, initWithDeployConfig, fromProject, deploy (webhook & UUID modes), getStatus, getLogs, start, stop, restart, validateConnection, getDeploymentType, isDockerCompose, isDockerfile, createCoolifyProviderFromEnv
-  - The coolify.ts file uses private methods accessed indirectly through public API testing
+  - Patterns discovered: ConversationRepository uses a pattern where db connection is managed via optional param - if not provided, it initializes and closes; if provided, caller manages lifecycle
+  - The codebase uses snake_case for DB columns and camelCase for TypeScript interfaces, with rowTo* conversion functions
+  - Test mocking pattern: mock prepare() to return {run, get, all} object
+  - All repository methods follow the same shouldCloseDb pattern for proper cleanup
 ---
