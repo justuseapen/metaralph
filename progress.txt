@@ -190,3 +190,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Auto-generate related fields: update branch name when PRD path changes
   - Loading projects: call listProjects() from registry module
 ---
+
+## 2026-01-14 - US-110
+- What was implemented: Loop start functionality with LoopRunner module
+- Files changed:
+  - `src/loops/runner.ts` - New file with LoopRunner module:
+    - start() - Spawns ralph.sh subprocess for a loop
+    - pause() - Marks loop as paused (takes effect after current iteration)
+    - resume() - Restarts a paused loop
+    - stop() - Kills running loop process immediately
+    - getActive() - Get active loop info
+    - isRunning() - Check if loop is running
+    - monitorLoopProcess() - Monitors stdout for iteration markers, story IDs, commits
+    - Tracks active loops in memory Map for process management
+  - `src/loops/index.ts` - Export LoopRunner and related types
+  - `src/cli/components/LoopsView.tsx` - Wire up handleCreateLoop to call LoopRunner.start()
+- **Learnings for future iterations:**
+  - Use spawn() from child_process with stdio: ['ignore', 'pipe', 'pipe'] for subprocess control
+  - Track active processes in a Map<id, ActiveLoop> for pause/stop functionality
+  - Parse iteration markers from Ralph output: /Ralph Iteration (\d+) of (\d+)/
+  - Detect story IDs with patterns like /Working on (US-\d+)/i or /"id":\s*"(US-\d+)"/
+  - Detect commits with /\[([a-f0-9]{7,40})\]/ or /commit ([a-f0-9]{7,40})/i
+  - Use process.on('close', callback) for exit handling, process.on('error', callback) for errors
+  - findRalphScript() searches project-local and user-level locations for ralph.sh
+  - Keep only last 10KB of output when storing in database: output.slice(-10000)
+---
