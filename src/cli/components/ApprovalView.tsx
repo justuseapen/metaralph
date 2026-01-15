@@ -11,32 +11,30 @@ import { Box, Text, useInput } from 'ink';
 import { ApprovalQueue, type Task } from '../../queue/index.js';
 import { getProject } from '../../registry/index.js';
 import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
+import {
+  formatTaskType as formatTypeWithColor,
+  formatEffort as formatEffortWithColor,
+} from './ColorScheme.js';
 
 /**
- * Format a task type for display
+ * Format a task type for display - uses centralized ColorScheme
  */
 function formatType(type: string): string {
-  const typeMap: Record<string, string> = {
-    bug_fix: 'Bug Fix',
-    test: 'Test',
-    docs: 'Docs',
-    refactor: 'Refactor',
-    feature: 'Feature',
-  };
-  return typeMap[type] || type;
+  return formatTypeWithColor(type).text;
 }
 
 /**
- * Format effort level for display
+ * Get task type color - uses centralized ColorScheme
+ */
+function getTypeColor(type: string): string {
+  return formatTypeWithColor(type).color;
+}
+
+/**
+ * Format effort level for display - uses centralized ColorScheme
  */
 function formatEffort(effort: string): { text: string; color: string } {
-  const effortMap: Record<string, { text: string; color: string }> = {
-    quick_win: { text: 'Quick Win', color: 'greenBright' },
-    small: { text: 'Small', color: 'green' },
-    medium: { text: 'Medium', color: 'yellow' },
-    large: { text: 'Large', color: 'red' },
-  };
-  return effortMap[effort] || { text: effort, color: 'white' };
+  return formatEffortWithColor(effort);
 }
 
 /**
@@ -90,7 +88,7 @@ function TaskDetail({ task }: { task: Task }): React.ReactElement {
         <Box width={14}>
           <Text dimColor>Type:</Text>
         </Box>
-        <Text>{formatType(task.type)}</Text>
+        <Text color={getTypeColor(task.type)}>{formatType(task.type)}</Text>
       </Box>
 
       <Box>
@@ -147,7 +145,7 @@ function TaskListItem({ task, selected }: { task: Task; selected: boolean }): Re
       >
         {selected ? ' ▸ ' : '   '}
         {truncate(task.title, 50)}
-        <Text dimColor> ({formatType(task.type)})</Text>
+        <Text color={getTypeColor(task.type)} dimColor> ({formatType(task.type)})</Text>
       </Text>
     </Box>
   );

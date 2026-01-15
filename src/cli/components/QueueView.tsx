@@ -13,6 +13,16 @@ import { TaskRepository, type Task, type TaskStatus, type TaskType, type EffortL
 import { ExecutionRepository, type Execution } from '../../workers/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
 import { LoadingSpinner, RefreshingIndicator, EmptyState } from './LoadingStates.js';
+import {
+  STATUS_COLORS,
+  TASK_TYPE_COLORS,
+  UI_COLORS,
+  getTaskStatusColor,
+  getExecutionStatusColor as getExecStatusColor,
+  formatTaskType as formatTypeWithColor,
+  formatTaskStatus,
+  formatEffort as formatEffortWithColor,
+} from './ColorScheme.js';
 
 /**
  * Status filter options for the filter bar
@@ -40,32 +50,24 @@ const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
 ];
 
 /**
- * Format a task status for display
+ * Format a task status for display - uses centralized ColorScheme
  */
 function formatStatus(status: TaskStatus): { text: string; color: string } {
-  const statusMap: Record<TaskStatus, { text: string; color: string }> = {
-    pending: { text: 'Pending', color: 'yellow' },
-    approved: { text: 'Approved', color: 'cyan' },
-    queued: { text: 'Queued', color: 'blue' },
-    running: { text: 'Running', color: 'green' },
-    completed: { text: 'Completed', color: 'greenBright' },
-    failed: { text: 'Failed', color: 'red' },
-  };
-  return statusMap[status] || { text: status, color: 'white' };
+  return formatTaskStatus(status);
 }
 
 /**
- * Format a task type for display
+ * Format a task type for display - uses centralized ColorScheme
  */
 function formatType(type: string): string {
-  const typeMap: Record<string, string> = {
-    bug_fix: 'Bug Fix',
-    test: 'Test',
-    docs: 'Docs',
-    refactor: 'Refactor',
-    feature: 'Feature',
-  };
-  return typeMap[type] || type;
+  return formatTypeWithColor(type).text;
+}
+
+/**
+ * Get task type color for display
+ */
+function getTypeColor(type: string): string {
+  return formatTypeWithColor(type).color;
 }
 
 /**
@@ -165,6 +167,8 @@ function TaskRow({
 }): React.ReactElement {
   const status = formatStatus(task.status);
 
+  const typeColor = getTypeColor(task.type);
+
   // Use simpler layout when no search term (supports inverse selection)
   if (!searchTerm) {
     return (
@@ -173,7 +177,7 @@ function TaskRow({
           {String(task.priorityScore).padEnd(8)}
           <Text dimColor>{truncate(task.id, 8).padEnd(10)}</Text>
           {truncate(projectName, 14).padEnd(16)}
-          {formatType(task.type).padEnd(10)}
+          <Text color={typeColor}>{formatType(task.type).padEnd(10)}</Text>
           <Text color={status.color}>{status.text.padEnd(12)}</Text>
           {truncate(task.title, 40)}
         </Text>
@@ -194,7 +198,7 @@ function TaskRow({
         <HighlightedText text={projectName} searchTerm={searchTerm} maxLength={14} />
       </Box>
       <Box width={10}>
-        <HighlightedText text={formatType(task.type)} searchTerm={searchTerm} />
+        <HighlightedText text={formatType(task.type)} searchTerm={searchTerm} color={typeColor} />
       </Box>
       <Box width={12}>
         <Text inverse={selected} color={status.color}>{status.text}</Text>
@@ -419,15 +423,10 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
 }
 
 /**
- * Get execution status color
+ * Get execution status color - uses centralized ColorScheme
  */
 function getExecutionStatusColor(status: string): string {
-  switch (status) {
-    case 'completed': return 'cyan';
-    case 'running': return 'green';
-    case 'failed': return 'red';
-    default: return 'gray';
-  }
+  return getExecStatusColor(status);
 }
 
 /**
@@ -592,7 +591,7 @@ function TaskDetailView({ task, onClose }: TaskDetailViewProps): React.ReactElem
         {/* Type and source */}
         <Box marginBottom={0}>
           <Text bold>Type: </Text>
-          <Text>{formatType(task.type)}</Text>
+          <Text color={getTypeColor(task.type)}>{formatType(task.type)}</Text>
           <Text>  </Text>
           <Text bold>Source: </Text>
           <Text dimColor>{formatSource(task.source)}</Text>

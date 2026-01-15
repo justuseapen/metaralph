@@ -15,6 +15,12 @@ import { listProjects, type Project } from '../../registry/index.js';
 import { TaskRepository, type Task, type TaskType } from '../../queue/task.js';
 import { getRegisteredSelfProjects, Guardrails, type RiskAssessment } from '../../self-improve/index.js';
 import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
+import {
+  TASK_TYPE_COLORS,
+  UI_COLORS,
+  getRiskColor as getRiskColorFromScheme,
+  formatTaskType as formatTaskTypeFromScheme,
+} from './ColorScheme.js';
 
 /**
  * Self-improvement status data
@@ -42,12 +48,10 @@ interface ProposalWithRisk {
 }
 
 /**
- * Get risk score color
+ * Get risk score color - uses centralized ColorScheme
  */
 function getRiskColor(score: number): string {
-  if (score < 40) return 'green';
-  if (score <= 70) return 'yellow';
-  return 'red';
+  return getRiskColorFromScheme(score);
 }
 
 /**
@@ -172,17 +176,17 @@ function SelfImprovementSection({
 }
 
 /**
- * Format task type for display
+ * Format task type for display - uses centralized ColorScheme
  */
 function formatTaskType(type: TaskType): string {
-  switch (type) {
-    case 'bug_fix': return 'Bug Fix';
-    case 'test': return 'Test';
-    case 'docs': return 'Docs';
-    case 'refactor': return 'Refactor';
-    case 'feature': return 'Feature';
-    default: return type;
-  }
+  return formatTaskTypeFromScheme(type).text;
+}
+
+/**
+ * Get task type color - uses centralized ColorScheme
+ */
+function getTaskTypeColor(type: TaskType): string {
+  return formatTaskTypeFromScheme(type).color;
 }
 
 /**
@@ -233,7 +237,7 @@ function ProposalRow({
         </Text>
       </Box>
       <Box width={12}>
-        <Text color="cyan">{formatTaskType(proposal.task.type)}</Text>
+        <Text color={getTaskTypeColor(proposal.task.type)}>{formatTaskType(proposal.task.type)}</Text>
       </Box>
       <Box width={8}>
         <Text color={riskColor} bold>
@@ -337,7 +341,7 @@ function ProposalDetailView({
       <Box flexDirection="row" marginTop={1} gap={4}>
         <Box flexDirection="column">
           <Text color="gray">Type</Text>
-          <Text>{formatTaskType(proposal.task.type)}</Text>
+          <Text color={getTaskTypeColor(proposal.task.type)}>{formatTaskType(proposal.task.type)}</Text>
         </Box>
         <Box flexDirection="column">
           <Text color="gray">Risk Score</Text>

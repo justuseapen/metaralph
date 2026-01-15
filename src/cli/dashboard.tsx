@@ -21,6 +21,12 @@ import { HealthView } from './components/HealthView.js';
 import { ErrorBoundary } from './components/LoadingStates.js';
 import { initDatabase } from '../db/index.js';
 import { NotificationRepository, type Notification } from '../notifications/index.js';
+import {
+  STATUS_COLORS,
+  SEVERITY_COLORS,
+  UI_COLORS,
+  getSeverityColor as getSeverityColorFromScheme,
+} from './components/ColorScheme.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -241,19 +247,19 @@ function Header(): React.ReactElement {
 }
 
 /**
- * Get badge color based on tab and count
+ * Get badge color for tab based on status - uses centralized ColorScheme
  */
 function getBadgeColor(tabId: TabId, count: number): string | undefined {
   if (count === 0) return undefined;
   switch (tabId) {
     case 'queue':
-      return 'cyan';
+      return STATUS_COLORS.completed;  // cyan - items ready
     case 'approvals':
-      return 'yellow';
+      return STATUS_COLORS.warning;    // yellow - needs attention
     case 'workers':
-      return 'green';
+      return STATUS_COLORS.running;    // green - active
     case 'health':
-      return 'red';
+      return STATUS_COLORS.failed;     // red - critical
     default:
       return undefined;
   }
@@ -550,14 +556,10 @@ function ShortcutHelpOverlay({ activeTab, onClose }: { activeTab: TabId; onClose
 }
 
 /**
- * Get notification severity color
+ * Get severity color - uses centralized ColorScheme
  */
 function getSeverityColor(severity: string): string {
-  switch (severity) {
-    case 'critical': return 'red';
-    case 'warning': return 'yellow';
-    default: return 'cyan';
-  }
+  return getSeverityColorFromScheme(severity);
 }
 
 /**

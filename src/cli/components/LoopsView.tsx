@@ -13,6 +13,12 @@ import * as path from 'node:path';
 import { LoopRepository, LoopIterationRepository, LoopRunner, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
 import { LoadingSpinner, RefreshingIndicator, EmptyState } from './LoadingStates.js';
+import {
+  STATUS_COLORS,
+  UI_COLORS,
+  getLoopStatusColor,
+  getExecutionStatusColor,
+} from './ColorScheme.js';
 
 /**
  * User story from PRD
@@ -78,18 +84,10 @@ function readPrdProgress(projectPath: string, prdPath: string): StoryProgress | 
 }
 
 /**
- * Get color for loop status
+ * Get color for loop status - uses centralized ColorScheme
  */
 function getStatusColor(status: LoopStatus): string {
-  const colors: Record<LoopStatus, string> = {
-    pending: 'gray',
-    running: 'green',
-    paused: 'yellow',
-    completed: 'cyan',
-    failed: 'red',
-    stopped: 'red',
-  };
-  return colors[status] || 'white';
+  return getLoopStatusColor(status);
 }
 
 /**
@@ -608,15 +606,10 @@ function getStoryTitle(storyId: string | null, stories: PrdStory[]): string | nu
 }
 
 /**
- * Get iteration status color with emphasis for failed
+ * Get iteration status color - uses centralized ColorScheme
  */
 function getIterationStatusColor(status: string): string {
-  switch (status) {
-    case 'completed': return 'cyan';
-    case 'running': return 'green';
-    case 'failed': return 'red';
-    default: return 'gray';
-  }
+  return getExecutionStatusColor(status);
 }
 
 /**

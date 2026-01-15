@@ -15,6 +15,7 @@ Started: Wed Jan 14 20:48:19 EST 2026
 - 2-second refresh interval for real-time dashboard updates
 - Anthropic SDK streaming: use `client.messages.stream()` and `stream.on('text', callback)`
 - For spinners in Ink, use text-based frames (e.g., SPINNER_FRAMES array) with setInterval
+- **Color scheme**: Use `src/cli/components/ColorScheme.tsx` for all colors - STATUS_COLORS, TASK_TYPE_COLORS, etc.
 
 ---
 
@@ -715,4 +716,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - useInput in dialogs/overlays should return early to block parent handlers
   - Search mode should block navigation keys while input is active
   - ApprovalView uses split-pane layout (detail always visible) - valid pattern
+---
+
+## 2026-01-15 - US-134
+- What was implemented: Added consistent color coding across all dashboard views
+- Files changed:
+  - `src/cli/components/ColorScheme.tsx` - New centralized color scheme module with:
+    - STATUS_COLORS: green=running, red=failed, yellow=paused/warning, cyan=completed, gray=pending
+    - TASK_TYPE_COLORS: magenta=feature, red=bug_fix, cyan=test, blue=docs, yellow=refactor
+    - RISK_COLORS, SEVERITY_COLORS, EFFORT_COLORS for other color needs
+    - UI_COLORS for headers, highlights, action keys
+    - Helper functions: getTaskStatusColor, getLoopStatusColor, getExecutionStatusColor
+    - Format functions: formatTaskType, formatTaskStatus, formatEffort with color
+  - `src/cli/components/QueueView.tsx` - Updated to use ColorScheme for status, type colors
+  - `src/cli/components/LoopsView.tsx` - Updated getStatusColor and getIterationStatusColor
+  - `src/cli/components/HealthView.tsx` - Updated getRiskColor and formatTaskType with type color
+  - `src/cli/components/ApprovalView.tsx` - Updated formatType and formatEffort with type color
+  - `src/cli/dashboard.tsx` - Updated getBadgeColor and getSeverityColor
+- **Learnings for future iterations:**
+  - Centralize color constants in ColorScheme.tsx - import from there for consistency
+  - STATUS_COLORS uses semantic names: running, completed, failed, pending, paused, etc.
+  - TASK_TYPE_COLORS assigns distinct colors per type: feature=magenta, bug=red, test=cyan
+  - Wrap existing color functions to use centralized scheme: `return getXFromScheme(x)`
+  - Task types now show with color throughout: QueueView list, detail, ApprovalView, HealthView
+  - Import with alias to avoid name conflicts: `formatTaskType as formatTypeWithColor`
 ---
