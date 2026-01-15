@@ -19,6 +19,7 @@ import { ChatView } from './components/ChatView.js';
 import { LoopsView } from './components/LoopsView.js';
 import { HealthView } from './components/HealthView.js';
 import { initDatabase } from '../db/index.js';
+import { NotificationRepository, type Notification } from '../notifications/index.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -404,15 +405,146 @@ function ShortcutHelpOverlay({ activeTab, onClose }: { activeTab: TabId; onClose
 }
 
 /**
- * Notification list overlay component
- * Shows pending approvals, failed tasks, and critical alerts
+ * Get notification severity color
  */
-function NotificationListOverlay({ counts, onClose }: { counts: NotificationCounts; onClose: () => void }): React.ReactElement {
+function getSeverityColor(severity: string): string {
+  switch (severity) {
+    case 'critical': return 'red';
+    case 'warning': return 'yellow';
+    default: return 'cyan';
+  }
+}
+
+/**
+ * Format notification time relative to now
+ */
+function formatNotificationTime(createdAt: string): string {
+  const now = new Date();
+  const created = new Date(createdAt);
+  const diffMs = now.getTime() - created.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return created.toLocaleDateString();
+}
+
+/**
+ * Notification row component
+ */
+function NotificationRow({
+  notification,
+  isSelected,
+}: {
+  notification: Notification;
+  isSelected: boolean;
+}): React.ReactElement {
+  const severityColor = getSeverityColor(notification.severity);
+  const isUnread = !notification.read;
+
+  return (
+    <Box>
+      <Text inverse={isSelected}>
+        <Text color={severityColor} bold={isUnread}>
+          {notification.severity === 'critical' ? '!' : notification.severity === 'warning' ? '*' : ' '}
+        </Text>
+        <Text bold={isUnread}> {notification.title.substring(0, 40).padEnd(40)} </Text>
+        <Text dimColor={!isUnread}>{formatNotificationTime(notification.createdAt).padEnd(12)}</Text>
+        {isUnread && <Text color="cyan"> [new]</Text>}
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * Notification list overlay component
+ * Shows recent notifications with selection and mark read/dismiss functionality
+ */
+function NotificationListOverlay({
+  counts,
+  onClose,
+}: {
+  counts: NotificationCounts;
+  onClose: () => void;
+}): React.ReactElement {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Load notifications from database
+  const loadNotifications = useCallback(() => {
+    try {
+      const recent = NotificationRepository.findRecent(50);
+      setNotifications(recent);
+    } catch {
+      // Table might not exist yet
+      setNotifications([]);
+    }
+    setLoading(false);
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  // Handle marking notification as read
+  const handleMarkRead = useCallback(() => {
+    if (notifications.length === 0) return;
+    const selected = notifications[selectedIndex];
+    if (selected && !selected.read) {
+      NotificationRepository.markAsRead(selected.id);
+      loadNotifications();
+    }
+  }, [notifications, selectedIndex, loadNotifications]);
+
+  // Handle dismissing (deleting) notification
+  const handleDismiss = useCallback(() => {
+    if (notifications.length === 0) return;
+    const selected = notifications[selectedIndex];
+    if (selected) {
+      NotificationRepository.delete(selected.id);
+      // Adjust selection if needed
+      if (selectedIndex >= notifications.length - 1 && selectedIndex > 0) {
+        setSelectedIndex(selectedIndex - 1);
+      }
+      loadNotifications();
+    }
+  }, [notifications, selectedIndex, loadNotifications]);
+
   useInput((input, key) => {
     if (input === '!' || key.escape) {
       onClose();
+      return;
+    }
+
+    if (notifications.length === 0) return;
+
+    // Arrow key navigation
+    if (key.upArrow) {
+      setSelectedIndex(Math.max(0, selectedIndex - 1));
+    } else if (key.downArrow) {
+      setSelectedIndex(Math.min(notifications.length - 1, selectedIndex + 1));
+    }
+
+    // Enter marks as read
+    if (key.return) {
+      handleMarkRead();
+    }
+
+    // 'd' dismisses notification
+    if (input === 'd') {
+      handleDismiss();
     }
   });
+
+  // Calculate unread count
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <Box
@@ -422,54 +554,67 @@ function NotificationListOverlay({ counts, onClose }: { counts: NotificationCoun
       paddingX={2}
       paddingY={1}
     >
-      <Box justifyContent="center" marginBottom={1}>
-        <Text bold color="cyan">Notifications</Text>
-        <Text dimColor> ({counts.total} items)</Text>
-      </Box>
-
-      <Box flexDirection="column" gap={1}>
-        {/* Pending Approvals Section */}
-        <Box flexDirection="column">
-          <Box>
-            <Text bold color="cyan">Pending Approvals</Text>
-            <Text dimColor> ({counts.pendingApprovals})</Text>
-          </Box>
-          {counts.pendingApprovals > 0 ? (
-            <Text dimColor>  Press <Text bold>2</Text> to go to Approvals tab</Text>
-          ) : (
-            <Text dimColor>  No pending approvals</Text>
-          )}
+      {/* Header */}
+      <Box justifyContent="space-between" marginBottom={1}>
+        <Box>
+          <Text bold color="cyan">Notifications</Text>
+          <Text dimColor> ({notifications.length} items</Text>
+          {unreadCount > 0 && <Text color="yellow">, {unreadCount} unread</Text>}
+          <Text dimColor>)</Text>
         </Box>
-
-        {/* Failed Tasks Section */}
-        <Box flexDirection="column">
-          <Box>
-            <Text bold color="yellow">Failed Tasks</Text>
-            <Text dimColor> ({counts.failedTasks})</Text>
-          </Box>
-          {counts.failedTasks > 0 ? (
-            <Text dimColor>  Press <Text bold>1</Text> to go to Queue tab</Text>
-          ) : (
-            <Text dimColor>  No failed tasks</Text>
+        <Box>
+          {counts.pendingApprovals > 0 && (
+            <Text color="cyan" dimColor> {counts.pendingApprovals} approvals </Text>
           )}
-        </Box>
-
-        {/* Critical Alerts Section */}
-        <Box flexDirection="column">
-          <Box>
-            <Text bold color="red">Critical Alerts</Text>
-            <Text dimColor> ({counts.criticalAlerts})</Text>
-          </Box>
-          {counts.criticalAlerts > 0 ? (
-            <Text dimColor>  Press <Text bold>5</Text> to go to Health tab</Text>
-          ) : (
-            <Text dimColor>  No critical alerts</Text>
+          {counts.failedTasks > 0 && (
+            <Text color="yellow" dimColor> {counts.failedTasks} failed </Text>
+          )}
+          {counts.criticalAlerts > 0 && (
+            <Text color="red" dimColor> {counts.criticalAlerts} critical </Text>
           )}
         </Box>
       </Box>
 
+      {/* Notification list */}
+      <Box flexDirection="column" height={15}>
+        {loading ? (
+          <Text dimColor>Loading notifications...</Text>
+        ) : notifications.length === 0 ? (
+          <Box flexDirection="column">
+            <Text dimColor>No notifications yet.</Text>
+            <Text> </Text>
+            <Text dimColor>
+              Notifications appear when tasks complete, fail, or need approval.
+            </Text>
+          </Box>
+        ) : (
+          notifications.slice(0, 15).map((notification, index) => (
+            <NotificationRow
+              key={notification.id}
+              notification={notification}
+              isSelected={index === selectedIndex}
+            />
+          ))
+        )}
+      </Box>
+
+      {/* Selected notification message preview */}
+      {notifications.length > 0 && notifications[selectedIndex]?.message && (
+        <Box borderStyle="single" borderColor="gray" paddingX={1} marginTop={1}>
+          <Text dimColor wrap="truncate">
+            {notifications[selectedIndex].message}
+          </Text>
+        </Box>
+      )}
+
+      {/* Footer with shortcuts */}
       <Box justifyContent="center" marginTop={1}>
-        <Text dimColor>Press <Text bold>!</Text> or <Text bold>Esc</Text> to close</Text>
+        <Text dimColor>
+          <Text bold>↑↓</Text> Navigate  |
+          <Text bold> Enter</Text> Mark read  |
+          <Text bold> d</Text> Dismiss  |
+          <Text bold> !</Text>/<Text bold>Esc</Text> Close
+        </Text>
       </Box>
     </Box>
   );
