@@ -4,20 +4,32 @@
  * Displays chat history with timestamps and allows sending prompts to Claude.
  * US-102: Message display with user/assistant styling and scroll support.
  * US-103: Multi-line chat input with Ctrl+Enter submit.
+ * US-104: Streaming Claude responses with real-time display.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   ConversationRepository,
   type Message,
   type Conversation,
 } from '../../collaboration/conversation.js';
-import { listProjects, type Project } from '../../registry/index.js';
+import { listProjects, getProject, type Project } from '../../registry/index.js';
+import { DiscussionEngine, type ProjectContext } from '../../collaboration/discussion.js';
 
 // Maximum character limit for chat input
 const MAX_INPUT_LENGTH = 4000;
+
+// Spinner frames for streaming indicator
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+// Streaming message type for in-progress responses
+interface StreamingMessage {
+  content: string;
+  isComplete: boolean;
+}
 
 /**
  * Format a timestamp for display
@@ -82,6 +94,46 @@ function MessageItem({ message }: { message: Message }): React.ReactElement {
           {displayContent}
         </Text>
       </Box>
+    </Box>
+  );
+}
+
+/**
+ * Streaming indicator with spinner animation
+ * US-104: Shows while Claude is generating a response
+ */
+function StreamingIndicator({
+  content,
+  spinnerFrame,
+}: {
+  content: string;
+  spinnerFrame: number;
+}): React.ReactElement {
+  const spinner = SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length];
+
+  // Truncate streaming content for display
+  const maxContentLength = 500;
+  const displayContent =
+    content.length > maxContentLength
+      ? content.slice(0, maxContentLength) + '...'
+      : content;
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Box>
+        <Text color="green" bold>
+          Claude
+        </Text>
+        <Text color="cyan"> {spinner} </Text>
+        <Text dimColor>generating...</Text>
+      </Box>
+      {displayContent && (
+        <Box paddingLeft={2}>
+          <Text color="greenBright" wrap="wrap">
+            {displayContent}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -155,15 +207,20 @@ function ConversationList({
 
 /**
  * Message list with scroll support
+ * US-104: Includes streaming message display
  */
 function MessageList({
   messages,
   scrollOffset,
   visibleCount,
+  streamingMessage,
+  spinnerFrame,
 }: {
   messages: Message[];
   scrollOffset: number;
   visibleCount: number;
+  streamingMessage: StreamingMessage | null;
+  spinnerFrame: number;
 }): React.ReactElement {
   // Calculate visible messages based on scroll offset
   const startIndex = Math.max(0, scrollOffset);
@@ -198,8 +255,13 @@ function MessageList({
         );
       })}
 
+      {/* Streaming message indicator - US-104 */}
+      {streamingMessage && !streamingMessage.isComplete && (
+        <StreamingIndicator content={streamingMessage.content} spinnerFrame={spinnerFrame} />
+      )}
+
       {/* Scroll indicator at bottom */}
-      {startIndex + visibleCount < messages.length && (
+      {startIndex + visibleCount < messages.length && !streamingMessage && (
         <Box justifyContent="center" marginTop={1}>
           <Text dimColor>
             ↓ {messages.length - startIndex - visibleCount} more message(s) below
@@ -208,7 +270,7 @@ function MessageList({
       )}
 
       {/* Auto-scroll hint */}
-      {messages.length > 0 && (
+      {messages.length > 0 && !streamingMessage && (
         <Box marginTop={1}>
           <Text dimColor>Use ↑/↓ to scroll • End to jump to latest</Text>
         </Box>
@@ -314,6 +376,7 @@ function ChatInput({
 
 /**
  * ChatView component - main chat interface for the dashboard
+ * US-104: Enhanced with streaming Claude responses
  */
 export function ChatView(): React.ReactElement {
   const [loading, setLoading] = useState(true);
@@ -325,8 +388,24 @@ export function ChatView(): React.ReactElement {
   const [autoScroll, setAutoScroll] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // US-104: Streaming state
+  const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const streamAbortRef = useRef<AbortController | null>(null);
+
   // Number of messages visible at once (adjust based on terminal size)
   const visibleMessageCount = 10;
+
+  // US-104: Spinner animation effect
+  useEffect(() => {
+    if (!streamingMessage || streamingMessage.isComplete) return;
+
+    const interval = setInterval(() => {
+      setSpinnerFrame((prev) => (prev + 1) % SPINNER_FRAMES.length);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [streamingMessage]);
 
   // Load conversations and projects
   useEffect(() => {
@@ -372,24 +451,167 @@ export function ChatView(): React.ReactElement {
     return () => clearInterval(interval);
   }, [selectedConvIndex, autoScroll]);
 
-  // Handle message submission from chat input
-  // Note: This is a placeholder - actual Claude API integration will be added in US-104
-  const handleSubmitMessage = (message: string) => {
-    if (!message.trim() || isProcessing) return;
+  /**
+   * Build system prompt for Claude with project context
+   * US-104: Used for streaming responses
+   */
+  const buildSystemPrompt = useCallback((projectContext: ProjectContext | null): string => {
+    let prompt = `You are MetaRalph, an intelligent assistant helping developers improve their software projects.
 
-    // For now, just log the message - actual sending will be implemented in US-104
-    // This allows testing the input component works correctly
-    setIsProcessing(true);
+Your role is to:
+1. Help the user understand their codebase
+2. Suggest improvements and optimizations
+3. Help create PRDs (Product Requirements Documents) for new features
+4. Answer questions about the project architecture and best practices
+5. Help identify and prioritize technical debt
 
-    // Simulate processing delay (remove when actual API integration is added)
-    setTimeout(() => {
-      setIsProcessing(false);
-      // In US-104, this will actually send the message to Claude
-      // For now, auto-scroll to bottom after "sending"
+Be concise but thorough. Focus on practical, actionable advice.
+
+`;
+
+    if (projectContext) {
+      prompt += `You are currently discussing the project: ${projectContext.name}\nProject path: ${projectContext.path}\n\n`;
+
+      if (projectContext.readme) {
+        prompt += `## Project README\n\n${projectContext.readme.slice(0, 3000)}\n\n`;
+      }
+
+      if (projectContext.structure) {
+        prompt += `## Project Structure\n\n\`\`\`\n${projectContext.structure}\n\`\`\`\n\n`;
+      }
+    }
+
+    return prompt;
+  }, []);
+
+  /**
+   * Handle message submission with Claude streaming
+   * US-104: Implements streaming responses from Claude
+   */
+  const handleSubmitMessage = useCallback(
+    async (message: string) => {
+      if (!message.trim() || isProcessing) return;
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        // eslint-disable-next-line no-console
+        console.error('ANTHROPIC_API_KEY environment variable is required');
+        return;
+      }
+
+      setIsProcessing(true);
+      setStreamingMessage({ content: '', isComplete: false });
       setAutoScroll(true);
-      setScrollOffset(Math.max(0, messages.length - visibleMessageCount));
-    }, 1500);
-  };
+
+      // Get current conversation context
+      const currentConversation =
+        conversations.length > 0 ? conversations[selectedConvIndex] : null;
+
+      // Get project context if we have a conversation
+      let projectContext: ProjectContext | null = null;
+      if (currentConversation) {
+        const project = getProject(currentConversation.projectId);
+        if (project) {
+          projectContext = DiscussionEngine.getProjectContext(project);
+        }
+      }
+
+      try {
+        // Add user message to conversation first
+        if (currentConversation) {
+          ConversationRepository.addMessage({
+            conversationId: currentConversation.id,
+            role: 'user',
+            content: message,
+          });
+        }
+
+        // Create Anthropic client and stream
+        const client = new Anthropic({ apiKey });
+        const abortController = new AbortController();
+        streamAbortRef.current = abortController;
+
+        // Build message history for context
+        const anthropicMessages: Array<{ role: 'user' | 'assistant'; content: string }> =
+          messages
+            .filter((m) => m.role === 'user' || m.role === 'assistant')
+            .slice(-10) // Keep last 10 messages for context
+            .map((m) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            }));
+
+        // Add current message
+        anthropicMessages.push({ role: 'user', content: message });
+
+        // Start streaming
+        const stream = client.messages.stream({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2048,
+          system: buildSystemPrompt(projectContext),
+          messages: anthropicMessages,
+        });
+
+        let fullContent = '';
+
+        // Handle text delta events
+        stream.on('text', (textDelta: string) => {
+          fullContent += textDelta;
+          setStreamingMessage({ content: fullContent, isComplete: false });
+
+          // Auto-scroll to follow new content - US-104
+          if (autoScroll) {
+            setScrollOffset(Math.max(0, messages.length - visibleMessageCount + 1));
+          }
+        });
+
+        // Wait for stream to complete
+        const finalMessage = await stream.finalMessage();
+
+        // Extract full response text
+        const textContent = finalMessage.content.find((c) => c.type === 'text');
+        const responseText = textContent && textContent.type === 'text' ? textContent.text : fullContent;
+
+        // Save assistant message to database
+        if (currentConversation) {
+          ConversationRepository.addMessage({
+            conversationId: currentConversation.id,
+            role: 'assistant',
+            content: responseText,
+          });
+        }
+
+        // Complete streaming
+        setStreamingMessage({ content: responseText, isComplete: true });
+
+        // Refresh messages from database to show new messages
+        if (currentConversation) {
+          const updatedMessages = ConversationRepository.getMessages(currentConversation.id);
+          setMessages(updatedMessages);
+          if (autoScroll) {
+            setScrollOffset(Math.max(0, updatedMessages.length - visibleMessageCount));
+          }
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Stream error:', error);
+        setStreamingMessage(null);
+      } finally {
+        setIsProcessing(false);
+        setStreamingMessage(null);
+        streamAbortRef.current = null;
+      }
+    },
+    [
+      isProcessing,
+      conversations,
+      selectedConvIndex,
+      messages,
+      autoScroll,
+      visibleMessageCount,
+      buildSystemPrompt,
+    ]
+  );
 
   // Handle keyboard input for navigation and scrolling
   useInput((input, key) => {
@@ -515,6 +737,16 @@ export function ChatView(): React.ReactElement {
           {' '}
           ({messages.length} message{messages.length !== 1 ? 's' : ''})
         </Text>
+        {/* US-104: Streaming status indicator */}
+        {streamingMessage && !streamingMessage.isComplete && (
+          <Text color="cyan">
+            {' '}
+            {SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]} Streaming...
+          </Text>
+        )}
+        {!autoScroll && !streamingMessage && (
+          <Text color="yellow"> (auto-scroll paused)</Text>
+        )}
       </Box>
 
       <Box flexGrow={1} flexDirection="row">
@@ -543,6 +775,8 @@ export function ChatView(): React.ReactElement {
               messages={messages}
               scrollOffset={scrollOffset}
               visibleCount={visibleMessageCount}
+              streamingMessage={streamingMessage}
+              spinnerFrame={spinnerFrame}
             />
           )}
         </Box>
