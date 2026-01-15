@@ -200,8 +200,8 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "'s' key opens StopConfirmationDialog, Enter confirms with reason, LoopRunner.stop() kills process and records reason"
     },
     {
       "id": "US-114",

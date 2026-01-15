@@ -256,3 +256,21 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Status-specific visual hints help users discover available actions
   - Pause/resume controls should check loop.status before taking action
 ---
+
+## 2026-01-14 - US-113
+- What was implemented: Added stop loop control with confirmation dialog
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - StopConfirmationDialog component with loop info, warning, and reason input
+    - 's' key handler to open stop confirmation dialog
+    - handleStopLoop callback that calls LoopRunner.stop(loopId, reason)
+    - showStopDialog state to manage dialog visibility
+    - Updated navigation hints to include 's stop'
+    - Updated visual hints in LoopRow for running/paused loops to show stop option
+- **Learnings for future iterations:**
+  - LoopRunner.stop() already existed - just needed UI integration
+  - Stop confirmation dialog pattern: show context info, warning, optional reason input
+  - TextInput handles optional input - use placeholder and default value
+  - Block parent useInput when dialog is open by adding to early return condition
+  - Stop can apply to both 'running' and 'paused' loops (status check in handler)
+---
