@@ -181,10 +181,39 @@ export function ViewHeader({
   );
 }
 
+/**
+ * Empty state component for views with no data
+ * Shows a message and optional keyboard shortcut hint
+ * US-129: Add empty states to all views
+ */
+export function EmptyState({
+  message,
+  shortcutKey,
+  shortcutAction,
+}: {
+  message: string;
+  shortcutKey?: string;
+  shortcutAction?: string;
+}): React.ReactElement {
+  return (
+    <Box flexDirection="column" paddingX={1} marginTop={1}>
+      <Text dimColor>{message}</Text>
+      {shortcutKey && shortcutAction && (
+        <Box marginTop={1}>
+          <Text dimColor>Press </Text>
+          <Text color="yellow" bold>{shortcutKey}</Text>
+          <Text dimColor> to {shortcutAction}.</Text>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export default {
   LoadingSpinner,
   LoadingView,
   RefreshingIndicator,
   ViewHeader,
+  EmptyState,
   useLoadingState,
 };

@@ -12,7 +12,7 @@ import TextInput from 'ink-text-input';
 import { ExecutionRepository, type Execution } from '../../workers/execution.js';
 import { TaskRepository, type Task } from '../../queue/index.js';
 import { getProject, type Project } from '../../registry/index.js';
-import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
+import { LoadingSpinner, RefreshingIndicator, EmptyState } from './LoadingStates.js';
 
 /**
  * Get the last N lines from output
@@ -794,22 +794,9 @@ export function WorkersView(): React.ReactElement {
       <WorkerStats running={stats.running} completed={stats.completed} failed={stats.failed} />
 
       {workers.length === 0 ? (
-        <Box flexDirection="column" paddingX={1} marginTop={1}>
-          <Text dimColor>No workers currently running.</Text>
-          <Box marginTop={1}>
-            <Text dimColor>Workers will appear here when tasks are being executed.</Text>
-          </Box>
-          <Box marginTop={1}>
-            <Text dimColor>To start processing tasks:</Text>
-          </Box>
-          <Box marginLeft={2} flexDirection="column">
-            <Text dimColor>1. Ensure the daemon is running: </Text>
-            <Text bold>metaralph start</Text>
-          </Box>
-          <Box marginLeft={2} flexDirection="column" marginTop={1}>
-            <Text dimColor>2. Add projects and create tasks</Text>
-          </Box>
-        </Box>
+        <EmptyState
+          message="No active workers."
+        />
       ) : (
         <Box flexDirection="column" marginTop={1}>
           <WorkerListHeader />

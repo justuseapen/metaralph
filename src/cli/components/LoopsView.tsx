@@ -12,7 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { LoopRepository, LoopIterationRepository, LoopRunner, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
-import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
+import { LoadingSpinner, RefreshingIndicator, EmptyState } from './LoadingStates.js';
 
 /**
  * User story from PRD
@@ -1111,9 +1111,11 @@ export function LoopsView(): React.ReactElement {
         <Box marginBottom={1}>
           <Text bold color="cyan">Ralph Loops</Text>
         </Box>
-        <Box flexDirection="column">
-          <Text dimColor>No loops yet. Press n to start one.</Text>
-        </Box>
+        <EmptyState
+          message="No loops yet."
+          shortcutKey="n"
+          shortcutAction="start one"
+        />
       </Box>
     );
   }

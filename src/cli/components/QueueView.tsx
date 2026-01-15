@@ -12,7 +12,7 @@ import TextInput from 'ink-text-input';
 import { TaskRepository, type Task, type TaskStatus, type TaskType, type EffortLevel } from '../../queue/index.js';
 import { ExecutionRepository, type Execution } from '../../workers/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
-import { LoadingSpinner, RefreshingIndicator } from './LoadingStates.js';
+import { LoadingSpinner, RefreshingIndicator, EmptyState } from './LoadingStates.js';
 
 /**
  * Status filter options for the filter bar
@@ -1281,19 +1281,17 @@ export function QueueView(): React.ReactElement {
     return (
       <Box flexDirection="column" paddingX={1}>
         <Text bold color="blue">Task Queue</Text>
-        <Box marginTop={1}>
-          <Text dimColor>No pending tasks in the queue.</Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>
-            {projects.length > 0
-              ? 'Press c to create a new task.'
-              : 'Add a project first to create tasks.'}
-          </Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>/: Search  {projects.length > 0 ? 'c: Create' : ''}</Text>
-        </Box>
+        {projects.length > 0 ? (
+          <EmptyState
+            message="No tasks yet."
+            shortcutKey="c"
+            shortcutAction="create one"
+          />
+        ) : (
+          <EmptyState
+            message="No tasks yet. Add a project first to create tasks."
+          />
+        )}
       </Box>
     );
   }
