@@ -7,8 +7,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import { LoopRepository, LoopIterationRepository, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
-import { getProject } from '../../registry/index.js';
+import { getProject, listProjects, type Project } from '../../registry/index.js';
 
 /**
  * Get color for loop status
@@ -112,6 +113,211 @@ function LoopListHeader(): React.ReactElement {
         <Text>{'Progress'.padEnd(8)}</Text>
         <Text>Duration</Text>
       </Text>
+    </Box>
+  );
+}
+
+/**
+ * Form fields for creating a new loop
+ */
+type CreateLoopField = 'project' | 'prdPath' | 'maxIterations' | 'branchName';
+
+/**
+ * State for create loop dialog
+ */
+interface CreateLoopDialogState {
+  selectedProjectIndex: number;
+  prdPath: string;
+  maxIterations: string;
+  branchName: string;
+  activeField: CreateLoopField;
+}
+
+/**
+ * Props for CreateLoopDialog
+ */
+interface CreateLoopDialogProps {
+  projects: Project[];
+  onSubmit: (projectId: string, prdPath: string, maxIterations: number, branchName: string) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Generate branch name from PRD path
+ */
+function generateBranchName(prdPath: string): string {
+  // Extract base name from prd path and create a branch name
+  // e.g., prd.json -> ralph/main, tasks/prd-feature.md -> ralph/feature
+  const basename = prdPath.replace(/^.*\//, '').replace(/\.(json|md)$/, '');
+  const cleanName = basename
+    .replace(/^prd[-_]?/, '')
+    .replace(/[-_]+/g, '-')
+    .toLowerCase();
+  return `ralph/${cleanName || 'main'}`;
+}
+
+/**
+ * Dialog for creating a new Ralph loop
+ */
+function CreateLoopDialog({ projects, onSubmit, onCancel }: CreateLoopDialogProps): React.ReactElement {
+  const [state, setState] = useState<CreateLoopDialogState>({
+    selectedProjectIndex: 0,
+    prdPath: 'prd.json',
+    maxIterations: '10',
+    branchName: generateBranchName('prd.json'),
+    activeField: 'project',
+  });
+
+  // Field order for tab navigation
+  const fields: CreateLoopField[] = ['project', 'prdPath', 'maxIterations', 'branchName'];
+
+  // Auto-update branch name when PRD path changes
+  const handlePrdPathChange = useCallback((value: string) => {
+    setState(prev => ({
+      ...prev,
+      prdPath: value,
+      branchName: generateBranchName(value),
+    }));
+  }, []);
+
+  useInput((input, key) => {
+    // Escape cancels
+    if (key.escape) {
+      onCancel();
+      return;
+    }
+
+    // Enter submits if we have valid data
+    if (key.return && !key.ctrl && !key.meta) {
+      if (state.activeField === 'project') {
+        // In project selector, Enter moves to next field
+        setState(prev => ({ ...prev, activeField: 'prdPath' }));
+        return;
+      }
+      // Submit form
+      if (projects.length > 0) {
+        const maxIter = parseInt(state.maxIterations, 10) || 10;
+        onSubmit(
+          projects[state.selectedProjectIndex].id,
+          state.prdPath || 'prd.json',
+          maxIter,
+          state.branchName || generateBranchName(state.prdPath)
+        );
+      }
+      return;
+    }
+
+    // Tab cycles through fields
+    if (key.tab) {
+      setState(prev => {
+        const currentIndex = fields.indexOf(prev.activeField);
+        const nextIndex = key.shift
+          ? (currentIndex - 1 + fields.length) % fields.length
+          : (currentIndex + 1) % fields.length;
+        return { ...prev, activeField: fields[nextIndex] };
+      });
+      return;
+    }
+
+    // Arrow keys in project selector
+    if (state.activeField === 'project') {
+      if (key.upArrow && state.selectedProjectIndex > 0) {
+        setState(prev => ({ ...prev, selectedProjectIndex: prev.selectedProjectIndex - 1 }));
+      } else if (key.downArrow && state.selectedProjectIndex < projects.length - 1) {
+        setState(prev => ({ ...prev, selectedProjectIndex: prev.selectedProjectIndex + 1 }));
+      }
+    }
+  });
+
+  const isFieldActive = (field: CreateLoopField) => state.activeField === field;
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color="cyan">Create New Loop</Text>
+        <Text dimColor> - Tab to navigate, Enter to confirm, Escape to cancel</Text>
+      </Box>
+
+      {/* Form */}
+      <Box flexDirection="column" borderStyle="single" paddingX={1} paddingY={0}>
+        {/* Project selector */}
+        <Box marginY={0}>
+          <Text bold inverse={isFieldActive('project')}>
+            Project:{' '}
+          </Text>
+          {projects.length === 0 ? (
+            <Text color="red">No projects registered</Text>
+          ) : isFieldActive('project') ? (
+            <Box flexDirection="column">
+              {projects.map((project, index) => (
+                <Text
+                  key={project.id}
+                  color={index === state.selectedProjectIndex ? 'cyan' : undefined}
+                >
+                  {index === state.selectedProjectIndex ? '> ' : '  '}
+                  {project.name}
+                </Text>
+              ))}
+            </Box>
+          ) : (
+            <Text color="cyan">{projects[state.selectedProjectIndex]?.name || 'None'}</Text>
+          )}
+        </Box>
+
+        {/* PRD Path input */}
+        <Box marginY={0}>
+          <Text bold inverse={isFieldActive('prdPath')}>
+            PRD Path:{' '}
+          </Text>
+          {isFieldActive('prdPath') ? (
+            <TextInput
+              value={state.prdPath}
+              onChange={handlePrdPathChange}
+              placeholder="prd.json"
+            />
+          ) : (
+            <Text>{state.prdPath || 'prd.json'}</Text>
+          )}
+        </Box>
+
+        {/* Max Iterations input */}
+        <Box marginY={0}>
+          <Text bold inverse={isFieldActive('maxIterations')}>
+            Max Iterations:{' '}
+          </Text>
+          {isFieldActive('maxIterations') ? (
+            <TextInput
+              value={state.maxIterations}
+              onChange={(value) => setState(prev => ({ ...prev, maxIterations: value.replace(/[^0-9]/g, '') }))}
+              placeholder="10"
+            />
+          ) : (
+            <Text>{state.maxIterations || '10'}</Text>
+          )}
+        </Box>
+
+        {/* Branch Name input */}
+        <Box marginY={0}>
+          <Text bold inverse={isFieldActive('branchName')}>
+            Branch Name:{' '}
+          </Text>
+          {isFieldActive('branchName') ? (
+            <TextInput
+              value={state.branchName}
+              onChange={(value) => setState(prev => ({ ...prev, branchName: value }))}
+              placeholder={generateBranchName(state.prdPath)}
+            />
+          ) : (
+            <Text>{state.branchName || generateBranchName(state.prdPath)}</Text>
+          )}
+        </Box>
+      </Box>
+
+      {/* Submit hint */}
+      <Box marginTop={1}>
+        <Text dimColor>Press Enter to create loop, Escape to cancel</Text>
+      </Box>
     </Box>
   );
 }
@@ -255,6 +461,8 @@ export function LoopsView(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailLoop, setDetailLoop] = useState<LoopWithProject | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   // Load loops with project names
   const loadLoops = useCallback(() => {
@@ -275,11 +483,38 @@ export function LoopsView(): React.ReactElement {
     }
   }, []);
 
+  // Load projects for create dialog
+  const loadProjects = useCallback(() => {
+    try {
+      const allProjects = listProjects();
+      setProjects(allProjects);
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+    }
+  }, []);
+
+  // Handle create loop submission
+  const handleCreateLoop = useCallback((projectId: string, prdPath: string, maxIterations: number, branchName: string) => {
+    try {
+      LoopRepository.create({
+        projectId,
+        prdPath,
+        maxIterations,
+        branchName,
+      });
+      setShowCreateDialog(false);
+      loadLoops(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to create loop:', error);
+    }
+  }, [loadLoops]);
+
   useEffect(() => {
     loadLoops();
+    loadProjects();
     const interval = setInterval(loadLoops, 2000);
     return () => clearInterval(interval);
-  }, [loadLoops]);
+  }, [loadLoops, loadProjects]);
 
   // Keep selected index in bounds
   useEffect(() => {
@@ -289,10 +524,14 @@ export function LoopsView(): React.ReactElement {
   }, [loops.length, selectedIndex]);
 
   useInput((input, key) => {
-    // Don't handle input if showing detail view
-    if (detailLoop) return;
+    // Don't handle input if showing detail view or create dialog
+    if (detailLoop || showCreateDialog) return;
 
-    if (key.upArrow && selectedIndex > 0) {
+    if (input === 'n') {
+      // Open create dialog
+      loadProjects(); // Refresh projects list
+      setShowCreateDialog(true);
+    } else if (key.upArrow && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
     } else if (key.downArrow && selectedIndex < loops.length - 1) {
       setSelectedIndex(selectedIndex + 1);
@@ -301,6 +540,19 @@ export function LoopsView(): React.ReactElement {
       setDetailLoop(loops[selectedIndex]);
     }
   });
+
+  // Show create dialog if requested
+  if (showCreateDialog) {
+    return (
+      <Box flexGrow={1} flexDirection="column">
+        <CreateLoopDialog
+          projects={projects}
+          onSubmit={handleCreateLoop}
+          onCancel={() => setShowCreateDialog(false)}
+        />
+      </Box>
+    );
+  }
 
   // Show detail view if a loop is selected
   if (detailLoop) {
@@ -340,7 +592,7 @@ export function LoopsView(): React.ReactElement {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">Ralph Loops</Text>
-        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ to navigate, Enter to view details</Text>
+        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ to navigate, Enter to view, n to create</Text>
       </Box>
 
       <LoopListHeader />
