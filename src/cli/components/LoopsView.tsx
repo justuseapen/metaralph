@@ -209,7 +209,7 @@ function LoopRow({ loop, selected }: LoopRowProps): React.ReactElement {
           <Text dimColor>
             └ Working on: <Text color="cyan">{storyProgress.currentStory.id}</Text>
             {' - '}{truncate(storyProgress.currentStory.title, 40)}
-            <Text color="yellow"> (press 'p' to pause)</Text>
+            <Text color="yellow"> (p: pause, s: stop)</Text>
           </Text>
         </Box>
       )}
@@ -218,7 +218,7 @@ function LoopRow({ loop, selected }: LoopRowProps): React.ReactElement {
       {selected && loop.status === 'paused' && (
         <Box marginLeft={2} marginTop={0}>
           <Text color="yellow">
-            └ Paused - press 'r' to resume
+            └ Paused - press 'r' to resume, 's' to stop
           </Text>
         </Box>
       )}
@@ -516,6 +516,88 @@ function CreateLoopDialog({ projects, onSubmit, onCancel }: CreateLoopDialogProp
 }
 
 /**
+ * Props for StopConfirmationDialog
+ */
+interface StopConfirmationDialogProps {
+  loop: LoopWithProject;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Confirmation dialog for stopping a loop
+ */
+function StopConfirmationDialog({ loop, onConfirm, onCancel }: StopConfirmationDialogProps): React.ReactElement {
+  const [reason, setReason] = useState('');
+
+  useInput((input, key) => {
+    if (key.escape) {
+      onCancel();
+    } else if (key.return && !key.ctrl && !key.meta) {
+      onConfirm(reason || 'Stopped by user');
+    }
+  });
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color="red">Stop Loop</Text>
+        <Text dimColor> - This will kill the loop process immediately</Text>
+      </Box>
+
+      {/* Loop info */}
+      <Box flexDirection="column" borderStyle="single" paddingX={1} paddingY={0} marginBottom={1}>
+        <Box>
+          <Text bold>Project: </Text>
+          <Text>{loop.projectName}</Text>
+        </Box>
+        <Box>
+          <Text bold>Branch: </Text>
+          <Text>{loop.branchName}</Text>
+        </Box>
+        <Box>
+          <Text bold>Status: </Text>
+          <Text color={getStatusColor(loop.status)}>{formatStatus(loop.status)}</Text>
+        </Box>
+        <Box>
+          <Text bold>Progress: </Text>
+          <Text>Iteration {loop.currentIteration}/{loop.maxIterations}</Text>
+          {loop.storyProgress && (
+            <Text dimColor> ({loop.storyProgress.completed}/{loop.storyProgress.total} stories)</Text>
+          )}
+        </Box>
+      </Box>
+
+      {/* Warning */}
+      <Box marginBottom={1}>
+        <Text color="yellow">⚠ Warning: </Text>
+        <Text>The current iteration will be interrupted and marked as failed.</Text>
+      </Box>
+
+      {/* Reason input */}
+      <Box marginBottom={1}>
+        <Text bold>Reason (optional): </Text>
+        <TextInput
+          value={reason}
+          onChange={setReason}
+          placeholder="Enter reason for stopping..."
+        />
+      </Box>
+
+      {/* Actions hint */}
+      <Box marginTop={1}>
+        <Text dimColor>Press </Text>
+        <Text color="red">Enter</Text>
+        <Text dimColor> to confirm stop, </Text>
+        <Text color="cyan">Escape</Text>
+        <Text dimColor> to cancel</Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * Loop detail view showing iterations
  */
 interface LoopDetailViewProps {
@@ -698,6 +780,7 @@ export function LoopsView(): React.ReactElement {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailLoop, setDetailLoop] = useState<LoopWithProject | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showStopDialog, setShowStopDialog] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
   // Spinner frame state for running loops indicator
@@ -822,9 +905,28 @@ export function LoopsView(): React.ReactElement {
     }
   }, [loops, selectedIndex, loadLoops]);
 
+  // Handle stop loop confirmation
+  const handleStopLoop = useCallback((reason: string) => {
+    const loop = loops[selectedIndex];
+    if (!loop || (loop.status !== 'running' && loop.status !== 'paused')) {
+      setShowStopDialog(false);
+      return;
+    }
+
+    try {
+      const success = LoopRunner.stop(loop.id, reason);
+      if (success) {
+        loadLoops(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Failed to stop loop:', error);
+    }
+    setShowStopDialog(false);
+  }, [loops, selectedIndex, loadLoops]);
+
   useInput((input, key) => {
-    // Don't handle input if showing detail view or create dialog
-    if (detailLoop || showCreateDialog) return;
+    // Don't handle input if showing detail view, create dialog, or stop dialog
+    if (detailLoop || showCreateDialog || showStopDialog) return;
 
     if (input === 'n') {
       // Open create dialog
@@ -836,6 +938,12 @@ export function LoopsView(): React.ReactElement {
     } else if (input === 'r') {
       // Resume the selected paused loop
       handleResumeLoop();
+    } else if (input === 's') {
+      // Open stop confirmation dialog for running or paused loops
+      const loop = loops[selectedIndex];
+      if (loop && (loop.status === 'running' || loop.status === 'paused')) {
+        setShowStopDialog(true);
+      }
     } else if (key.upArrow && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
     } else if (key.downArrow && selectedIndex < loops.length - 1) {
@@ -854,6 +962,19 @@ export function LoopsView(): React.ReactElement {
           projects={projects}
           onSubmit={handleCreateLoop}
           onCancel={() => setShowCreateDialog(false)}
+        />
+      </Box>
+    );
+  }
+
+  // Show stop confirmation dialog if requested
+  if (showStopDialog && loops[selectedIndex]) {
+    return (
+      <Box flexGrow={1} flexDirection="column">
+        <StopConfirmationDialog
+          loop={loops[selectedIndex]}
+          onConfirm={handleStopLoop}
+          onCancel={() => setShowStopDialog(false)}
         />
       </Box>
     );
@@ -900,7 +1021,7 @@ export function LoopsView(): React.ReactElement {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">Ralph Loops</Text>
-        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ navigate, Enter view, n new, p pause, r resume</Text>
+        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ navigate, Enter view, n new, p pause, r resume, s stop</Text>
       </Box>
 
       <LoopListHeader />
