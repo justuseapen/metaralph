@@ -392,3 +392,30 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Import EffortLevel type from queue module for type safety
   - Import Project type from registry module for project list typing
 ---
+
+## 2026-01-14 - US-119
+- What was implemented: Added worker log search functionality to WorkersView
+- Files changed:
+  - `src/cli/components/WorkersView.tsx` - Major enhancements:
+    - Added WorkerRow and WorkerListHeader components for selectable worker list
+    - Added selection state (selectedIndex) and navigation (↑/↓ arrow keys)
+    - Enter opens WorkerDetailView for selected worker
+    - Added WorkerDetailView component with full output display
+    - Added '/' key handler to open search input
+    - Added HighlightedLine component for search match highlighting
+    - Yellow background for matches, cyan for current match
+    - 'n' jumps to next match, 'N' to previous match
+    - Match count displayed with current position (e.g., "3/12")
+    - Auto-scroll to first match when search is submitted
+    - Scroll navigation: ↑/↓, PgUp/PgDn, g/G for start/end
+    - Line numbers displayed in output view
+- **Learnings for future iterations:**
+  - For search highlighting: create HighlightedLine component that splits text at matches
+  - Use backgroundColor="yellow" color="black" for highlight, backgroundColor="cyan" for current match
+  - Track matchIndices[] as array of line numbers containing matches
+  - currentMatchIndex tracks position in matchIndices for n/N navigation
+  - Auto-scroll to match: calculate target offset as Math.max(0, Math.min(matchLine - 5, maxOffset))
+  - For live search input: keep separate searchInputValue state for TextInput, set searchTerm on submit
+  - When searchActive, block other useInput handlers with early return
+  - visibleMatchLineNumbers Set for efficient lookup of which visible lines have matches
+---

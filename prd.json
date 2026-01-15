@@ -296,8 +296,8 @@
         "Typecheck passes"
       ],
       "priority": 19,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "WorkerDetailView with '/' search, HighlightedLine component, n/N match navigation, match count display"
     },
     {
       "id": "US-120",
