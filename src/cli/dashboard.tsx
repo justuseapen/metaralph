@@ -40,12 +40,12 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'queue', label: 'Queue', shortcut: '1' },
-  { id: 'approvals', label: 'Approvals', shortcut: '2' },
-  { id: 'projects', label: 'Projects', shortcut: '3' },
-  { id: 'workers', label: 'Workers', shortcut: '4' },
-  { id: 'health', label: 'Health', shortcut: '5' },
-  { id: 'chat', label: 'Chat', shortcut: '9' },
-  { id: 'loops', label: 'Loops', shortcut: '0' },
+  { id: 'loops', label: 'Loops', shortcut: '2' },
+  { id: 'workers', label: 'Workers', shortcut: '3' },
+  { id: 'chat', label: 'Chat', shortcut: '4' },
+  { id: 'projects', label: 'Projects', shortcut: '5' },
+  { id: 'health', label: 'Health', shortcut: '6' },
+  { id: 'approvals', label: 'Approvals', shortcut: '7' },
 ];
 
 /**
@@ -395,7 +395,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: 'q', description: 'Quit dashboard' },
       { key: '?', description: 'Toggle help overlay' },
       { key: '!', description: 'Open notifications' },
-      { key: '1-5,9,0', description: 'Switch tabs' },
+      { key: '1-7', description: 'Switch tabs' },
     ],
   },
   {
@@ -776,12 +776,12 @@ function Footer(): React.ReactElement {
         <Text bold> ?</Text> Help  |
         <Text bold> !</Text> Alerts  |
         <Text bold> 1</Text> Queue  |
-        <Text bold> 2</Text> Approvals  |
-        <Text bold> 3</Text> Projects  |
-        <Text bold> 4</Text> Workers  |
-        <Text bold> 5</Text> Health  |
-        <Text bold> 9</Text> Chat  |
-        <Text bold> 0</Text> Loops
+        <Text bold> 2</Text> Loops  |
+        <Text bold> 3</Text> Workers  |
+        <Text bold> 4</Text> Chat  |
+        <Text bold> 5</Text> Projects  |
+        <Text bold> 6</Text> Health  |
+        <Text bold> 7</Text> Approvals
       </Text>
     </Box>
   );
