@@ -1,0 +1,544 @@
+{
+  "project": "MetaRalph",
+  "branchName": "ralph/cli-dashboard-production",
+  "description": "CLI Dashboard Production Ready - Transform the terminal dashboard into a polished, production-ready developer tool with embedded Claude chat, Ralph loop controls, improved task management, and real-time updates.",
+  "userStories": [
+    {
+      "id": "US-101",
+      "title": "Add Chat tab to dashboard navigation",
+      "description": "As a developer, I want a dedicated Chat tab so I can access AI assistance from the dashboard.",
+      "acceptanceCriteria": [
+        "New 'Chat' tab added to TABS array in dashboard.tsx",
+        "Tab uses shortcut key '9'",
+        "Pressing '9' switches activeTab to 'chat'",
+        "renderView() returns ChatView component for 'chat' tab",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-102",
+      "title": "Create ChatView component with message display",
+      "description": "As a developer, I want to see my chat history in the Chat tab so I can reference previous conversations.",
+      "acceptanceCriteria": [
+        "src/cli/components/ChatView.tsx exists (may need updates from existing)",
+        "Displays message history from database with timestamps",
+        "User messages styled differently from assistant messages",
+        "Messages scroll with arrow keys, auto-scroll to bottom on new messages",
+        "Loading state shown while fetching history",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "ChatView component already exists - enhance it for dashboard integration"
+    },
+    {
+      "id": "US-103",
+      "title": "Add chat input with multi-line support",
+      "description": "As a developer, I want to type multi-line prompts so I can ask complex questions.",
+      "acceptanceCriteria": [
+        "TextInput component at bottom of ChatView",
+        "Ctrl+Enter or Cmd+Enter submits the prompt",
+        "Escape clears current input",
+        "Character count displayed (e.g., '150/4000')",
+        "Input disabled while waiting for response",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-104",
+      "title": "Stream Claude responses in chat",
+      "description": "As a developer, I want to see responses stream in real-time so I know Claude is working.",
+      "acceptanceCriteria": [
+        "Responses appear token-by-token as they stream",
+        "Spinner/indicator shows while generating",
+        "Auto-scroll follows new content",
+        "Can scroll up to pause auto-scroll",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-105",
+      "title": "Add project context selector to chat",
+      "description": "As a developer, I want to select which project Claude should know about.",
+      "acceptanceCriteria": [
+        "Dropdown/selector at top of ChatView for project selection",
+        "Lists all registered projects plus 'No project' option",
+        "Selected project indicator visible (e.g., '[metaralph]')",
+        "Project context sent with each prompt",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-106",
+      "title": "Add Loops tab to dashboard",
+      "description": "As a developer, I want a dedicated tab to manage Ralph loops.",
+      "acceptanceCriteria": [
+        "New 'Loops' tab added after Chat tab",
+        "Tab uses shortcut key '0' (zero)",
+        "Empty LoopsView component renders for 'loops' tab",
+        "Tab shows in tab bar",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-107",
+      "title": "Create loops database table",
+      "description": "As a developer, I need to store Ralph loop state in the database.",
+      "acceptanceCriteria": [
+        "loops table created with columns: id, project_id, branch_name, prd_path, status, max_iterations, current_iteration, started_at, completed_at, created_at",
+        "status column: 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped'",
+        "loop_iterations table: id, loop_id, iteration_number, story_id, status, output, commit_sha, started_at, completed_at",
+        "Migration runs on database init",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-108",
+      "title": "Create LoopsView component with loop list",
+      "description": "As a developer, I want to see all my Ralph loops in one place.",
+      "acceptanceCriteria": [
+        "src/cli/components/LoopsView.tsx displays list of loops",
+        "Each loop shows: project name, branch, status, progress (e.g., 3/10), duration",
+        "Running loops sorted first, then by created_at DESC",
+        "Status color-coded: running=green, paused=yellow, completed=cyan, failed=red",
+        "Arrow keys navigate list, Enter opens detail view",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-109",
+      "title": "Add new loop creation dialog",
+      "description": "As a developer, I want to start a Ralph loop from the dashboard.",
+      "acceptanceCriteria": [
+        "'n' key opens new loop creation dialog",
+        "Project dropdown to select project",
+        "PRD file input (defaults to prd.json)",
+        "Max iterations input (default 10)",
+        "Branch name input (auto-generated from PRD)",
+        "Enter starts loop, Escape cancels",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-110",
+      "title": "Implement loop start functionality",
+      "description": "As a developer, I want loops to actually start when I create them.",
+      "acceptanceCriteria": [
+        "startLoop() function creates loop record in database",
+        "Spawns ralph.sh subprocess with project path and prd file",
+        "Loop status set to 'running'",
+        "Output captured and stored in loop_iterations table",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-111",
+      "title": "Add loop progress display",
+      "description": "As a developer, I want to see real-time progress of running loops.",
+      "acceptanceCriteria": [
+        "Progress bar showing completed/total stories",
+        "Current story title and status displayed",
+        "Iteration count (e.g., 'Iteration 3/10')",
+        "Updates every 2 seconds",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-112",
+      "title": "Add pause and resume loop controls",
+      "description": "As a developer, I want to pause a loop to review changes.",
+      "acceptanceCriteria": [
+        "'p' key pauses selected running loop",
+        "Pause takes effect after current iteration completes",
+        "Paused loops show 'Paused' status",
+        "'r' key resumes paused loop",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-113",
+      "title": "Add stop loop control",
+      "description": "As a developer, I want to stop a loop if something goes wrong.",
+      "acceptanceCriteria": [
+        "'s' key stops selected loop (with confirmation)",
+        "Stop kills the subprocess immediately",
+        "Loop status set to 'stopped'",
+        "Reason recorded in database",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-114",
+      "title": "Add loop iteration history view",
+      "description": "As a developer, I want to see what each iteration did.",
+      "acceptanceCriteria": [
+        "Enter on loop opens detail view with iteration list",
+        "Each iteration shows: story title, status, duration, commit SHA",
+        "Failed iterations highlighted in red",
+        "Expand iteration to see full output",
+        "Escape returns to list",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-115",
+      "title": "Add task search to Queue view",
+      "description": "As a developer, I want to search tasks quickly.",
+      "acceptanceCriteria": [
+        "'/' key opens search input in QueueView",
+        "Search filters by title, project, or type",
+        "Results update as you type (debounced 150ms)",
+        "Escape clears search",
+        "Search term highlighted in results",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-116",
+      "title": "Add task filter controls to Queue",
+      "description": "As a developer, I want to filter tasks by status and type.",
+      "acceptanceCriteria": [
+        "Filter bar at top of QueueView",
+        "Status filter: All | Pending | Running | Completed | Failed",
+        "Type filter: All | Feature | Bug | Test | Docs | Refactor",
+        "Filter count shown (e.g., 'Showing 12 of 45')",
+        "Tab key cycles through filters",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-117",
+      "title": "Add enhanced task detail view",
+      "description": "As a developer, I want to see everything about a task.",
+      "acceptanceCriteria": [
+        "Enter on task opens full-screen detail view",
+        "Shows: title, description, acceptance criteria, status",
+        "Shows: project, effort, priority, timestamps",
+        "Shows: execution history (all attempts)",
+        "Escape returns to list",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-118",
+      "title": "Add quick task creation",
+      "description": "As a developer, I want to create tasks quickly with smart defaults.",
+      "acceptanceCriteria": [
+        "'c' key in Queue view opens quick create",
+        "Only title required",
+        "Project auto-selected if only one registered",
+        "Type inferred from keywords (e.g., 'fix' -> bug_fix)",
+        "Tab cycles through optional fields",
+        "Enter creates, Escape cancels",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-119",
+      "title": "Add worker log search",
+      "description": "As a developer, I want to search worker output logs.",
+      "acceptanceCriteria": [
+        "'/' key in WorkerDetailView opens log search",
+        "Highlights matching lines in output",
+        "'n' jumps to next match, 'N' to previous",
+        "Match count displayed",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-120",
+      "title": "Add worker output level filtering",
+      "description": "As a developer, I want to filter worker output by level.",
+      "acceptanceCriteria": [
+        "Filter options: All | Errors | Warnings | Info",
+        "Error lines (containing 'error') highlighted red",
+        "Warning lines (containing 'warn') highlighted yellow",
+        "Line count by level shown in header",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-121",
+      "title": "Add self-improvement status section to Health tab",
+      "description": "As a developer, I want to see self-improvement status in the dashboard.",
+      "acceptanceCriteria": [
+        "New 'Self-Improvement' section in HealthDashboard",
+        "Shows: last analysis time, proposals in queue",
+        "Shows: pending approvals count, recent results",
+        "Loads data from self-improve module",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-122",
+      "title": "Add self-improvement proposal list",
+      "description": "As a developer, I want to see pending self-improvement proposals.",
+      "acceptanceCriteria": [
+        "Proposal list shows title, type, risk score",
+        "Color coding: green (<40 risk), yellow (40-70), red (>70)",
+        "Arrow keys navigate proposals",
+        "Enter shows proposal detail",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-123",
+      "title": "Add proposal approve/reject controls",
+      "description": "As a developer, I want to approve or reject proposals from dashboard.",
+      "acceptanceCriteria": [
+        "'a' key approves selected proposal",
+        "'r' key rejects with reason prompt",
+        "Approved proposals queued for execution",
+        "Status updates immediately",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-124",
+      "title": "Add keyboard shortcut help overlay",
+      "description": "As a developer, I want to see all keyboard shortcuts.",
+      "acceptanceCriteria": [
+        "'?' key opens shortcut help overlay from any screen",
+        "Shortcuts grouped by context (global, queue, workers, etc.)",
+        "Current tab's shortcuts highlighted",
+        "Escape or '?' closes overlay",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-125",
+      "title": "Add notification bell to header",
+      "description": "As a developer, I want to see when things need attention.",
+      "acceptanceCriteria": [
+        "Bell icon with count in Header component",
+        "Count includes: pending approvals, failed tasks, critical alerts",
+        "Count updates in real-time",
+        "'!' key opens notification list",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-126",
+      "title": "Create notifications database table",
+      "description": "As a developer, I need to persist notifications.",
+      "acceptanceCriteria": [
+        "notifications table: id, type, title, message, severity, read, created_at",
+        "type column: 'task_complete' | 'task_failed' | 'loop_complete' | 'approval_needed' | 'alert'",
+        "severity column: 'info' | 'warning' | 'critical'",
+        "Migration runs on database init",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-127",
+      "title": "Add notification list view",
+      "description": "As a developer, I want to see all my notifications.",
+      "acceptanceCriteria": [
+        "'!' key opens notification list overlay",
+        "Shows recent notifications sorted by created_at DESC",
+        "Unread notifications highlighted",
+        "Enter marks as read, 'd' dismisses",
+        "Escape closes overlay",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-128",
+      "title": "Add loading states to all views",
+      "description": "As a developer, I want to see loading indicators.",
+      "acceptanceCriteria": [
+        "Spinner shown during initial data load in each view",
+        "Loading never blocks keyboard input for tab switching",
+        "'Refreshing...' indicator for background updates",
+        "Consistent spinner style across views",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-129",
+      "title": "Add empty states to all views",
+      "description": "As a developer, I want helpful messages when there's no data.",
+      "acceptanceCriteria": [
+        "QueueView: 'No tasks yet. Press c to create one.'",
+        "LoopsView: 'No loops yet. Press n to start one.'",
+        "WorkersView: 'No active workers.'",
+        "Empty states show relevant keyboard shortcut",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-130",
+      "title": "Add error handling wrapper",
+      "description": "As a developer, I want clear error messages, not stack traces.",
+      "acceptanceCriteria": [
+        "ErrorBoundary component wraps each view",
+        "Database errors show user-friendly message",
+        "Retry option shown where applicable",
+        "Error details accessible via 'd' key",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-131",
+      "title": "Add tab badges for attention items",
+      "description": "As a developer, I want to see counts on tabs that need attention.",
+      "acceptanceCriteria": [
+        "Queue tab shows pending task count",
+        "Approvals tab shows pending approval count",
+        "Workers tab shows running worker count",
+        "Health tab shows critical alert count",
+        "Badges update on refresh",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-132",
+      "title": "Reorganize tabs for better workflow",
+      "description": "As a developer, I want tabs ordered by importance.",
+      "acceptanceCriteria": [
+        "New tab order: 1-Queue, 2-Loops, 3-Workers, 4-Chat, 5-Projects, 6-Health, 7-Costs, 8-Approvals, 9-Debug",
+        "Most-used tabs get low numbers",
+        "Update TABS array in dashboard.tsx",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-133",
+      "title": "Standardize navigation patterns",
+      "description": "As a developer, I want consistent navigation everywhere.",
+      "acceptanceCriteria": [
+        "Arrow keys always navigate lists in all views",
+        "Enter always opens detail view",
+        "Escape always goes back/closes",
+        "Tab cycles through sections",
+        "Number keys always switch main tabs",
+        "Typecheck passes"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-134",
+      "title": "Add consistent color coding",
+      "description": "As a developer, I want colors to mean the same thing everywhere.",
+      "acceptanceCriteria": [
+        "Status colors consistent: green=success/running, red=failed/error, yellow=warning/paused, cyan=completed, gray=pending",
+        "Task type colors consistent across Queue, Approvals, PRD Editor",
+        "Create COLOR_SCHEME constant for reuse",
+        "Typecheck passes"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-135",
+      "title": "Add footer context hints",
+      "description": "As a developer, I want the footer to show relevant shortcuts.",
+      "acceptanceCriteria": [
+        "Footer shows context-specific shortcuts based on active tab",
+        "QueueView: 'c:Create //:Search a:Approve'",
+        "LoopsView: 'n:New p:Pause s:Stop'",
+        "Common shortcuts always shown: 'q:Quit ?:Help'",
+        "Typecheck passes"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
