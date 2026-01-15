@@ -1,3 +1,44 @@
 # Ralph Progress Log
 Started: Wed Jan 14 20:48:19 EST 2026
 ---
+
+## Codebase Patterns
+- Dashboard tabs are defined in `src/cli/dashboard.tsx` in the `TABS` array with `TabId` type union
+- Tab views are React components in `src/cli/components/` named `*View.tsx`
+- Footer component shows keyboard shortcuts - update when adding new tabs
+- Ink library used for terminal UI - Box, Text, useInput from 'ink'
+- Ink's Key type has: upArrow, downArrow, leftArrow, rightArrow, pageUp, pageDown, return, escape, ctrl, shift, tab, backspace, delete, meta
+- Use `Text inverse={selected}` for selection highlighting (not backgroundColor)
+- Database access via *Repository classes in `src/collaboration/` and `src/queue/`
+- 2-second refresh interval for real-time dashboard updates
+
+---
+
+## 2026-01-14 - US-101
+- What was implemented: Added Chat tab to dashboard navigation
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added 'chat' to TabId, added Chat tab to TABS array, added ChatView to TabContent switch, updated Footer
+  - `src/cli/components/ChatView.tsx` - Created new component (placeholder)
+- **Learnings for future iterations:**
+  - Tab navigation is handled automatically by useInput hook that reads from TABS array
+  - Each tab needs: TabId type member, TABS array entry, TabContent case, Footer shortcut
+  - View components follow pattern: export function XView(): React.ReactElement
+---
+
+## 2026-01-14 - US-102
+- What was implemented: Enhanced ChatView component with full message display functionality
+- Files changed:
+  - `src/cli/components/ChatView.tsx` - Complete rewrite with:
+    - Message history display with timestamps (formatted dates/times)
+    - Role-specific styling (user=cyan, assistant=green, system=yellow)
+    - Arrow key scrolling with auto-scroll to bottom on new messages
+    - Loading state and empty state handling
+    - Conversation list sidebar for multiple conversations
+    - Date grouping headers (Today, Yesterday, dates)
+- **Learnings for future iterations:**
+  - ConversationRepository.findActive() gets active conversations
+  - ConversationRepository.getMessages(convId) gets messages for a conversation
+  - Ink's Key type doesn't include 'end' or 'home' - use input string checks instead (e.g., 'g' for start, 'G' for end)
+  - Use Text inverse={selected} for selection highlighting, not backgroundColor (Box doesn't have that prop)
+  - 2-second refresh interval is the standard pattern for dashboard views
+---
