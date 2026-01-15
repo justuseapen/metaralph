@@ -419,3 +419,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - When searchActive, block other useInput handlers with early return
   - visibleMatchLineNumbers Set for efficient lookup of which visible lines have matches
 ---
+
+## 2026-01-14 - US-120
+- What was implemented: Added worker output level filtering to WorkerDetailView
+- Files changed:
+  - `src/cli/components/WorkersView.tsx` - Major enhancements:
+    - Added OutputLevelFilter type and OUTPUT_LEVEL_FILTERS array
+    - Added isErrorLine(), isWarningLine(), getLineLevel(), countLinesByLevel() helper functions
+    - Added levelFilter and filterActive state variables
+    - 'f' key opens filter selector mode
+    - Left/right arrows cycle through filter options (All | Errors | Warnings | Info)
+    - Enter/ESC closes filter selector
+    - Level counts header shows: X errors | Y warnings | Z info
+    - Filter info bar shows current filter and line count when not 'all'
+    - Error lines (containing 'error', 'failed', 'exception') highlighted red
+    - Warning lines (containing 'warn', 'warning') highlighted yellow
+    - Filtering works with search - both are applied together
+    - Added filteredLinesWithIndex to preserve original line numbers when filtering
+- **Learnings for future iterations:**
+  - For level detection: check line.toLowerCase().includes() for error/warning keywords
+  - Filter + search combo: apply filter first, then search on filtered results
+  - Track original line numbers: use `{ line, originalIndex }` objects in filtered array
+  - When filtering changes, reset scrollOffset to 0 to avoid out-of-bounds
+  - Level color coding: error=red, warning=yellow, info=default
+  - Filter mode pattern: similar to search mode with active state and key handlers
+---

@@ -311,8 +311,8 @@
         "Typecheck passes"
       ],
       "priority": 20,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "'f' key opens filter selector, ←/→ cycles options, level counts in header, red/yellow line coloring"
     },
     {
       "id": "US-121",
