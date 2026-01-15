@@ -165,3 +165,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - LoopWithProject interface extends Loop with projectName for display convenience
   - Detail views can be shown conditionally by setting a state (detailLoop) and returning early
 ---
+
+## 2026-01-14 - US-109
+- What was implemented: Added new loop creation dialog to LoopsView
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - CreateLoopDialog component with multi-field form
+    - Project selector dropdown with arrow key navigation
+    - PRD path input with default 'prd.json'
+    - Max iterations input with default 10 (numeric only)
+    - Branch name input with auto-generation from PRD path
+    - Tab key cycles through fields, Shift+Tab goes back
+    - Enter submits the form, Escape cancels
+    - generateBranchName() helper for auto-generating branch names
+    - showCreateDialog state and 'n' key handler
+    - loadProjects() to fetch available projects
+    - handleCreateLoop() to create loop via LoopRepository
+- **Learnings for future iterations:**
+  - Multi-field forms in Ink: use activeField state to track which field is focused
+  - TextInput from ink-text-input handles text entry, but needs isActive-like conditional rendering
+  - For numeric inputs, filter with `value.replace(/[^0-9]/g, '')` in onChange
+  - Tab navigation: use field array and index math for cycling
+  - Project selector: show dropdown only when field active, show selected value otherwise
+  - Auto-generate related fields: update branch name when PRD path changes
+  - Loading projects: call listProjects() from registry module
+---
