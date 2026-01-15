@@ -13,3 +13,9 @@ export {
   LoopRepository,
   LoopIterationRepository,
 } from './repository.js';
+
+export {
+  type StartLoopResult,
+  type StartLoopOptions,
+  LoopRunner,
+} from './runner.js';

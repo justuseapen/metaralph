@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { LoopRepository, LoopIterationRepository, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
+import { LoopRepository, LoopIterationRepository, LoopRunner, type Loop, type LoopStatus, type LoopIteration } from '../../loops/index.js';
 import { getProject, listProjects, type Project } from '../../registry/index.js';
 
 /**
@@ -496,12 +496,21 @@ export function LoopsView(): React.ReactElement {
   // Handle create loop submission
   const handleCreateLoop = useCallback((projectId: string, prdPath: string, maxIterations: number, branchName: string) => {
     try {
-      LoopRepository.create({
+      // Create the loop record
+      const loop = LoopRepository.create({
         projectId,
         prdPath,
         maxIterations,
         branchName,
       });
+
+      // Start the loop (spawn ralph.sh subprocess)
+      const result = LoopRunner.start(loop.id, { tool: 'claude' });
+      if (!result.success) {
+        console.error('Failed to start loop:', result.error);
+        // Loop is still created, just not started - user can try again
+      }
+
       setShowCreateDialog(false);
       loadLoops(); // Refresh the list
     } catch (error) {
