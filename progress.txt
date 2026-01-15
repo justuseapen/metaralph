@@ -121,3 +121,18 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Loops tab uses shortcut '0' (zero) - consistent with pattern of single-digit shortcuts
   - LoopsView follows same pattern as other views: export function XView(): React.ReactElement
 ---
+
+## 2026-01-14 - US-107
+- What was implemented: Created loops and loop_iterations database tables
+- Files changed:
+  - `src/db/index.ts` - Added two new table definitions in createTables():
+    - `loops` table: id, project_id, branch_name, prd_path, status, max_iterations, current_iteration, started_at, completed_at, created_at
+    - `loop_iterations` table: id, loop_id, iteration_number, story_id, status, output, commit_sha, started_at, completed_at
+    - Added 4 indexes: idx_loops_project_id, idx_loops_status, idx_loop_iterations_loop_id, idx_loop_iterations_status
+- **Learnings for future iterations:**
+  - Database tables use CREATE TABLE IF NOT EXISTS for idempotent creation
+  - Foreign keys reference projects(id) and loops(id) with ON DELETE CASCADE
+  - Status columns use TEXT type with DEFAULT values (status tracking: pending/running/paused/completed/failed/stopped)
+  - Indexes follow naming pattern: idx_{table}_{column}
+  - No separate migration files - all schema lives in src/db/index.ts createTables()
+---
