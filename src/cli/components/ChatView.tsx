@@ -3,16 +3,21 @@
  *
  * Displays chat history with timestamps and allows sending prompts to Claude.
  * US-102: Message display with user/assistant styling and scroll support.
+ * US-103: Multi-line chat input with Ctrl+Enter submit.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import {
   ConversationRepository,
   type Message,
   type Conversation,
 } from '../../collaboration/conversation.js';
 import { listProjects, type Project } from '../../registry/index.js';
+
+// Maximum character limit for chat input
+const MAX_INPUT_LENGTH = 4000;
 
 /**
  * Format a timestamp for display
@@ -213,6 +218,101 @@ function MessageList({
 }
 
 /**
+ * Chat input component with multi-line support
+ * US-103: Multi-line input with Ctrl+Enter submit and character count
+ */
+function ChatInput({
+  onSubmit,
+  disabled,
+}: {
+  onSubmit: (message: string) => void;
+  disabled: boolean;
+}): React.ReactElement {
+  const [value, setValue] = useState('');
+
+  // Handle keyboard input for special keys
+  useInput((input, key) => {
+    if (disabled) return;
+
+    // Escape clears current input
+    if (key.escape) {
+      setValue('');
+      return;
+    }
+
+    // Ctrl+Enter or Cmd+Enter submits (key.meta is cmd on mac)
+    // Note: Enter alone also submits via TextInput's onSubmit
+    if ((key.ctrl || key.meta) && key.return) {
+      if (value.trim()) {
+        onSubmit(value.trim());
+        setValue('');
+      }
+      return;
+    }
+  });
+
+  // Handle submit from TextInput (Enter key)
+  const handleSubmit = (submittedValue: string) => {
+    if (disabled) return;
+    if (submittedValue.trim()) {
+      onSubmit(submittedValue.trim());
+      setValue('');
+    }
+  };
+
+  // Handle value change with max length enforcement
+  const handleChange = (newValue: string) => {
+    if (newValue.length <= MAX_INPUT_LENGTH) {
+      setValue(newValue);
+    }
+  };
+
+  const charCount = value.length;
+  const isNearLimit = charCount > MAX_INPUT_LENGTH * 0.9;
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor={disabled ? 'gray' : 'cyan'}
+      paddingX={1}
+    >
+      {/* Input header with character count */}
+      <Box justifyContent="space-between" marginBottom={0}>
+        <Text dimColor={disabled}>
+          {disabled ? '⏳ Waiting for response...' : '💬 Type your message:'}
+        </Text>
+        <Text color={isNearLimit ? 'yellow' : 'gray'}>
+          {charCount}/{MAX_INPUT_LENGTH}
+        </Text>
+      </Box>
+
+      {/* Text input */}
+      <Box>
+        {disabled ? (
+          <Text dimColor>Input disabled while processing...</Text>
+        ) : (
+          <TextInput
+            value={value}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+            placeholder="Enter your prompt... (Enter or Ctrl+Enter to send, Escape to clear)"
+          />
+        )}
+      </Box>
+
+      {/* Keyboard hints */}
+      <Box marginTop={0}>
+        <Text dimColor>
+          <Text bold>Enter</Text> or <Text bold>Ctrl+Enter</Text> Send |{' '}
+          <Text bold>Esc</Text> Clear
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * ChatView component - main chat interface for the dashboard
  */
 export function ChatView(): React.ReactElement {
@@ -223,6 +323,7 @@ export function ChatView(): React.ReactElement {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [projects, setProjects] = useState<Map<string, Project>>(new Map());
   const [autoScroll, setAutoScroll] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Number of messages visible at once (adjust based on terminal size)
   const visibleMessageCount = 10;
@@ -270,6 +371,25 @@ export function ChatView(): React.ReactElement {
     const interval = setInterval(loadData, 2000);
     return () => clearInterval(interval);
   }, [selectedConvIndex, autoScroll]);
+
+  // Handle message submission from chat input
+  // Note: This is a placeholder - actual Claude API integration will be added in US-104
+  const handleSubmitMessage = (message: string) => {
+    if (!message.trim() || isProcessing) return;
+
+    // For now, just log the message - actual sending will be implemented in US-104
+    // This allows testing the input component works correctly
+    setIsProcessing(true);
+
+    // Simulate processing delay (remove when actual API integration is added)
+    setTimeout(() => {
+      setIsProcessing(false);
+      // In US-104, this will actually send the message to Claude
+      // For now, auto-scroll to bottom after "sending"
+      setAutoScroll(true);
+      setScrollOffset(Math.max(0, messages.length - visibleMessageCount));
+    }, 1500);
+  };
 
   // Handle keyboard input for navigation and scrolling
   useInput((input, key) => {
@@ -372,6 +492,8 @@ export function ChatView(): React.ReactElement {
           </Text>
         </Box>
         <EmptyState />
+        {/* Chat input available even with no history - US-103 */}
+        <ChatInput onSubmit={handleSubmitMessage} disabled={isProcessing} />
       </Box>
     );
   }
@@ -425,6 +547,9 @@ export function ChatView(): React.ReactElement {
           )}
         </Box>
       </Box>
+
+      {/* Chat input at bottom - US-103 */}
+      <ChatInput onSubmit={handleSubmitMessage} disabled={isProcessing} />
 
       {/* Navigation hints */}
       <Box borderStyle="single" borderColor="gray" paddingX={1} marginTop={1}>
