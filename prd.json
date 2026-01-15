@@ -123,8 +123,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "LoopRepository and LoopIterationRepository created in src/loops/, LoopsView with list and detail view"
     },
     {
       "id": "US-109",

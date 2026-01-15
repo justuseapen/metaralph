@@ -9,7 +9,9 @@ Started: Wed Jan 14 20:48:19 EST 2026
 - Ink library used for terminal UI - Box, Text, useInput from 'ink'
 - Ink's Key type has: upArrow, downArrow, leftArrow, rightArrow, pageUp, pageDown, return, escape, ctrl, shift, tab, backspace, delete, meta
 - Use `Text inverse={selected}` for selection highlighting (not backgroundColor)
-- Database access via *Repository classes in `src/collaboration/` and `src/queue/`
+- Database access via *Repository classes in `src/collaboration/`, `src/queue/`, and `src/loops/`
+- Repository pattern: use `interface XRow` (snake_case) and `interface X` (camelCase), convert with `rowToX` functions
+- Repositories are const objects with methods, not classes (e.g., `export const XRepository = { create(), findAll(), ... }`)
 - 2-second refresh interval for real-time dashboard updates
 - Anthropic SDK streaming: use `client.messages.stream()` and `stream.on('text', callback)`
 - For spinners in Ink, use text-based frames (e.g., SPINNER_FRAMES array) with setInterval
@@ -135,4 +137,31 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Status columns use TEXT type with DEFAULT values (status tracking: pending/running/paused/completed/failed/stopped)
   - Indexes follow naming pattern: idx_{table}_{column}
   - No separate migration files - all schema lives in src/db/index.ts createTables()
+---
+
+## 2026-01-14 - US-108
+- What was implemented: Created LoopsView component with loop list display
+- Files changed:
+  - `src/loops/repository.ts` - New file with:
+    - LoopRepository: create, findById, findAll, findByProject, findByStatus, updateStatus, updateCurrentIteration, delete
+    - LoopIterationRepository: create, findByLoop, update
+    - Types: Loop, LoopIteration, LoopStatus, IterationStatus, CreateLoopInput
+    - Database row to interface converters following snake_case to camelCase pattern
+  - `src/loops/index.ts` - New module entry point exporting all types and repositories
+  - `src/cli/components/LoopsView.tsx` - Enhanced with full loop list:
+    - LoopRow component showing status, project, branch, progress, duration
+    - Status color-coded: running=green, paused=yellow, completed=cyan, failed/stopped=red
+    - LoopListHeader component for table columns
+    - Arrow key navigation with selectedIndex state
+    - Enter opens LoopDetailView showing iteration history
+    - LoopDetailView with expandable iteration output
+    - 2-second refresh interval for real-time updates
+- **Learnings for future iterations:**
+  - Repository pattern: create a new `src/<module>/repository.ts` for database operations
+  - Use `interface XRow` for database rows (snake_case) and `interface X` for app types (camelCase)
+  - Row to interface conversion functions follow `rowToX` naming
+  - Repositories are exported as const objects with methods, not classes
+  - `findAll` can use CASE expressions in ORDER BY to sort by status priority
+  - LoopWithProject interface extends Loop with projectName for display convenience
+  - Detail views can be shown conditionally by setting a state (detailLoop) and returning early
 ---
