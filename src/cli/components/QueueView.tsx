@@ -5,10 +5,11 @@
  * Automatically refreshes when data changes.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import { TaskRepository, type Task, type TaskStatus } from '../../queue/index.js';
-import { getProject } from '../../registry/index.js';
+import { getProject, listProjects } from '../../registry/index.js';
 
 /**
  * Format a task status for display
@@ -48,6 +49,49 @@ function truncate(str: string, maxLength: number): string {
 }
 
 /**
+ * Highlight search term in text by rendering matching parts in yellow with inverse
+ */
+function HighlightedText({
+  text,
+  searchTerm,
+  color,
+  dimColor,
+  maxLength,
+}: {
+  text: string;
+  searchTerm: string;
+  color?: string;
+  dimColor?: boolean;
+  maxLength?: number;
+}): React.ReactElement {
+  const displayText = maxLength ? truncate(text, maxLength) : text;
+
+  if (!searchTerm) {
+    return <Text color={color} dimColor={dimColor}>{displayText}</Text>;
+  }
+
+  const lowerText = displayText.toLowerCase();
+  const lowerSearch = searchTerm.toLowerCase();
+  const matchIndex = lowerText.indexOf(lowerSearch);
+
+  if (matchIndex === -1) {
+    return <Text color={color} dimColor={dimColor}>{displayText}</Text>;
+  }
+
+  const before = displayText.slice(0, matchIndex);
+  const match = displayText.slice(matchIndex, matchIndex + searchTerm.length);
+  const after = displayText.slice(matchIndex + searchTerm.length);
+
+  return (
+    <Text color={color} dimColor={dimColor}>
+      {before}
+      <Text backgroundColor="yellow" color="black" bold>{match}</Text>
+      {after}
+    </Text>
+  );
+}
+
+/**
  * Table header component
  */
 function TableHeader(): React.ReactElement {
@@ -78,16 +122,18 @@ function TableHeader(): React.ReactElement {
 /**
  * Table row component for a single task
  */
-function TaskRow({ task, index }: { task: Task; index: number }): React.ReactElement {
-  const [projectName, setProjectName] = useState<string>('Loading...');
+function TaskRow({
+  task,
+  index,
+  searchTerm,
+  projectName,
+}: {
+  task: Task;
+  index: number;
+  searchTerm: string;
+  projectName: string;
+}): React.ReactElement {
   const status = formatStatus(task.status);
-
-  useEffect(() => {
-    const project = getProject(task.projectId);
-    setProjectName(project?.name || 'Unknown');
-  }, [task.projectId]);
-
-  const bgColor = index % 2 === 0 ? undefined : undefined;
 
   return (
     <Box paddingX={1}>
@@ -98,16 +144,63 @@ function TaskRow({ task, index }: { task: Task; index: number }): React.ReactEle
         <Text dimColor>{truncate(task.id, 8)}</Text>
       </Box>
       <Box width={16}>
-        <Text>{truncate(projectName, 14)}</Text>
+        <HighlightedText text={projectName} searchTerm={searchTerm} maxLength={14} />
       </Box>
       <Box width={10}>
-        <Text>{formatType(task.type)}</Text>
+        <HighlightedText text={formatType(task.type)} searchTerm={searchTerm} />
       </Box>
       <Box width={12}>
         <Text color={status.color}>{status.text}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text>{truncate(task.title, 40)}</Text>
+        <HighlightedText text={task.title} searchTerm={searchTerm} maxLength={40} />
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * Task with resolved project name for display
+ */
+interface TaskWithProject extends Task {
+  projectName: string;
+}
+
+/**
+ * SearchInput component - Displays at the top when search is active
+ */
+function SearchInput({
+  value,
+  onChange,
+  totalCount,
+  filteredCount,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  totalCount: number;
+  filteredCount: number;
+}): React.ReactElement {
+  return (
+    <Box paddingX={1} marginBottom={1}>
+      <Box marginRight={1}>
+        <Text color="yellow">/</Text>
+      </Box>
+      <Box flexGrow={1}>
+        <TextInput
+          value={value}
+          onChange={onChange}
+          placeholder="Search by title, project, or type..."
+        />
+      </Box>
+      <Box marginLeft={2}>
+        <Text dimColor>
+          {filteredCount === totalCount
+            ? `${totalCount} task${totalCount !== 1 ? 's' : ''}`
+            : `${filteredCount} of ${totalCount}`}
+        </Text>
+      </Box>
+      <Box marginLeft={2}>
+        <Text dimColor>ESC: clear</Text>
       </Box>
     </Box>
   );
@@ -117,15 +210,27 @@ function TaskRow({ task, index }: { task: Task; index: number }): React.ReactEle
  * QueueView component - main task queue display
  */
 export function QueueView(): React.ReactElement {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // Debounced search term
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load tasks and set up refresh interval
+  // Load tasks and project names, set up refresh interval
   useEffect(() => {
     const loadTasks = () => {
       try {
         const pendingTasks = TaskRepository.findPending();
-        setTasks(pendingTasks);
+        const projects = listProjects();
+        const projectMap = new Map(projects.map(p => [p.id, p.name]));
+
+        const tasksWithProjects: TaskWithProject[] = pendingTasks.map(task => ({
+          ...task,
+          projectName: projectMap.get(task.projectId) || 'Unknown',
+        }));
+
+        setTasks(tasksWithProjects);
         setLoading(false);
       } catch (error) {
         console.error('Failed to load tasks:', error);
@@ -133,13 +238,70 @@ export function QueueView(): React.ReactElement {
       }
     };
 
-    // Load immediately
     loadTasks();
 
-    // Refresh every 2 seconds
     const interval = setInterval(loadTasks, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // Handle search input changes with debounce
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+
+    // Clear existing debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new debounce timer (150ms)
+    debounceTimerRef.current = setTimeout(() => {
+      setSearchTerm(value);
+    }, 150);
+  }, []);
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Filter tasks based on search term
+  const filteredTasks = searchTerm
+    ? tasks.filter(task => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          task.title.toLowerCase().includes(searchLower) ||
+          task.projectName.toLowerCase().includes(searchLower) ||
+          formatType(task.type).toLowerCase().includes(searchLower)
+        );
+      })
+    : tasks;
+
+  // Handle keyboard input
+  useInput((input, key) => {
+    if (searchActive) {
+      // Escape clears search and exits search mode
+      if (key.escape) {
+        setSearchActive(false);
+        setSearchInput('');
+        setSearchTerm('');
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        return;
+      }
+      return;
+    }
+
+    // '/' key activates search
+    if (input === '/') {
+      setSearchActive(true);
+      return;
+    }
+  });
 
   if (loading) {
     return (
@@ -159,21 +321,51 @@ export function QueueView(): React.ReactElement {
         <Box marginTop={1}>
           <Text dimColor>Add a project and create tasks to see them here.</Text>
         </Box>
+        <Box marginTop={1}>
+          <Text dimColor>/: Search</Text>
+        </Box>
       </Box>
     );
   }
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Box paddingX={1} marginBottom={1}>
+      {/* Header */}
+      <Box paddingX={1} marginBottom={searchActive ? 0 : 1}>
         <Text bold color="blue">Task Queue</Text>
-        <Text dimColor> ({tasks.length} task{tasks.length !== 1 ? 's' : ''})</Text>
+        {!searchActive && (
+          <Text dimColor> ({tasks.length} task{tasks.length !== 1 ? 's' : ''}) — /: Search</Text>
+        )}
       </Box>
+
+      {/* Search input when active */}
+      {searchActive && (
+        <SearchInput
+          value={searchInput}
+          onChange={handleSearchChange}
+          totalCount={tasks.length}
+          filteredCount={filteredTasks.length}
+        />
+      )}
+
+      {/* Table */}
       <TableHeader />
       <Box flexDirection="column" borderStyle="single" borderTop={false}>
-        {tasks.map((task, index) => (
-          <TaskRow key={task.id} task={task} index={index} />
-        ))}
+        {filteredTasks.length === 0 ? (
+          <Box paddingX={1} paddingY={1}>
+            <Text dimColor>No tasks match "{searchTerm}"</Text>
+          </Box>
+        ) : (
+          filteredTasks.map((task, index) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              index={index}
+              searchTerm={searchTerm}
+              projectName={task.projectName}
+            />
+          ))
+        )}
       </Box>
     </Box>
   );
