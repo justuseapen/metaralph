@@ -15,6 +15,7 @@ import { ApprovalView } from './components/ApprovalView.js';
 import { ProjectsView } from './components/ProjectsView.js';
 import { WorkersView } from './components/WorkersView.js';
 import { DeploymentStatusBar } from './components/DeploymentNotifications.js';
+import { ChatView } from './components/ChatView.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +24,7 @@ const packageJsonPath = path.resolve(__dirname, '../../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
 /** Tab identifiers */
-type TabId = 'queue' | 'approvals' | 'projects' | 'workers';
+type TabId = 'queue' | 'approvals' | 'projects' | 'workers' | 'chat';
 
 /** Tab configuration */
 interface Tab {
@@ -37,6 +38,7 @@ const TABS: Tab[] = [
   { id: 'approvals', label: 'Approvals', shortcut: '2' },
   { id: 'projects', label: 'Projects', shortcut: '3' },
   { id: 'workers', label: 'Workers', shortcut: '4' },
+  { id: 'chat', label: 'Chat', shortcut: '9' },
 ];
 
 /**
@@ -116,6 +118,8 @@ function TabContent({ tab }: { tab: TabId }): React.ReactElement {
       return <ProjectsView />;
     case 'workers':
       return <WorkersView />;
+    case 'chat':
+      return <ChatView />;
     default:
       return (
         <Box flexGrow={1} flexDirection="column" paddingX={1}>
@@ -136,7 +140,8 @@ function Footer(): React.ReactElement {
         <Text bold> 1</Text> Queue  |
         <Text bold> 2</Text> Approvals  |
         <Text bold> 3</Text> Projects  |
-        <Text bold> 4</Text> Workers
+        <Text bold> 4</Text> Workers  |
+        <Text bold> 9</Text> Chat
       </Text>
     </Box>
   );
