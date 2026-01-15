@@ -88,3 +88,25 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Use useRef for AbortController to allow stream cancellation
   - Keep message history for context (slice last 10 messages to avoid context limits)
 ---
+
+## 2026-01-14 - US-105
+- What was implemented: Project context selector for chat
+- Files changed:
+  - `src/cli/components/ChatView.tsx` - Added:
+    - ProjectSelector component with dropdown/selector UI
+    - 'p' key opens/closes project selector
+    - Arrow keys navigate the project list
+    - Enter confirms selection, Escape cancels
+    - "No project" option at index 0
+    - Selected project indicator shown in header (e.g., "[metaralph]")
+    - Project context now comes from selected project, not conversation
+    - Auto-select project from conversation on load if no manual selection
+    - Navigation hints updated to include 'p' shortcut
+- **Learnings for future iterations:**
+  - listProjects() returns all registered projects from the registry
+  - Keep both projectMap (for lookups) and projectList (for iteration) for different use cases
+  - Use separate state for selector: selectedProjectId, projectSelectorOpen, projectSelectorIndex
+  - Block other key handlers when selector is open (return early after handling)
+  - Use useCallback for selection handler to avoid stale closures
+  - Project context is passed to buildSystemPrompt() which includes project name, path, README, and structure
+---

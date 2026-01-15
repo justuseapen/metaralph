@@ -77,8 +77,8 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ProjectSelector component with 'p' key toggle, arrow keys for navigation, Enter to confirm, selected project shown in header and used for context"
     },
     {
       "id": "US-106",
