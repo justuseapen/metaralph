@@ -11,6 +11,8 @@ Started: Wed Jan 14 20:48:19 EST 2026
 - Use `Text inverse={selected}` for selection highlighting (not backgroundColor)
 - Database access via *Repository classes in `src/collaboration/` and `src/queue/`
 - 2-second refresh interval for real-time dashboard updates
+- Anthropic SDK streaming: use `client.messages.stream()` and `stream.on('text', callback)`
+- For spinners in Ink, use text-based frames (e.g., SPINNER_FRAMES array) with setInterval
 
 ---
 
@@ -62,4 +64,27 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - key.return is used for Enter key in Ink
   - For simulating async operations, useState with setTimeout works for placeholder behavior
   - Input appears in both empty state and main view to allow starting conversations
+---
+
+## 2026-01-14 - US-104
+- What was implemented: Streaming Claude responses in chat with real-time display
+- Files changed:
+  - `src/cli/components/ChatView.tsx` - Major enhancements:
+    - Streaming response integration using Anthropic SDK `client.messages.stream()`
+    - StreamingIndicator component with animated spinner (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+    - StreamingMessage interface to track streaming state
+    - Token-by-token response display as stream.on('text') events fire
+    - Auto-scroll that follows new streaming content
+    - Scroll-up pauses auto-scroll, scroll to bottom or 'G' re-enables
+    - Streaming status indicator in header showing "⠋ Streaming..."
+    - Auto-scroll paused indicator shown when paused
+- **Learnings for future iterations:**
+  - Anthropic SDK has `client.messages.stream()` for streaming responses
+  - MessageStream emits 'text' event with (textDelta, textSnapshot) - use textDelta to accumulate
+  - Use `stream.finalMessage()` to await completion and get full response
+  - Use `stream.on('text', callback)` to handle streaming text deltas
+  - For spinner animation, use setInterval with ~100ms delay and cycle through frames
+  - Track auto-scroll state separately - disable on user scroll up, re-enable at bottom
+  - Use useRef for AbortController to allow stream cancellation
+  - Keep message history for context (slice last 10 messages to avoid context limits)
 ---
