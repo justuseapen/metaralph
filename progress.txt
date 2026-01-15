@@ -444,3 +444,27 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Level color coding: error=red, warning=yellow, info=default
   - Filter mode pattern: similar to search mode with active state and key handlers
 ---
+
+## 2026-01-14 - US-121
+- What was implemented: Added self-improvement status section to new Health tab
+- Files changed:
+  - `src/cli/components/HealthView.tsx` - New file with:
+    - SelfImprovementSection component showing status metrics
+    - Shows: self-managed projects count, last analysis time, proposals in queue, pending approvals
+    - Recent results list with status icons (completed/failed/running)
+    - HealthOverviewSection placeholder for future project health metrics
+    - 10-second refresh interval for real-time updates
+    - 'r' key to manually refresh
+  - `src/cli/dashboard.tsx` - Added Health tab:
+    - Added 'health' to TabId type union
+    - Added Health tab to TABS array with shortcut '5'
+    - Added HealthView case in TabContent switch
+    - Updated Footer with Health shortcut
+- **Learnings for future iterations:**
+  - Health tab uses shortcut '5' - between Workers (4) and Chat (9)
+  - HealthDashboard.js exists in dist but not src - source files may need recreation
+  - Self-improvement data comes from tasks table with source='self_improvement'
+  - Use getRegisteredSelfProjects(db) from self-improve module to get self-managed projects
+  - Text component doesn't have marginTop prop in Ink - use Box wrapper instead
+  - Border styles available: 'round', 'single', etc. - use 'round' for sections
+---
