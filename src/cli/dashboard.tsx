@@ -82,10 +82,10 @@ function getTabBadgeCounts(): TabBadgeCounts {
       WHERE approval_status = 'pending' AND requires_approval = 1
     `).get() as { count: number };
 
-    // Count running workers for Workers tab
+    // Count running executions for Workers tab (uses executions table, not workers)
     const runningWorkers = db.prepare(`
-      SELECT COUNT(*) as count FROM workers
-      WHERE status = 'running' OR status = 'busy'
+      SELECT COUNT(*) as count FROM executions
+      WHERE status = 'running' OR status = 'in_progress'
     `).get() as { count: number };
 
     // Count critical alerts for Health tab
