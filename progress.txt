@@ -341,3 +341,26 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Use inverse={isSelected && isActive} for current selection highlight in filter bars
   - TypeFilter and StatusFilter types use union: `'all' | ActualType` to include "all" option
 ---
+
+## 2026-01-14 - US-117
+- What was implemented: Enhanced task detail view in QueueView
+- Files changed:
+  - `src/cli/components/QueueView.tsx` - Major additions:
+    - TaskDetailView component showing full task information
+    - formatEffort(), formatApprovalStatus(), formatSource(), formatDate(), formatDuration() helpers
+    - getExecutionStatusColor() for status color coding
+    - parseAcceptanceCriteria() to extract AC from prdJson (handles direct AC or userStories format)
+    - Selection state (selectedIndex, detailTask) for list navigation
+    - Enter key opens detail view, Escape closes it
+    - Arrow key navigation for task list and execution history
+    - Execution output scrolling with ↑↓, PgUp/PgDn, g/G
+    - Error log display for failed executions
+- **Learnings for future iterations:**
+  - ExecutionRepository.findByTask(taskId) retrieves execution history for a task
+  - Execution interface has: id, taskId, status, iterationsUsed, ralphOutput, errorLog, exitCode, startedAt, completedAt
+  - For detail views: use conditional rendering - check for detailTask state, return early if set
+  - PRD JSON may have acceptanceCriteria at top level or nested in userStories[0].acceptanceCriteria
+  - Use Text inverse={selected} for selection highlighting in lists
+  - When nesting Text elements, can't put Box inside Text - use string padding or separate layout
+  - Reset selectedIndex when filteredTasks.length changes to avoid out-of-bounds
+---
