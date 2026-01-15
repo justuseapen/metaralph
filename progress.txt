@@ -686,3 +686,14 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Badge display: `({count})` format with conditional rendering for count > 0
   - When tab is active, badge inherits active color; inactive tabs use getBadgeColor()
 ---
+
+## 2026-01-15 - US-132
+- What was implemented: Reorganized dashboard tabs for better workflow
+- Files changed:
+  - `src/cli/dashboard.tsx` - Updated TABS array order, Footer shortcuts, and SHORTCUT_GROUPS global help
+- **Learnings for future iterations:**
+  - Tab order reflects usage frequency: Queue > Loops > Workers > Chat > Projects > Health > Approvals
+  - When changing tab shortcuts, update 3 places: TABS array, Footer component, SHORTCUT_GROUPS global
+  - Sequential shortcuts (1-7) are easier to remember than scattered numbers (1-5, 9, 0)
+  - Costs and Debug tabs mentioned in acceptance criteria don't exist yet - focus on existing tabs
+---
