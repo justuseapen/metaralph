@@ -215,3 +215,26 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - findRalphScript() searches project-local and user-level locations for ralph.sh
   - Keep only last 10KB of output when storing in database: output.slice(-10000)
 ---
+
+## 2026-01-14 - US-111
+- What was implemented: Added loop progress display with real-time updates
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Major enhancements:
+    - Added PrdStory, PrdFile, StoryProgress interfaces for PRD data
+    - Added readPrdProgress() function to read PRD and get story completion status
+    - Added ProgressBar component with filled/empty characters and percentage
+    - Added LoopProgressDisplay component showing detailed progress for selected loop
+    - Updated LoopWithProject interface to include projectPath and storyProgress
+    - Updated LoopRow to show story progress count and current story for running loops
+    - Updated LoopListHeader with Iterations and Stories columns
+    - Enhanced LoopDetailView with spinner animation, progress bar, and current story display
+    - Added spinner animation (SPINNER_FRAMES) for running loops
+    - Story progress refreshes every 2 seconds via existing loadLoops interval
+- **Learnings for future iterations:**
+  - Read PRD file with fs.readFileSync and JSON.parse to get story data
+  - Use path.join(projectPath, prdPath) to construct full path to PRD
+  - Progress bar: use '█' for filled and '░' for empty characters
+  - Find current story by filtering userStories.find(s => !s.passes)
+  - For real-time updates, store projectPath in LoopWithProject and re-read PRD in loadLoops
+  - Spinner frames work best with 100ms interval: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+---
