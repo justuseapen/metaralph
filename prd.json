@@ -371,8 +371,8 @@
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "'?' toggles ShortcutHelpOverlay with all shortcuts grouped by tab context, current tab highlighted with cyan inverse, ESC or '?' closes"
     },
     {
       "id": "US-125",

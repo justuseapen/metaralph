@@ -520,3 +520,26 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Pass callbacks through component hierarchy: parent -> list section -> detail view -> dialog
   - RejectDialog uses its own useInput for Enter/ESC handling
 ---
+
+## 2026-01-14 - US-124
+- What was implemented: Added keyboard shortcut help overlay accessible from any screen
+- Files changed:
+  - `src/cli/dashboard.tsx` - Major additions:
+    - ShortcutGroup interface and SHORTCUT_GROUPS constant with all shortcuts grouped by context
+    - ShortcutHelpOverlay component displaying shortcuts in a grid layout
+    - Shortcuts for all 8 contexts: Global, Queue, Approvals, Projects, Workers, Health, Chat, Loops
+    - '?' key handler in Dashboard to toggle help overlay
+    - showHelp state to track overlay visibility
+    - Current tab's shortcuts highlighted with cyan border and inverse text
+    - Global shortcuts highlighted with green border
+    - Yellow text for key combinations, dimColor for inactive context descriptions
+    - ESC or '?' closes the overlay
+    - Updated Footer to show '?' Help shortcut
+- **Learnings for future iterations:**
+  - Overlay pattern: use conditional return in main component to show full-screen overlay instead of tab content
+  - For multi-context shortcuts, use array of groups with tabId to identify which is current
+  - Use inverse={isCurrentTab} on Text to highlight the active section
+  - Block other key handlers when overlay is open by checking showHelp state first
+  - ShortcutHelpOverlay has its own useInput for '?' and ESC handling
+  - flexWrap="wrap" on Box allows groups to flow to next row on small terminals
+---
