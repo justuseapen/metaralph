@@ -598,6 +598,27 @@ function StopConfirmationDialog({ loop, onConfirm, onCancel }: StopConfirmationD
 }
 
 /**
+ * Get story title by ID from PRD stories
+ */
+function getStoryTitle(storyId: string | null, stories: PrdStory[]): string | null {
+  if (!storyId) return null;
+  const story = stories.find(s => s.id === storyId);
+  return story?.title || null;
+}
+
+/**
+ * Get iteration status color with emphasis for failed
+ */
+function getIterationStatusColor(status: string): string {
+  switch (status) {
+    case 'completed': return 'cyan';
+    case 'running': return 'green';
+    case 'failed': return 'red';
+    default: return 'gray';
+  }
+}
+
+/**
  * Loop detail view showing iterations
  */
 interface LoopDetailViewProps {
@@ -609,8 +630,12 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
   const [iterations, setIterations] = useState<LoopIteration[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [outputScrollOffset, setOutputScrollOffset] = useState(0);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [storyProgress, setStoryProgress] = useState<StoryProgress | null>(loop.storyProgress);
+
+  // Maximum visible lines for expanded output
+  const MAX_OUTPUT_LINES = 15;
 
   // Spinner animation for running loops
   useEffect(() => {
@@ -644,21 +669,59 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
     return () => clearInterval(interval);
   }, [loop.id, loop.projectPath, loop.prdPath]);
 
+  // Reset output scroll when expanding a different iteration
+  useEffect(() => {
+    setOutputScrollOffset(0);
+  }, [expandedIndex]);
+
   useInput((input, key) => {
     if (key.escape) {
-      onClose();
-    } else if (key.upArrow && selectedIndex > 0) {
-      setSelectedIndex(selectedIndex - 1);
-    } else if (key.downArrow && selectedIndex < iterations.length - 1) {
-      setSelectedIndex(selectedIndex + 1);
-    } else if (key.return && iterations.length > 0) {
-      // Toggle expanded view for selected iteration
-      setExpandedIndex(expandedIndex === selectedIndex ? null : selectedIndex);
+      // If output is expanded, collapse it first
+      if (expandedIndex !== null) {
+        setExpandedIndex(null);
+        setOutputScrollOffset(0);
+      } else {
+        onClose();
+      }
+    } else if (expandedIndex !== null) {
+      // When output is expanded, arrow keys scroll the output
+      const iter = iterations[expandedIndex];
+      if (iter?.output) {
+        const lines = iter.output.split('\n');
+        const maxOffset = Math.max(0, lines.length - MAX_OUTPUT_LINES);
+
+        if (key.upArrow && outputScrollOffset > 0) {
+          setOutputScrollOffset(outputScrollOffset - 1);
+        } else if (key.downArrow && outputScrollOffset < maxOffset) {
+          setOutputScrollOffset(outputScrollOffset + 1);
+        } else if (key.pageUp) {
+          setOutputScrollOffset(Math.max(0, outputScrollOffset - MAX_OUTPUT_LINES));
+        } else if (key.pageDown) {
+          setOutputScrollOffset(Math.min(maxOffset, outputScrollOffset + MAX_OUTPUT_LINES));
+        } else if (input === 'g') {
+          // Go to start
+          setOutputScrollOffset(0);
+        } else if (input === 'G') {
+          // Go to end
+          setOutputScrollOffset(maxOffset);
+        }
+      }
+    } else {
+      // Normal navigation when output is not expanded
+      if (key.upArrow && selectedIndex > 0) {
+        setSelectedIndex(selectedIndex - 1);
+      } else if (key.downArrow && selectedIndex < iterations.length - 1) {
+        setSelectedIndex(selectedIndex + 1);
+      } else if (key.return && iterations.length > 0) {
+        // Expand/collapse output for selected iteration
+        setExpandedIndex(expandedIndex === selectedIndex ? null : selectedIndex);
+      }
     }
   });
 
   const statusColor = getStatusColor(loop.status);
   const isRunning = loop.status === 'running';
+  const stories = storyProgress?.stories || [];
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -710,7 +773,7 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
       {/* Iterations list */}
       <Box marginBottom={1}>
         <Text bold color="cyan">Iterations</Text>
-        <Text dimColor> (↑/↓ to navigate, Enter to expand)</Text>
+        <Text dimColor> (↑/↓ to navigate, Enter to expand output)</Text>
       </Box>
 
       {iterations.length === 0 ? (
@@ -721,7 +784,8 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
           <Box paddingX={1}>
             <Text bold color="cyan">
               <Text>{'#'.padEnd(4)}</Text>
-              <Text>{'Story'.padEnd(12)}</Text>
+              <Text>{'Story'.padEnd(10)}</Text>
+              <Text>{'Title'.padEnd(32)}</Text>
               <Text>{'Status'.padEnd(12)}</Text>
               <Text>{'Duration'.padEnd(10)}</Text>
               <Text>Commit</Text>
@@ -730,36 +794,65 @@ function LoopDetailView({ loop, onClose }: LoopDetailViewProps): React.ReactElem
 
           {/* Iteration rows */}
           {iterations.map((iter, index) => {
-            const iterStatusColor = iter.status === 'completed' ? 'cyan' :
-              iter.status === 'running' ? 'green' :
-              iter.status === 'failed' ? 'red' : 'gray';
+            const iterStatusColor = getIterationStatusColor(iter.status);
             const duration = formatDuration(iter.startedAt, iter.completedAt);
             const commitDisplay = iter.commitSha ? iter.commitSha.slice(0, 7) : '-';
             const isExpanded = expandedIndex === index;
+            const isFailed = iter.status === 'failed';
+            const storyTitle = getStoryTitle(iter.storyId, stories);
 
             return (
               <Box key={iter.id} flexDirection="column">
                 <Box paddingX={1}>
-                  <Text inverse={selectedIndex === index}>
-                    <Text>{String(iter.iterationNumber).padEnd(4)}</Text>
-                    <Text>{(iter.storyId || '-').padEnd(12)}</Text>
-                    <Text color={iterStatusColor}>{iter.status.padEnd(12)}</Text>
-                    <Text dimColor>{duration.padEnd(10)}</Text>
-                    <Text dimColor>{commitDisplay}</Text>
+                  <Text inverse={selectedIndex === index} backgroundColor={isFailed && selectedIndex !== index ? 'red' : undefined}>
+                    <Text color={isFailed ? 'red' : undefined}>{String(iter.iterationNumber).padEnd(4)}</Text>
+                    <Text color={isFailed ? 'red' : undefined}>{(iter.storyId || '-').padEnd(10)}</Text>
+                    <Text color={isFailed ? 'red' : undefined}>{truncate(storyTitle || '-', 30).padEnd(32)}</Text>
+                    <Text color={iterStatusColor} bold={isFailed}>{iter.status.padEnd(12)}</Text>
+                    <Text color={isFailed ? 'red' : undefined} dimColor={!isFailed}>{duration.padEnd(10)}</Text>
+                    <Text color={isFailed ? 'red' : undefined} dimColor={!isFailed}>{commitDisplay}</Text>
                   </Text>
                 </Box>
 
-                {/* Expanded output */}
-                {isExpanded && iter.output && (
+                {/* Expanded output with scrolling */}
+                {isExpanded && (
                   <Box
                     marginLeft={2}
                     marginY={1}
                     paddingX={1}
                     borderStyle="single"
+                    borderColor={isFailed ? 'red' : undefined}
                     flexDirection="column"
                   >
-                    <Text bold dimColor>Output:</Text>
-                    <Text wrap="wrap">{truncate(iter.output, 500)}</Text>
+                    {iter.output ? (
+                      <>
+                        {/* Output header with scroll info */}
+                        <Box marginBottom={1}>
+                          <Text bold dimColor>Output</Text>
+                          {(() => {
+                            const lines = iter.output.split('\n');
+                            const totalLines = lines.length;
+                            if (totalLines > MAX_OUTPUT_LINES) {
+                              return (
+                                <Text dimColor>
+                                  {' '}(lines {outputScrollOffset + 1}-{Math.min(outputScrollOffset + MAX_OUTPUT_LINES, totalLines)} of {totalLines}, ↑/↓ PgUp/PgDn to scroll, g/G start/end)
+                                </Text>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </Box>
+
+                        {/* Output content with scrolling */}
+                        <Box flexDirection="column">
+                          {iter.output.split('\n').slice(outputScrollOffset, outputScrollOffset + MAX_OUTPUT_LINES).map((line, lineIdx) => (
+                            <Text key={lineIdx} wrap="wrap">{line}</Text>
+                          ))}
+                        </Box>
+                      </>
+                    ) : (
+                      <Text dimColor>No output recorded for this iteration.</Text>
+                    )}
                   </Box>
                 )}
               </Box>
