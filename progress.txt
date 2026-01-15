@@ -274,3 +274,24 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Block parent useInput when dialog is open by adding to early return condition
   - Stop can apply to both 'running' and 'paused' loops (status check in handler)
 ---
+
+## 2026-01-14 - US-114
+- What was implemented: Enhanced loop iteration history view with full functionality
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Enhanced LoopDetailView:
+    - Added getStoryTitle() helper to look up story titles from PRD by storyId
+    - Added getIterationStatusColor() helper for consistent status coloring
+    - Iteration table now shows story title column (looked up from PRD stories)
+    - Failed iterations highlighted in red with bold status and red text on all fields
+    - Full output display with vertical scrolling (arrows, PgUp/PgDn, g/G for start/end)
+    - Output header shows line count and scroll position when content exceeds MAX_OUTPUT_LINES
+    - Added outputScrollOffset state for managing scroll position
+    - Escape first collapses expanded output, then second Escape returns to loop list
+    - Failed iteration output boxes have red border for emphasis
+- **Learnings for future iterations:**
+  - To show related data (like story title from storyId), look up from available data (storyProgress.stories)
+  - Use array.find() with object property match for simple lookups
+  - For scrollable content: track offset state, slice array with offset/limit, show scroll info in header
+  - Multiple escape handling: check current state and collapse inner views first before outer navigation
+  - Red highlighting for failures: use both color="red" on Text and borderColor="red" on Box
+---
