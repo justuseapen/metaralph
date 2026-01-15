@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { TaskRepository, type Task, type TaskStatus, type TaskType } from '../../queue/index.js';
+import { ExecutionRepository, type Execution } from '../../workers/index.js';
 import { getProject, listProjects } from '../../registry/index.js';
 
 /**
@@ -153,21 +154,40 @@ function TaskRow({
   index,
   searchTerm,
   projectName,
+  selected,
 }: {
   task: Task;
   index: number;
   searchTerm: string;
   projectName: string;
+  selected: boolean;
 }): React.ReactElement {
   const status = formatStatus(task.status);
 
+  // Use simpler layout when no search term (supports inverse selection)
+  if (!searchTerm) {
+    return (
+      <Box paddingX={1}>
+        <Text inverse={selected}>
+          {String(task.priorityScore).padEnd(8)}
+          <Text dimColor>{truncate(task.id, 8).padEnd(10)}</Text>
+          {truncate(projectName, 14).padEnd(16)}
+          {formatType(task.type).padEnd(10)}
+          <Text color={status.color}>{status.text.padEnd(12)}</Text>
+          {truncate(task.title, 40)}
+        </Text>
+      </Box>
+    );
+  }
+
+  // Use highlight-enabled layout when searching
   return (
     <Box paddingX={1}>
       <Box width={8}>
-        <Text>{task.priorityScore}</Text>
+        <Text inverse={selected}>{task.priorityScore}</Text>
       </Box>
       <Box width={10}>
-        <Text dimColor>{truncate(task.id, 8)}</Text>
+        <Text inverse={selected} dimColor>{truncate(task.id, 8)}</Text>
       </Box>
       <Box width={16}>
         <HighlightedText text={projectName} searchTerm={searchTerm} maxLength={14} />
@@ -176,7 +196,7 @@ function TaskRow({
         <HighlightedText text={formatType(task.type)} searchTerm={searchTerm} />
       </Box>
       <Box width={12}>
-        <Text color={status.color}>{status.text}</Text>
+        <Text inverse={selected} color={status.color}>{status.text}</Text>
       </Box>
       <Box flexGrow={1}>
         <HighlightedText text={task.title} searchTerm={searchTerm} maxLength={40} />
@@ -321,6 +341,412 @@ function FilterBar({
 }
 
 /**
+ * Format effort level for display
+ */
+function formatEffort(effort: string): string {
+  const effortMap: Record<string, string> = {
+    quick_win: 'Quick Win',
+    small: 'Small',
+    medium: 'Medium',
+    large: 'Large',
+  };
+  return effortMap[effort] || effort;
+}
+
+/**
+ * Format approval status for display
+ */
+function formatApprovalStatus(status: string): { text: string; color: string } {
+  const statusMap: Record<string, { text: string; color: string }> = {
+    not_required: { text: 'Not Required', color: 'gray' },
+    pending: { text: 'Pending', color: 'yellow' },
+    approved: { text: 'Approved', color: 'green' },
+    rejected: { text: 'Rejected', color: 'red' },
+  };
+  return statusMap[status] || { text: status, color: 'white' };
+}
+
+/**
+ * Format source for display
+ */
+function formatSource(source: string): string {
+  const sourceMap: Record<string, string> = {
+    manual: 'Manual',
+    onboarding: 'Onboarding',
+    analysis: 'Analysis',
+    conversation: 'Conversation',
+    self_improvement: 'Self-Improvement',
+  };
+  return sourceMap[source] || source;
+}
+
+/**
+ * Format date for display
+ */
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Format duration between two dates
+ */
+function formatDuration(startedAt: string | null, completedAt: string | null): string {
+  if (!startedAt) return '-';
+
+  const start = new Date(startedAt);
+  const end = completedAt ? new Date(completedAt) : new Date();
+  const diffMs = end.getTime() - start.getTime();
+
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+/**
+ * Get execution status color
+ */
+function getExecutionStatusColor(status: string): string {
+  switch (status) {
+    case 'completed': return 'cyan';
+    case 'running': return 'green';
+    case 'failed': return 'red';
+    default: return 'gray';
+  }
+}
+
+/**
+ * PRD data structure for acceptance criteria
+ */
+interface PrdData {
+  acceptanceCriteria?: string[];
+  userStories?: Array<{
+    id: string;
+    title: string;
+    acceptanceCriteria?: string[];
+  }>;
+}
+
+/**
+ * Parse acceptance criteria from PRD JSON
+ */
+function parseAcceptanceCriteria(prdJson: string | null): string[] {
+  if (!prdJson) return [];
+
+  try {
+    const prd = JSON.parse(prdJson) as PrdData;
+    // Check for direct acceptanceCriteria
+    if (prd.acceptanceCriteria && Array.isArray(prd.acceptanceCriteria)) {
+      return prd.acceptanceCriteria;
+    }
+    // Check for userStories with acceptanceCriteria
+    if (prd.userStories && prd.userStories.length > 0) {
+      const firstStory = prd.userStories[0];
+      if (firstStory.acceptanceCriteria) {
+        return firstStory.acceptanceCriteria;
+      }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Props for TaskDetailView
+ */
+interface TaskDetailViewProps {
+  task: TaskWithProject;
+  onClose: () => void;
+}
+
+/**
+ * Full-screen task detail view
+ */
+function TaskDetailView({ task, onClose }: TaskDetailViewProps): React.ReactElement {
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [selectedExecutionIndex, setSelectedExecutionIndex] = useState(0);
+  const [expandedExecution, setExpandedExecution] = useState<number | null>(null);
+  const [outputScrollOffset, setOutputScrollOffset] = useState(0);
+
+  const MAX_OUTPUT_LINES = 12;
+
+  // Load executions for this task
+  useEffect(() => {
+    const loadExecutions = () => {
+      try {
+        const taskExecutions = ExecutionRepository.findByTask(task.id);
+        setExecutions(taskExecutions);
+      } catch (error) {
+        console.error('Failed to load executions:', error);
+      }
+    };
+
+    loadExecutions();
+    const interval = setInterval(loadExecutions, 2000);
+    return () => clearInterval(interval);
+  }, [task.id]);
+
+  // Reset output scroll when expanding a different execution
+  useEffect(() => {
+    setOutputScrollOffset(0);
+  }, [expandedExecution]);
+
+  useInput((input, key) => {
+    if (key.escape) {
+      if (expandedExecution !== null) {
+        setExpandedExecution(null);
+        setOutputScrollOffset(0);
+      } else {
+        onClose();
+      }
+      return;
+    }
+
+    // Handle output scrolling when expanded
+    if (expandedExecution !== null) {
+      const exec = executions[expandedExecution];
+      if (exec?.ralphOutput) {
+        const lines = exec.ralphOutput.split('\n');
+        const maxOffset = Math.max(0, lines.length - MAX_OUTPUT_LINES);
+
+        if (key.upArrow && outputScrollOffset > 0) {
+          setOutputScrollOffset(outputScrollOffset - 1);
+        } else if (key.downArrow && outputScrollOffset < maxOffset) {
+          setOutputScrollOffset(outputScrollOffset + 1);
+        } else if (key.pageUp) {
+          setOutputScrollOffset(Math.max(0, outputScrollOffset - MAX_OUTPUT_LINES));
+        } else if (key.pageDown) {
+          setOutputScrollOffset(Math.min(maxOffset, outputScrollOffset + MAX_OUTPUT_LINES));
+        } else if (input === 'g') {
+          setOutputScrollOffset(0);
+        } else if (input === 'G') {
+          setOutputScrollOffset(maxOffset);
+        }
+      }
+      return;
+    }
+
+    // Navigate executions list
+    if (key.upArrow && selectedExecutionIndex > 0) {
+      setSelectedExecutionIndex(selectedExecutionIndex - 1);
+    } else if (key.downArrow && selectedExecutionIndex < executions.length - 1) {
+      setSelectedExecutionIndex(selectedExecutionIndex + 1);
+    } else if (key.return && executions.length > 0) {
+      setExpandedExecution(selectedExecutionIndex);
+    }
+  });
+
+  const status = formatStatus(task.status);
+  const approvalStatus = formatApprovalStatus(task.approvalStatus);
+  const acceptanceCriteria = parseAcceptanceCriteria(task.prdJson);
+
+  return (
+    <Box flexDirection="column" paddingX={1} flexGrow={1}>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color="blue">Task Details</Text>
+        <Text dimColor> — Escape: back  ↑↓: navigate  Enter: expand output</Text>
+      </Box>
+
+      {/* Task info section */}
+      <Box flexDirection="column" borderStyle="single" paddingX={1} paddingY={0} marginBottom={1}>
+        {/* Title */}
+        <Box marginBottom={0}>
+          <Text bold>Title: </Text>
+          <Text>{task.title}</Text>
+        </Box>
+
+        {/* Description */}
+        {task.description && (
+          <Box marginBottom={0}>
+            <Text bold>Description: </Text>
+            <Text dimColor>{task.description}</Text>
+          </Box>
+        )}
+
+        {/* Status row */}
+        <Box marginBottom={0}>
+          <Text bold>Status: </Text>
+          <Text color={status.color}>{status.text}</Text>
+          <Text>  </Text>
+          <Text bold>Approval: </Text>
+          <Text color={approvalStatus.color}>{approvalStatus.text}</Text>
+        </Box>
+
+        {/* Type and source */}
+        <Box marginBottom={0}>
+          <Text bold>Type: </Text>
+          <Text>{formatType(task.type)}</Text>
+          <Text>  </Text>
+          <Text bold>Source: </Text>
+          <Text dimColor>{formatSource(task.source)}</Text>
+        </Box>
+
+        {/* Project and effort */}
+        <Box marginBottom={0}>
+          <Text bold>Project: </Text>
+          <Text color="cyan">{task.projectName}</Text>
+          <Text>  </Text>
+          <Text bold>Effort: </Text>
+          <Text>{formatEffort(task.estimatedEffort)}</Text>
+        </Box>
+
+        {/* Priority */}
+        <Box marginBottom={0}>
+          <Text bold>Priority Score: </Text>
+          <Text color={task.priorityScore >= 70 ? 'green' : task.priorityScore >= 40 ? 'yellow' : 'gray'}>
+            {task.priorityScore.toFixed(1)}
+          </Text>
+        </Box>
+
+        {/* Timestamps */}
+        <Box marginBottom={0}>
+          <Text bold>Created: </Text>
+          <Text dimColor>{formatDate(task.createdAt)}</Text>
+          <Text>  </Text>
+          <Text bold>Updated: </Text>
+          <Text dimColor>{formatDate(task.updatedAt)}</Text>
+        </Box>
+      </Box>
+
+      {/* Acceptance Criteria section */}
+      {acceptanceCriteria.length > 0 && (
+        <Box flexDirection="column" borderStyle="single" paddingX={1} paddingY={0} marginBottom={1}>
+          <Box marginBottom={0}>
+            <Text bold color="cyan">Acceptance Criteria</Text>
+          </Box>
+          {acceptanceCriteria.map((criterion, index) => (
+            <Box key={index}>
+              <Text dimColor>• </Text>
+              <Text>{criterion}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* Execution History section */}
+      <Box flexDirection="column" borderStyle="single" paddingX={1} paddingY={0} flexGrow={1}>
+        <Box marginBottom={0}>
+          <Text bold color="cyan">Execution History</Text>
+          {executions.length > 0 && (
+            <Text dimColor> ({executions.length} attempt{executions.length !== 1 ? 's' : ''})</Text>
+          )}
+        </Box>
+
+        {executions.length === 0 ? (
+          <Box>
+            <Text dimColor>No execution history for this task.</Text>
+          </Box>
+        ) : (
+          <Box flexDirection="column">
+            {/* Execution list header */}
+            <Box marginBottom={0}>
+              <Text bold dimColor>
+                <Text>{'#'.padEnd(4)}</Text>
+                <Text>{'Status'.padEnd(12)}</Text>
+                <Text>{'Started'.padEnd(20)}</Text>
+                <Text>{'Duration'.padEnd(12)}</Text>
+                <Text>Exit</Text>
+              </Text>
+            </Box>
+
+            {/* Execution rows */}
+            {executions.map((exec, index) => {
+              const execStatusColor = getExecutionStatusColor(exec.status);
+              const isFailed = exec.status === 'failed';
+              const isSelected = index === selectedExecutionIndex;
+              const isExpanded = index === expandedExecution;
+
+              return (
+                <Box key={exec.id} flexDirection="column">
+                  <Text inverse={isSelected} color={isFailed ? 'red' : undefined}>
+                    <Text>{String(index + 1).padEnd(4)}</Text>
+                    <Text color={execStatusColor} bold={isFailed}>
+                      {exec.status.charAt(0).toUpperCase() + exec.status.slice(1).padEnd(11)}
+                    </Text>
+                    <Text>{(exec.startedAt ? formatDate(exec.startedAt) : '-').padEnd(20)}</Text>
+                    <Text>{formatDuration(exec.startedAt, exec.completedAt).padEnd(12)}</Text>
+                    <Text>{exec.exitCode !== null ? String(exec.exitCode) : '-'}</Text>
+                  </Text>
+
+                  {/* Expanded output view */}
+                  {isExpanded && exec.ralphOutput && (
+                    <Box
+                      flexDirection="column"
+                      borderStyle="single"
+                      borderColor={isFailed ? 'red' : 'gray'}
+                      marginY={0}
+                      paddingX={1}
+                    >
+                      <Box>
+                        <Text bold dimColor>
+                          Output
+                          {exec.ralphOutput.split('\n').length > MAX_OUTPUT_LINES && (
+                            <Text>
+                              {' '}(lines {outputScrollOffset + 1}-
+                              {Math.min(outputScrollOffset + MAX_OUTPUT_LINES, exec.ralphOutput.split('\n').length)}
+                              {' of '}{exec.ralphOutput.split('\n').length}){' '}
+                              <Text color="cyan">↑↓: scroll  g/G: top/bottom</Text>
+                            </Text>
+                          )}
+                        </Text>
+                      </Box>
+                      {exec.ralphOutput
+                        .split('\n')
+                        .slice(outputScrollOffset, outputScrollOffset + MAX_OUTPUT_LINES)
+                        .map((line, lineIdx) => (
+                          <Text key={lineIdx} dimColor wrap="truncate">
+                            {line}
+                          </Text>
+                        ))}
+                    </Box>
+                  )}
+
+                  {/* Error log for failed executions */}
+                  {isExpanded && exec.errorLog && (
+                    <Box
+                      flexDirection="column"
+                      borderStyle="single"
+                      borderColor="red"
+                      marginY={0}
+                      paddingX={1}
+                    >
+                      <Box>
+                        <Text bold color="red">Error Log</Text>
+                      </Box>
+                      {exec.errorLog.split('\n').slice(0, 5).map((line, lineIdx) => (
+                        <Text key={lineIdx} color="red" wrap="truncate">
+                          {line}
+                        </Text>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * QueueView component - main task queue display
  */
 export function QueueView(): React.ReactElement {
@@ -335,6 +761,10 @@ export function QueueView(): React.ReactElement {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [activeFilterField, setActiveFilterField] = useState<FilterField | null>(null);
+
+  // Navigation and detail view state
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [detailTask, setDetailTask] = useState<TaskWithProject | null>(null);
 
   // Load tasks and project names, set up refresh interval
   useEffect(() => {
@@ -416,6 +846,11 @@ export function QueueView(): React.ReactElement {
 
   // Handle keyboard input
   useInput((input, key) => {
+    // If detail view is open, don't handle main view keys (detail view has its own handler)
+    if (detailTask) {
+      return;
+    }
+
     if (searchActive) {
       // Escape clears search and exits search mode
       if (key.escape) {
@@ -473,6 +908,22 @@ export function QueueView(): React.ReactElement {
         return;
       }
     }
+
+    // Arrow key navigation for task list
+    if (key.upArrow && selectedIndex > 0) {
+      setSelectedIndex(selectedIndex - 1);
+      return;
+    }
+    if (key.downArrow && selectedIndex < filteredTasks.length - 1) {
+      setSelectedIndex(selectedIndex + 1);
+      return;
+    }
+
+    // Enter opens detail view for selected task
+    if (key.return && filteredTasks.length > 0) {
+      setDetailTask(filteredTasks[selectedIndex]);
+      return;
+    }
   });
 
   if (loading) {
@@ -503,13 +954,30 @@ export function QueueView(): React.ReactElement {
   // Check if any filters are active (for messaging)
   const hasActiveFilters = statusFilter !== 'all' || typeFilter !== 'all' || searchTerm !== '';
 
+  // Handle closing detail view
+  const handleCloseDetail = useCallback(() => {
+    setDetailTask(null);
+  }, []);
+
+  // Reset selection when filter results change
+  useEffect(() => {
+    if (selectedIndex >= filteredTasks.length) {
+      setSelectedIndex(Math.max(0, filteredTasks.length - 1));
+    }
+  }, [filteredTasks.length, selectedIndex]);
+
+  // Render detail view if a task is selected
+  if (detailTask) {
+    return <TaskDetailView task={detailTask} onClose={handleCloseDetail} />;
+  }
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
       <Box paddingX={1} marginBottom={0}>
         <Text bold color="blue">Task Queue</Text>
         {!searchActive && (
-          <Text dimColor> — /: Search  Tab: filters</Text>
+          <Text dimColor> — /: Search  Tab: filters  ↑↓: select  Enter: details</Text>
         )}
       </Box>
 
@@ -554,6 +1022,7 @@ export function QueueView(): React.ReactElement {
               index={index}
               searchTerm={searchTerm}
               projectName={task.projectName}
+              selected={index === selectedIndex}
             />
           ))
         )}
