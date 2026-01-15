@@ -245,6 +245,21 @@ function createTables(db: DatabaseInstance): void {
     )
   `);
 
+  // Notifications table - user notifications for important events
+  // type: 'task_complete' | 'task_failed' | 'loop_complete' | 'approval_needed' | 'alert'
+  // severity: 'info' | 'warning' | 'critical'
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'alert',
+      title TEXT NOT NULL,
+      message TEXT,
+      severity TEXT NOT NULL DEFAULT 'info',
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Create indexes for common queries
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_projects_group_id ON projects(group_id);
@@ -264,6 +279,9 @@ function createTables(db: DatabaseInstance): void {
     CREATE INDEX IF NOT EXISTS idx_loops_status ON loops(status);
     CREATE INDEX IF NOT EXISTS idx_loop_iterations_loop_id ON loop_iterations(loop_id);
     CREATE INDEX IF NOT EXISTS idx_loop_iterations_status ON loop_iterations(status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+    CREATE INDEX IF NOT EXISTS idx_notifications_severity ON notifications(severity);
   `);
 }
 
