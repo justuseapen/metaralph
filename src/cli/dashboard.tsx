@@ -18,6 +18,7 @@ import { DeploymentStatusBar } from './components/DeploymentNotifications.js';
 import { ChatView } from './components/ChatView.js';
 import { LoopsView } from './components/LoopsView.js';
 import { HealthView } from './components/HealthView.js';
+import { ErrorBoundary } from './components/LoadingStates.js';
 import { initDatabase } from '../db/index.js';
 import { NotificationRepository, type Notification } from '../notifications/index.js';
 
@@ -206,24 +207,79 @@ function TabBar({ activeTab }: { activeTab: TabId }): React.ReactElement {
 }
 
 /**
- * Tab content component - renders the appropriate view for each tab
+ * Get user-friendly view name for error boundary display
  */
-function TabContent({ tab }: { tab: TabId }): React.ReactElement {
+function getViewName(tab: TabId): string {
   switch (tab) {
     case 'queue':
-      return <QueueView />;
+      return 'Task Queue';
     case 'approvals':
-      return <ApprovalView />;
+      return 'Approvals';
     case 'projects':
-      return <ProjectsView />;
+      return 'Projects';
     case 'workers':
-      return <WorkersView />;
+      return 'Workers';
     case 'health':
-      return <HealthView />;
+      return 'Health';
     case 'chat':
-      return <ChatView />;
+      return 'Chat';
     case 'loops':
-      return <LoopsView />;
+      return 'Loops';
+    default:
+      return 'View';
+  }
+}
+
+/**
+ * Tab content component - renders the appropriate view for each tab
+ * Each view is wrapped in an ErrorBoundary for graceful error handling
+ */
+function TabContent({ tab }: { tab: TabId }): React.ReactElement {
+  const viewName = getViewName(tab);
+
+  switch (tab) {
+    case 'queue':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <QueueView />
+        </ErrorBoundary>
+      );
+    case 'approvals':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <ApprovalView />
+        </ErrorBoundary>
+      );
+    case 'projects':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <ProjectsView />
+        </ErrorBoundary>
+      );
+    case 'workers':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <WorkersView />
+        </ErrorBoundary>
+      );
+    case 'health':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <HealthView />
+        </ErrorBoundary>
+      );
+    case 'chat':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <ChatView />
+        </ErrorBoundary>
+      );
+    case 'loops':
+      return (
+        <ErrorBoundary viewName={viewName}>
+          <LoopsView />
+        </ErrorBoundary>
+      );
     default:
       return (
         <Box flexGrow={1} flexDirection="column" paddingX={1}>
