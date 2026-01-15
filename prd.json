@@ -537,8 +537,8 @@
         "Typecheck passes"
       ],
       "priority": 35,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TAB_SHORTCUTS constant with per-tab shortcuts, Footer accepts activeTab prop, cyan color for tab-specific shortcuts, common shortcuts (q/? /!) always shown"
     }
   ]
 }

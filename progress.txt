@@ -741,3 +741,21 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Task types now show with color throughout: QueueView list, detail, ApprovalView, HealthView
   - Import with alias to avoid name conflicts: `formatTaskType as formatTypeWithColor`
 ---
+
+## 2026-01-15 - US-135
+- What was implemented: Added context-specific footer hints based on active tab
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added:
+    - TAB_SHORTCUTS constant mapping TabId to array of { key, label } shortcuts
+    - Footer component now accepts activeTab prop
+    - Context-specific shortcuts highlighted in cyan
+    - Common shortcuts (q:Quit ?:Help !:Alerts) always shown at start
+    - Tab numbers (1-7) shown at end
+    - React.Fragment used for mapping shortcut items with keys
+- **Learnings for future iterations:**
+  - Footer context hints pattern: define TAB_SHORTCUTS record with per-tab arrays
+  - Use cyan color for tab-specific shortcuts to distinguish from global shortcuts
+  - Common shortcuts should be shown first, then context-specific, then tab numbers
+  - Use key:Label format (e.g., "c:Create") for compact shortcut display
+  - React.Fragment is needed for proper key handling when mapping JSX elements
+---
