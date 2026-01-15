@@ -49,6 +49,64 @@ const TABS: Tab[] = [
 ];
 
 /**
+ * Badge counts for tabs that need attention indicators
+ */
+interface TabBadgeCounts {
+  queue: number;      // Pending tasks
+  approvals: number;  // Pending approvals
+  workers: number;    // Running workers
+  health: number;     // Critical alerts
+}
+
+/**
+ * Get badge counts for all tabs from the database
+ */
+function getTabBadgeCounts(): TabBadgeCounts {
+  const db = initDatabase();
+  try {
+    // Count pending tasks for Queue tab
+    const pendingTasks = db.prepare(`
+      SELECT COUNT(*) as count FROM tasks
+      WHERE status = 'pending' OR status = 'queued'
+    `).get() as { count: number };
+
+    // Count pending approvals for Approvals tab
+    const pendingApprovals = db.prepare(`
+      SELECT COUNT(*) as count FROM tasks
+      WHERE approval_status = 'pending' AND requires_approval = 1
+    `).get() as { count: number };
+
+    // Count running workers for Workers tab
+    const runningWorkers = db.prepare(`
+      SELECT COUNT(*) as count FROM workers
+      WHERE status = 'running' OR status = 'busy'
+    `).get() as { count: number };
+
+    // Count critical alerts for Health tab
+    let criticalAlerts = 0;
+    const tableExists = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'
+    `).get();
+    if (tableExists) {
+      const alerts = db.prepare(`
+        SELECT COUNT(*) as count FROM notifications
+        WHERE severity = 'critical' AND read = 0
+      `).get() as { count: number };
+      criticalAlerts = alerts.count;
+    }
+
+    return {
+      queue: pendingTasks.count,
+      approvals: pendingApprovals.count,
+      workers: runningWorkers.count,
+      health: criticalAlerts,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+/**
  * Notification counts for the notification bell
  */
 interface NotificationCounts {
@@ -183,13 +241,38 @@ function Header(): React.ReactElement {
 }
 
 /**
- * Tab bar component for navigation
+ * Get badge color based on tab and count
  */
-function TabBar({ activeTab }: { activeTab: TabId }): React.ReactElement {
+function getBadgeColor(tabId: TabId, count: number): string | undefined {
+  if (count === 0) return undefined;
+  switch (tabId) {
+    case 'queue':
+      return 'cyan';
+    case 'approvals':
+      return 'yellow';
+    case 'workers':
+      return 'green';
+    case 'health':
+      return 'red';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Tab bar component for navigation with badge counts
+ */
+function TabBar({ activeTab, badgeCounts }: { activeTab: TabId; badgeCounts: TabBadgeCounts }): React.ReactElement {
   return (
     <Box paddingY={1} gap={2}>
       {TABS.map((tab) => {
         const isActive = tab.id === activeTab;
+        // Get badge count for this tab (only certain tabs have badges)
+        const badgeCount = (tab.id in badgeCounts)
+          ? badgeCounts[tab.id as keyof TabBadgeCounts]
+          : 0;
+        const badgeColor = getBadgeColor(tab.id, badgeCount);
+
         return (
           <Box key={tab.id}>
             <Text
@@ -197,7 +280,13 @@ function TabBar({ activeTab }: { activeTab: TabId }): React.ReactElement {
               bold={isActive}
               inverse={isActive}
             >
-              {' '}[{tab.shortcut}]{tab.label} {' '}
+              {' '}[{tab.shortcut}]{tab.label}
+              {badgeCount > 0 && (
+                <Text color={isActive ? undefined : badgeColor} bold>
+                  {' '}({badgeCount})
+                </Text>
+              )}
+              {' '}
             </Text>
           </Box>
         );
@@ -707,13 +796,16 @@ function Dashboard(): React.ReactElement {
   const [showHelp, setShowHelp] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationCounts, setNotificationCounts] = useState<NotificationCounts>({ pendingApprovals: 0, failedTasks: 0, criticalAlerts: 0, total: 0 });
+  const [tabBadgeCounts, setTabBadgeCounts] = useState<TabBadgeCounts>({ queue: 0, approvals: 0, workers: 0, health: 0 });
 
-  // Load notification counts and refresh periodically
+  // Load notification counts, badge counts and refresh periodically
   useEffect(() => {
     setNotificationCounts(getNotificationCounts());
+    setTabBadgeCounts(getTabBadgeCounts());
 
     const interval = setInterval(() => {
       setNotificationCounts(getNotificationCounts());
+      setTabBadgeCounts(getTabBadgeCounts());
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -772,7 +864,7 @@ function Dashboard(): React.ReactElement {
   return (
     <Box flexDirection="column" height="100%">
       <Header />
-      <TabBar activeTab={activeTab} />
+      <TabBar activeTab={activeTab} badgeCounts={tabBadgeCounts} />
       <TabContent tab={activeTab} />
       <Footer />
     </Box>
