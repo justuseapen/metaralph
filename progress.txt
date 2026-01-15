@@ -110,3 +110,14 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Use useCallback for selection handler to avoid stale closures
   - Project context is passed to buildSystemPrompt() which includes project name, path, README, and structure
 ---
+
+## 2026-01-14 - US-106
+- What was implemented: Added Loops tab to dashboard navigation
+- Files changed:
+  - `src/cli/dashboard.tsx` - Added 'loops' to TabId, added Loops tab to TABS array with shortcut '0', added LoopsView to TabContent switch, updated Footer
+  - `src/cli/components/LoopsView.tsx` - Created new component with placeholder content
+- **Learnings for future iterations:**
+  - Adding a new tab requires 4 changes: TabId type, TABS array, TabContent case, Footer shortcut
+  - Loops tab uses shortcut '0' (zero) - consistent with pattern of single-digit shortcuts
+  - LoopsView follows same pattern as other views: export function XView(): React.ReactElement
+---

@@ -92,8 +92,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Loops tab with shortcut '0' added to dashboard, LoopsView component created"
     },
     {
       "id": "US-107",
