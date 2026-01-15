@@ -3,13 +3,39 @@
  *
  * Shows tasks in a table with: Priority, ID, Project, Type, Status
  * Automatically refreshes when data changes.
+ * Supports filtering by status and type, with Tab key to cycle filters.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { TaskRepository, type Task, type TaskStatus } from '../../queue/index.js';
+import { TaskRepository, type Task, type TaskStatus, type TaskType } from '../../queue/index.js';
 import { getProject, listProjects } from '../../registry/index.js';
+
+/**
+ * Status filter options for the filter bar
+ */
+type StatusFilter = 'all' | TaskStatus;
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'running', label: 'Running' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'failed', label: 'Failed' },
+];
+
+/**
+ * Type filter options for the filter bar
+ */
+type TypeFilter = 'all' | TaskType;
+const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'feature', label: 'Feature' },
+  { value: 'bug_fix', label: 'Bug' },
+  { value: 'test', label: 'Test' },
+  { value: 'docs', label: 'Docs' },
+  { value: 'refactor', label: 'Refactor' },
+];
 
 /**
  * Format a task status for display
@@ -207,6 +233,94 @@ function SearchInput({
 }
 
 /**
+ * Filter field types for Tab key cycling
+ */
+type FilterField = 'status' | 'type';
+
+/**
+ * FilterBar component - Shows status and type filters at top of QueueView
+ */
+function FilterBar({
+  statusFilter,
+  typeFilter,
+  activeField,
+  onStatusChange,
+  onTypeChange,
+  totalCount,
+  filteredCount,
+}: {
+  statusFilter: StatusFilter;
+  typeFilter: TypeFilter;
+  activeField: FilterField | null;
+  onStatusChange: (status: StatusFilter) => void;
+  onTypeChange: (type: TypeFilter) => void;
+  totalCount: number;
+  filteredCount: number;
+}): React.ReactElement {
+  return (
+    <Box paddingX={1} marginBottom={1} flexDirection="row" gap={2}>
+      {/* Status filter */}
+      <Box>
+        <Text bold={activeField === 'status'} color={activeField === 'status' ? 'cyan' : undefined}>
+          Status:{' '}
+        </Text>
+        {STATUS_FILTERS.map((filter, index) => {
+          const isSelected = statusFilter === filter.value;
+          const isActive = activeField === 'status';
+          return (
+            <Text key={filter.value}>
+              {index > 0 && <Text dimColor> | </Text>}
+              <Text
+                bold={isSelected}
+                color={isSelected ? 'green' : isActive ? 'white' : 'gray'}
+                inverse={isSelected && isActive}
+              >
+                {filter.label}
+              </Text>
+            </Text>
+          );
+        })}
+      </Box>
+
+      {/* Type filter */}
+      <Box marginLeft={2}>
+        <Text bold={activeField === 'type'} color={activeField === 'type' ? 'cyan' : undefined}>
+          Type:{' '}
+        </Text>
+        {TYPE_FILTERS.map((filter, index) => {
+          const isSelected = typeFilter === filter.value;
+          const isActive = activeField === 'type';
+          return (
+            <Text key={filter.value}>
+              {index > 0 && <Text dimColor> | </Text>}
+              <Text
+                bold={isSelected}
+                color={isSelected ? 'green' : isActive ? 'white' : 'gray'}
+                inverse={isSelected && isActive}
+              >
+                {filter.label}
+              </Text>
+            </Text>
+          );
+        })}
+      </Box>
+
+      {/* Filter count */}
+      <Box marginLeft={2}>
+        <Text dimColor>
+          Showing {filteredCount} of {totalCount}
+        </Text>
+      </Box>
+
+      {/* Tab hint */}
+      <Box marginLeft={2}>
+        <Text dimColor>Tab: cycle filters</Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * QueueView component - main task queue display
  */
 export function QueueView(): React.ReactElement {
@@ -216,6 +330,11 @@ export function QueueView(): React.ReactElement {
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState(''); // Debounced search term
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [activeFilterField, setActiveFilterField] = useState<FilterField | null>(null);
 
   // Load tasks and project names, set up refresh interval
   useEffect(() => {
@@ -268,17 +387,32 @@ export function QueueView(): React.ReactElement {
     };
   }, []);
 
-  // Filter tasks based on search term
-  const filteredTasks = searchTerm
-    ? tasks.filter(task => {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          task.title.toLowerCase().includes(searchLower) ||
-          task.projectName.toLowerCase().includes(searchLower) ||
-          formatType(task.type).toLowerCase().includes(searchLower)
-        );
-      })
-    : tasks;
+  // Filter tasks based on search term and filters
+  const filteredTasks = tasks.filter(task => {
+    // Apply status filter
+    if (statusFilter !== 'all' && task.status !== statusFilter) {
+      return false;
+    }
+
+    // Apply type filter
+    if (typeFilter !== 'all' && task.type !== typeFilter) {
+      return false;
+    }
+
+    // Apply search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        task.title.toLowerCase().includes(searchLower) ||
+        task.projectName.toLowerCase().includes(searchLower) ||
+        formatType(task.type).toLowerCase().includes(searchLower);
+      if (!matchesSearch) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   // Handle keyboard input
   useInput((input, key) => {
@@ -300,6 +434,44 @@ export function QueueView(): React.ReactElement {
     if (input === '/') {
       setSearchActive(true);
       return;
+    }
+
+    // Tab key cycles through filter fields (null -> status -> type -> null)
+    if (key.tab) {
+      if (activeFilterField === null) {
+        setActiveFilterField('status');
+      } else if (activeFilterField === 'status') {
+        setActiveFilterField('type');
+      } else {
+        setActiveFilterField(null);
+      }
+      return;
+    }
+
+    // Escape deactivates filter field
+    if (key.escape && activeFilterField !== null) {
+      setActiveFilterField(null);
+      return;
+    }
+
+    // Arrow keys change filter values when a filter field is active
+    if (activeFilterField !== null) {
+      if (key.leftArrow || key.rightArrow) {
+        if (activeFilterField === 'status') {
+          const currentIndex = STATUS_FILTERS.findIndex(f => f.value === statusFilter);
+          const newIndex = key.rightArrow
+            ? (currentIndex + 1) % STATUS_FILTERS.length
+            : (currentIndex - 1 + STATUS_FILTERS.length) % STATUS_FILTERS.length;
+          setStatusFilter(STATUS_FILTERS[newIndex].value);
+        } else if (activeFilterField === 'type') {
+          const currentIndex = TYPE_FILTERS.findIndex(f => f.value === typeFilter);
+          const newIndex = key.rightArrow
+            ? (currentIndex + 1) % TYPE_FILTERS.length
+            : (currentIndex - 1 + TYPE_FILTERS.length) % TYPE_FILTERS.length;
+          setTypeFilter(TYPE_FILTERS[newIndex].value);
+        }
+        return;
+      }
     }
   });
 
@@ -328,15 +500,29 @@ export function QueueView(): React.ReactElement {
     );
   }
 
+  // Check if any filters are active (for messaging)
+  const hasActiveFilters = statusFilter !== 'all' || typeFilter !== 'all' || searchTerm !== '';
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
-      <Box paddingX={1} marginBottom={searchActive ? 0 : 1}>
+      <Box paddingX={1} marginBottom={0}>
         <Text bold color="blue">Task Queue</Text>
         {!searchActive && (
-          <Text dimColor> ({tasks.length} task{tasks.length !== 1 ? 's' : ''}) — /: Search</Text>
+          <Text dimColor> — /: Search  Tab: filters</Text>
         )}
       </Box>
+
+      {/* Filter bar */}
+      <FilterBar
+        statusFilter={statusFilter}
+        typeFilter={typeFilter}
+        activeField={activeFilterField}
+        onStatusChange={setStatusFilter}
+        onTypeChange={setTypeFilter}
+        totalCount={tasks.length}
+        filteredCount={filteredTasks.length}
+      />
 
       {/* Search input when active */}
       {searchActive && (
@@ -353,7 +539,12 @@ export function QueueView(): React.ReactElement {
       <Box flexDirection="column" borderStyle="single" borderTop={false}>
         {filteredTasks.length === 0 ? (
           <Box paddingX={1} paddingY={1}>
-            <Text dimColor>No tasks match "{searchTerm}"</Text>
+            <Text dimColor>
+              No tasks match current filters
+              {searchTerm && ` (search: "${searchTerm}")`}
+              {statusFilter !== 'all' && ` (status: ${statusFilter})`}
+              {typeFilter !== 'all' && ` (type: ${TYPE_FILTERS.find(f => f.value === typeFilter)?.label})`}
+            </Text>
           </Box>
         ) : (
           filteredTasks.map((task, index) => (
