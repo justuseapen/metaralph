@@ -1266,6 +1266,28 @@ export function QueueView(): React.ReactElement {
     }
   });
 
+  // Handle closing detail view
+  const handleCloseDetail = useCallback(() => {
+    setDetailTask(null);
+  }, []);
+
+  // Handle closing quick create dialog
+  const handleCloseQuickCreate = useCallback(() => {
+    setShowQuickCreate(false);
+  }, []);
+
+  // Handle task creation - triggers refresh
+  const handleTaskCreated = useCallback(() => {
+    // Task list will refresh automatically via the interval
+  }, []);
+
+  // Reset selection when filter results change
+  useEffect(() => {
+    if (selectedIndex >= filteredTasks.length) {
+      setSelectedIndex(Math.max(0, filteredTasks.length - 1));
+    }
+  }, [filteredTasks.length, selectedIndex]);
+
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1}>
@@ -1298,28 +1320,6 @@ export function QueueView(): React.ReactElement {
 
   // Check if any filters are active (for messaging)
   const hasActiveFilters = statusFilter !== 'all' || typeFilter !== 'all' || searchTerm !== '';
-
-  // Handle closing detail view
-  const handleCloseDetail = useCallback(() => {
-    setDetailTask(null);
-  }, []);
-
-  // Handle closing quick create dialog
-  const handleCloseQuickCreate = useCallback(() => {
-    setShowQuickCreate(false);
-  }, []);
-
-  // Handle task creation - triggers refresh
-  const handleTaskCreated = useCallback(() => {
-    // Task list will refresh automatically via the interval
-  }, []);
-
-  // Reset selection when filter results change
-  useEffect(() => {
-    if (selectedIndex >= filteredTasks.length) {
-      setSelectedIndex(Math.max(0, filteredTasks.length - 1));
-    }
-  }, [filteredTasks.length, selectedIndex]);
 
   // Render detail view if a task is selected
   if (detailTask) {
