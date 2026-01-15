@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, Key } from 'ink';
+import TextInput from 'ink-text-input';
 import { initDatabase, type DatabaseInstance } from '../../db/index.js';
 import { listProjects, type Project } from '../../registry/index.js';
 import { TaskRepository, type Task, type TaskType } from '../../queue/task.js';
@@ -246,14 +247,87 @@ function ProposalRow({
 }
 
 /**
+ * Reject dialog component
+ */
+function RejectDialog({
+  proposal,
+  onReject,
+  onCancel,
+}: {
+  proposal: ProposalWithRisk;
+  onReject: (reason: string) => void;
+  onCancel: () => void;
+}): React.ReactElement {
+  const [reason, setReason] = useState('');
+
+  useInput((input: string, key: Key) => {
+    if (key.escape) {
+      onCancel();
+      return;
+    }
+    if (key.return && reason.trim().length > 0) {
+      onReject(reason.trim());
+      return;
+    }
+  });
+
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1} paddingY={1}>
+      <Text bold color="red">Reject Proposal</Text>
+      <Box marginTop={1}>
+        <Text>Rejecting: </Text>
+        <Text color="cyan">{proposal.task.title}</Text>
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Text color="gray">Please provide a reason for rejection:</Text>
+        <Box marginTop={1}>
+          <Text color="yellow">&gt; </Text>
+          <TextInput
+            value={reason}
+            onChange={setReason}
+            placeholder="Enter rejection reason..."
+          />
+        </Box>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color="gray">
+          Enter: Reject with reason | ESC: Cancel
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * Proposal detail view
  */
 function ProposalDetailView({
   proposal,
+  onApprove,
+  onReject,
+  showRejectDialog,
+  onCancelReject,
 }: {
   proposal: ProposalWithRisk;
+  onApprove: () => void;
+  onReject: (reason: string) => void;
+  showRejectDialog: boolean;
+  onCancelReject: () => void;
 }): React.ReactElement {
   const riskColor = getRiskColor(proposal.riskAssessment.score);
+
+  // Show reject dialog if active
+  if (showRejectDialog) {
+    return (
+      <RejectDialog
+        proposal={proposal}
+        onReject={onReject}
+        onCancel={onCancelReject}
+      />
+    );
+  }
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={riskColor} paddingX={1}>
@@ -303,9 +377,19 @@ function ProposalDetailView({
         </Box>
       )}
 
+      {/* Action buttons */}
+      <Box marginTop={1} flexDirection="row" gap={2}>
+        <Box borderStyle="round" borderColor="green" paddingX={1}>
+          <Text color="green" bold>a: Approve</Text>
+        </Box>
+        <Box borderStyle="round" borderColor="red" paddingX={1}>
+          <Text color="red" bold>r: Reject</Text>
+        </Box>
+      </Box>
+
       <Box marginTop={1}>
         <Text color="gray">
-          Press ESC to go back | a: Approve | r: Reject
+          ESC: Go back | a: Approve and queue for execution | r: Reject with reason
         </Text>
       </Box>
     </Box>
@@ -320,11 +404,19 @@ function ProposalListSection({
   loading,
   selectedIndex,
   showDetail,
+  showRejectDialog,
+  onApprove,
+  onReject,
+  onCancelReject,
 }: {
   proposals: ProposalWithRisk[];
   loading: boolean;
   selectedIndex: number;
   showDetail: boolean;
+  showRejectDialog: boolean;
+  onApprove: () => void;
+  onReject: (reason: string) => void;
+  onCancelReject: () => void;
 }): React.ReactElement {
   if (loading) {
     return (
@@ -348,7 +440,13 @@ function ProposalListSection({
   if (showDetail && proposals[selectedIndex]) {
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <ProposalDetailView proposal={proposals[selectedIndex]} />
+        <ProposalDetailView
+          proposal={proposals[selectedIndex]}
+          onApprove={onApprove}
+          onReject={onReject}
+          showRejectDialog={showRejectDialog}
+          onCancelReject={onCancelReject}
+        />
       </Box>
     );
   }
@@ -407,7 +505,9 @@ export function HealthView(): React.ReactElement {
   const [proposalsLoading, setProposalsLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [projectMap, setProjectMap] = useState<Map<string, Project>>(new Map());
+  const [actionMessage, setActionMessage] = useState<{ text: string; color: string } | null>(null);
 
   // Load projects for name lookup
   const loadProjects = useCallback(() => {
@@ -554,6 +654,84 @@ export function HealthView(): React.ReactElement {
     loadProposals(map);
   }, [loadProjects, loadSelfImprovementData, loadProposals]);
 
+  // Handle approve action
+  const handleApprove = useCallback(() => {
+    const selectedProposal = proposals[selectedIndex];
+    if (!selectedProposal) return;
+
+    const db = initDatabase();
+    try {
+      // Update approval status to 'approved' - this also sets task status to 'queued'
+      TaskRepository.updateApprovalStatus(selectedProposal.task.id, 'approved', db);
+
+      // Show success message
+      setActionMessage({
+        text: `✓ Approved: "${selectedProposal.task.title}" - Queued for execution`,
+        color: 'green',
+      });
+
+      // Clear message after 3 seconds
+      setTimeout(() => setActionMessage(null), 3000);
+
+      // Exit detail view and refresh
+      setShowDetail(false);
+      setShowRejectDialog(false);
+      loadAllData();
+    } catch (error) {
+      console.error('Error approving proposal:', error);
+      setActionMessage({
+        text: `✗ Error approving proposal: ${error}`,
+        color: 'red',
+      });
+      setTimeout(() => setActionMessage(null), 3000);
+    } finally {
+      db.close();
+    }
+  }, [proposals, selectedIndex, loadAllData]);
+
+  // Handle reject action
+  const handleReject = useCallback((reason: string) => {
+    const selectedProposal = proposals[selectedIndex];
+    if (!selectedProposal) return;
+
+    const db = initDatabase();
+    try {
+      // Update approval status to 'rejected'
+      TaskRepository.updateApprovalStatus(selectedProposal.task.id, 'rejected', db);
+
+      // Also update the task status to reflect rejection
+      TaskRepository.updateStatus(selectedProposal.task.id, 'failed', db);
+
+      // Show success message with rejection reason
+      setActionMessage({
+        text: `✗ Rejected: "${selectedProposal.task.title}" - Reason: ${reason}`,
+        color: 'yellow',
+      });
+
+      // Clear message after 3 seconds
+      setTimeout(() => setActionMessage(null), 3000);
+
+      // Exit detail view and refresh
+      setShowDetail(false);
+      setShowRejectDialog(false);
+      loadAllData();
+    } catch (error) {
+      console.error('Error rejecting proposal:', error);
+      setActionMessage({
+        text: `✗ Error rejecting proposal: ${error}`,
+        color: 'red',
+      });
+      setTimeout(() => setActionMessage(null), 3000);
+    } finally {
+      db.close();
+    }
+  }, [proposals, selectedIndex, loadAllData]);
+
+  // Handle cancel reject dialog
+  const handleCancelReject = useCallback(() => {
+    setShowRejectDialog(false);
+  }, []);
+
   // Initial load and periodic refresh
   useEffect(() => {
     loadAllData();
@@ -571,11 +749,31 @@ export function HealthView(): React.ReactElement {
 
   // Handle keyboard input
   useInput((input: string, key: Key) => {
-    // Global refresh
+    // Don't handle keys when reject dialog is open (handled by RejectDialog)
+    if (showRejectDialog) {
+      return;
+    }
+
+    // Global refresh (only when not in detail view)
     if (input === 'r' && !showDetail) {
       setLoading(true);
       setProposalsLoading(true);
       loadAllData();
+      return;
+    }
+
+    // Approve selected proposal ('a' key)
+    if (input === 'a' && proposals.length > 0) {
+      handleApprove();
+      return;
+    }
+
+    // Reject selected proposal ('r' key in detail view or list view with selection)
+    if (input === 'r' && proposals.length > 0 && (showDetail || selectedIndex >= 0)) {
+      setShowRejectDialog(true);
+      if (!showDetail) {
+        setShowDetail(true); // Enter detail view to show reject dialog
+      }
       return;
     }
 
@@ -604,19 +802,32 @@ export function HealthView(): React.ReactElement {
 
   return (
     <Box flexDirection="column" padding={1} flexGrow={1}>
+      {/* Action message banner */}
+      {actionMessage && (
+        <Box marginBottom={1} borderStyle="round" borderColor={actionMessage.color} paddingX={1}>
+          <Text color={actionMessage.color}>{actionMessage.text}</Text>
+        </Box>
+      )}
+
       <SelfImprovementSection status={selfImprovementStatus} loading={loading} />
       <ProposalListSection
         proposals={proposals}
         loading={proposalsLoading}
         selectedIndex={selectedIndex}
         showDetail={showDetail}
+        showRejectDialog={showRejectDialog}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onCancelReject={handleCancelReject}
       />
       <HealthOverviewSection />
 
       {/* Footer with shortcuts */}
       <Box marginTop={1}>
         <Text color="gray">
-          r: Refresh | ↑↓: Navigate proposals | Enter: View details | ESC: Back | Number keys: Switch tabs
+          {showDetail
+            ? 'a: Approve | r: Reject | ESC: Back'
+            : 'r: Refresh | ↑↓: Navigate | Enter: Details | a: Approve | Number keys: Switch tabs'}
         </Text>
       </Box>
     </Box>
