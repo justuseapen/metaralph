@@ -468,3 +468,28 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Text component doesn't have marginTop prop in Ink - use Box wrapper instead
   - Border styles available: 'round', 'single', etc. - use 'round' for sections
 ---
+
+## 2026-01-14 - US-122
+- What was implemented: Added self-improvement proposal list to HealthView
+- Files changed:
+  - `src/cli/components/HealthView.tsx` - Major enhancements:
+    - Added ProposalWithRisk interface for proposals with RiskAssessment data
+    - Added ProposalListHeader component for table header
+    - Added ProposalRow component with risk-based color coding
+    - Added ProposalDetailView component showing full proposal details
+    - Added ProposalListSection with loading, empty, list, and detail states
+    - Risk color coding: green (<40), yellow (40-70), red (>70)
+    - Arrow key navigation for proposal selection
+    - Enter opens detail view, ESC returns to list
+    - Shows title, type, risk score, project in list view
+    - Detail view shows risk factors, affected files, description
+    - Integrated Guardrails.assessTaskRisk() for risk assessment
+    - Loads proposals from tasks table with source='self_improvement' and approval_status='pending'
+- **Learnings for future iterations:**
+  - Use Guardrails.assessTaskRisk(task, projectPath) from self-improve module for risk scoring
+  - RiskAssessment has: score (0-100), level ('low'|'medium'|'high'|'critical'), reasons[], affectedFiles[]
+  - Color coding pattern: green for low risk, yellow for medium, red for high - same as getRiskColor()
+  - For proposal lists: store projectName with proposal for display, get via projectMap lookup
+  - Detail views can share state with parent (showDetail) or use callback pattern
+  - Import Key type from 'ink' for proper type checking of useInput key parameter
+---

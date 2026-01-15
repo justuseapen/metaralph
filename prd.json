@@ -341,8 +341,8 @@
         "Typecheck passes"
       ],
       "priority": 22,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ProposalListSection, ProposalRow, ProposalDetailView components added with Guardrails.assessTaskRisk() integration"
     },
     {
       "id": "US-123",
