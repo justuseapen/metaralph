@@ -209,6 +209,16 @@ function LoopRow({ loop, selected }: LoopRowProps): React.ReactElement {
           <Text dimColor>
             └ Working on: <Text color="cyan">{storyProgress.currentStory.id}</Text>
             {' - '}{truncate(storyProgress.currentStory.title, 40)}
+            <Text color="yellow"> (press 'p' to pause)</Text>
+          </Text>
+        </Box>
+      )}
+
+      {/* Show paused indicator when selected */}
+      {selected && loop.status === 'paused' && (
+        <Box marginLeft={2} marginTop={0}>
+          <Text color="yellow">
+            └ Paused - press 'r' to resume
           </Text>
         </Box>
       )}
@@ -782,6 +792,36 @@ export function LoopsView(): React.ReactElement {
     }
   }, [loops.length, selectedIndex]);
 
+  // Handle pause loop
+  const handlePauseLoop = useCallback(() => {
+    const loop = loops[selectedIndex];
+    if (!loop || loop.status !== 'running') return;
+
+    try {
+      const success = LoopRunner.pause(loop.id);
+      if (success) {
+        loadLoops(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Failed to pause loop:', error);
+    }
+  }, [loops, selectedIndex, loadLoops]);
+
+  // Handle resume loop
+  const handleResumeLoop = useCallback(() => {
+    const loop = loops[selectedIndex];
+    if (!loop || loop.status !== 'paused') return;
+
+    try {
+      const result = LoopRunner.resume(loop.id, { tool: 'claude' });
+      if (result.success) {
+        loadLoops(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Failed to resume loop:', error);
+    }
+  }, [loops, selectedIndex, loadLoops]);
+
   useInput((input, key) => {
     // Don't handle input if showing detail view or create dialog
     if (detailLoop || showCreateDialog) return;
@@ -790,6 +830,12 @@ export function LoopsView(): React.ReactElement {
       // Open create dialog
       loadProjects(); // Refresh projects list
       setShowCreateDialog(true);
+    } else if (input === 'p') {
+      // Pause the selected running loop
+      handlePauseLoop();
+    } else if (input === 'r') {
+      // Resume the selected paused loop
+      handleResumeLoop();
     } else if (key.upArrow && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
     } else if (key.downArrow && selectedIndex < loops.length - 1) {
@@ -854,7 +900,7 @@ export function LoopsView(): React.ReactElement {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">Ralph Loops</Text>
-        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ to navigate, Enter to view, n to create</Text>
+        <Text dimColor> ({loops.length} loop{loops.length !== 1 ? 's' : ''}) - ↑/↓ navigate, Enter view, n new, p pause, r resume</Text>
       </Box>
 
       <LoopListHeader />
