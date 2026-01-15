@@ -47,8 +47,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ChatInput component added with ink-text-input, enter/ctrl+enter submit, escape clear, character count"
     },
     {
       "id": "US-104",
