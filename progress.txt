@@ -565,3 +565,18 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Notification counts aggregated from multiple sources: tasks table for approvals/failures, notifications table for alerts
   - NotificationListOverlay follows same pattern as ShortcutHelpOverlay: conditional render in Dashboard
 ---
+
+## 2026-01-15 - US-126
+- What was implemented: Created notifications database table and NotificationRepository
+- Files changed:
+  - `src/db/index.ts` - Added notifications table with columns: id, type, title, message, severity, read, created_at
+  - Added indexes: idx_notifications_type, idx_notifications_read, idx_notifications_severity
+  - `src/notifications/repository.ts` - New file with NotificationRepository providing CRUD operations
+  - `src/notifications/index.ts` - Module exports for Notification types and repository
+- **Learnings for future iterations:**
+  - Notification types: 'task_complete' | 'task_failed' | 'loop_complete' | 'approval_needed' | 'alert'
+  - Notification severity: 'info' | 'warning' | 'critical'
+  - NotificationRepository follows same pattern as LoopRepository - const object with methods
+  - read column uses INTEGER (0/1) in SQLite, converted to boolean in interface
+  - Repository includes utility methods: countUnread(), countBySeverity(), markAllAsRead(), deleteOld()
+---
