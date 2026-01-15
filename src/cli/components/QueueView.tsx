@@ -9,9 +9,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { TaskRepository, type Task, type TaskStatus, type TaskType } from '../../queue/index.js';
+import { TaskRepository, type Task, type TaskStatus, type TaskType, type EffortLevel } from '../../queue/index.js';
 import { ExecutionRepository, type Execution } from '../../workers/index.js';
-import { getProject, listProjects } from '../../registry/index.js';
+import { getProject, listProjects, type Project } from '../../registry/index.js';
 
 /**
  * Status filter options for the filter bar
@@ -747,6 +747,319 @@ function TaskDetailView({ task, onClose }: TaskDetailViewProps): React.ReactElem
 }
 
 /**
+ * Infer task type from title keywords
+ */
+function inferTaskType(title: string): TaskType {
+  const lowerTitle = title.toLowerCase();
+
+  // Bug/fix keywords
+  if (lowerTitle.includes('fix') || lowerTitle.includes('bug') || lowerTitle.includes('error') ||
+      lowerTitle.includes('broken') || lowerTitle.includes('crash') || lowerTitle.includes('issue')) {
+    return 'bug_fix';
+  }
+
+  // Test keywords
+  if (lowerTitle.includes('test') || lowerTitle.includes('spec') || lowerTitle.includes('coverage')) {
+    return 'test';
+  }
+
+  // Documentation keywords
+  if (lowerTitle.includes('doc') || lowerTitle.includes('readme') || lowerTitle.includes('comment') ||
+      lowerTitle.includes('jsdoc') || lowerTitle.includes('tsdoc')) {
+    return 'docs';
+  }
+
+  // Refactor keywords
+  if (lowerTitle.includes('refactor') || lowerTitle.includes('cleanup') || lowerTitle.includes('clean up') ||
+      lowerTitle.includes('reorganize') || lowerTitle.includes('restructure') || lowerTitle.includes('simplify')) {
+    return 'refactor';
+  }
+
+  // Default to feature
+  return 'feature';
+}
+
+/**
+ * Fields for quick task creation
+ */
+type QuickCreateField = 'title' | 'project' | 'type' | 'effort';
+const QUICK_CREATE_FIELDS: QuickCreateField[] = ['title', 'project', 'type', 'effort'];
+
+/**
+ * Effort level options for quick create
+ */
+const EFFORT_OPTIONS: { value: EffortLevel; label: string }[] = [
+  { value: 'quick_win', label: 'Quick Win' },
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+];
+
+/**
+ * Task type options for quick create
+ */
+const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
+  { value: 'feature', label: 'Feature' },
+  { value: 'bug_fix', label: 'Bug Fix' },
+  { value: 'test', label: 'Test' },
+  { value: 'docs', label: 'Docs' },
+  { value: 'refactor', label: 'Refactor' },
+];
+
+/**
+ * Props for QuickCreateDialog
+ */
+interface QuickCreateDialogProps {
+  projects: Project[];
+  onClose: () => void;
+  onCreate: () => void;
+}
+
+/**
+ * Quick task creation dialog - minimal fields with smart defaults
+ */
+function QuickCreateDialog({ projects, onClose, onCreate }: QuickCreateDialogProps): React.ReactElement {
+  const [activeField, setActiveField] = useState<QuickCreateField>('title');
+  const [title, setTitle] = useState('');
+  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
+  const [selectedTypeIndex, setSelectedTypeIndex] = useState(0);
+  const [selectedEffortIndex, setSelectedEffortIndex] = useState(1); // Default to 'small'
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+
+  // Auto-select project if only one registered
+  useEffect(() => {
+    if (projects.length === 1) {
+      setSelectedProjectIndex(0);
+    }
+  }, [projects.length]);
+
+  // Auto-infer type from title when title changes
+  useEffect(() => {
+    if (title.length > 3) {
+      const inferredType = inferTaskType(title);
+      const typeIndex = TASK_TYPE_OPTIONS.findIndex(t => t.value === inferredType);
+      if (typeIndex !== -1) {
+        setSelectedTypeIndex(typeIndex);
+      }
+    }
+  }, [title]);
+
+  const handleCreate = useCallback(() => {
+    if (!title.trim()) {
+      return; // Title is required
+    }
+
+    const project = projects[selectedProjectIndex];
+    if (!project) {
+      return; // Project is required
+    }
+
+    try {
+      TaskRepository.create({
+        projectId: project.id,
+        type: TASK_TYPE_OPTIONS[selectedTypeIndex].value,
+        title: title.trim(),
+        source: 'manual',
+        estimatedEffort: EFFORT_OPTIONS[selectedEffortIndex].value,
+      });
+      onCreate();
+      onClose();
+    } catch (error) {
+      // Error creating task
+      console.error('Failed to create task:', error);
+    }
+  }, [title, projects, selectedProjectIndex, selectedTypeIndex, selectedEffortIndex, onCreate, onClose]);
+
+  useInput((input, key) => {
+    // Escape closes dialog
+    if (key.escape) {
+      onClose();
+      return;
+    }
+
+    // Enter submits (creates task)
+    if (key.return && !showProjectDropdown) {
+      handleCreate();
+      return;
+    }
+
+    // Tab cycles through fields
+    if (key.tab) {
+      const currentIndex = QUICK_CREATE_FIELDS.indexOf(activeField);
+      const nextIndex = key.shift
+        ? (currentIndex - 1 + QUICK_CREATE_FIELDS.length) % QUICK_CREATE_FIELDS.length
+        : (currentIndex + 1) % QUICK_CREATE_FIELDS.length;
+      setActiveField(QUICK_CREATE_FIELDS[nextIndex]);
+      setShowProjectDropdown(false);
+      return;
+    }
+
+    // Handle project dropdown
+    if (activeField === 'project') {
+      if (key.return) {
+        setShowProjectDropdown(!showProjectDropdown);
+        return;
+      }
+      if (showProjectDropdown) {
+        if (key.upArrow && selectedProjectIndex > 0) {
+          setSelectedProjectIndex(selectedProjectIndex - 1);
+        } else if (key.downArrow && selectedProjectIndex < projects.length - 1) {
+          setSelectedProjectIndex(selectedProjectIndex + 1);
+        } else if (key.return) {
+          setShowProjectDropdown(false);
+        }
+        return;
+      }
+    }
+
+    // Arrow keys change dropdown values when on type or effort fields
+    if (activeField === 'type') {
+      if (key.leftArrow || key.upArrow) {
+        setSelectedTypeIndex((selectedTypeIndex - 1 + TASK_TYPE_OPTIONS.length) % TASK_TYPE_OPTIONS.length);
+      } else if (key.rightArrow || key.downArrow) {
+        setSelectedTypeIndex((selectedTypeIndex + 1) % TASK_TYPE_OPTIONS.length);
+      }
+      return;
+    }
+
+    if (activeField === 'effort') {
+      if (key.leftArrow || key.upArrow) {
+        setSelectedEffortIndex((selectedEffortIndex - 1 + EFFORT_OPTIONS.length) % EFFORT_OPTIONS.length);
+      } else if (key.rightArrow || key.downArrow) {
+        setSelectedEffortIndex((selectedEffortIndex + 1) % EFFORT_OPTIONS.length);
+      }
+      return;
+    }
+  });
+
+  const selectedProject = projects[selectedProjectIndex];
+
+  return (
+    <Box flexDirection="column" borderStyle="double" borderColor="cyan" padding={1}>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color="cyan">Quick Create Task</Text>
+        <Text dimColor> — Tab: next field  Enter: create  Escape: cancel</Text>
+      </Box>
+
+      {/* Title field - required */}
+      <Box marginBottom={1}>
+        <Box width={12}>
+          <Text bold={activeField === 'title'} color={activeField === 'title' ? 'cyan' : undefined}>
+            Title:
+          </Text>
+        </Box>
+        <Box flexGrow={1}>
+          {activeField === 'title' ? (
+            <TextInput
+              value={title}
+              onChange={setTitle}
+              placeholder="Enter task title (required)..."
+            />
+          ) : (
+            <Text>{title || <Text dimColor>No title</Text>}</Text>
+          )}
+        </Box>
+        {!title && <Text color="red">*</Text>}
+      </Box>
+
+      {/* Project field */}
+      <Box marginBottom={1} flexDirection="column">
+        <Box>
+          <Box width={12}>
+            <Text bold={activeField === 'project'} color={activeField === 'project' ? 'cyan' : undefined}>
+              Project:
+            </Text>
+          </Box>
+          <Box flexGrow={1}>
+            <Text inverse={activeField === 'project' && !showProjectDropdown}>
+              {selectedProject?.name || 'No project selected'}
+            </Text>
+            {activeField === 'project' && (
+              <Text dimColor> (Enter to {showProjectDropdown ? 'confirm' : 'change'})</Text>
+            )}
+          </Box>
+          {projects.length === 1 && <Text dimColor> (auto)</Text>}
+        </Box>
+
+        {/* Project dropdown */}
+        {showProjectDropdown && (
+          <Box flexDirection="column" marginLeft={12} marginTop={0}>
+            {projects.map((project, index) => (
+              <Text key={project.id} inverse={index === selectedProjectIndex}>
+                {project.name}
+              </Text>
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      {/* Type field */}
+      <Box marginBottom={1}>
+        <Box width={12}>
+          <Text bold={activeField === 'type'} color={activeField === 'type' ? 'cyan' : undefined}>
+            Type:
+          </Text>
+        </Box>
+        <Box>
+          {TASK_TYPE_OPTIONS.map((option, index) => {
+            const isSelected = index === selectedTypeIndex;
+            return (
+              <Text key={option.value}>
+                {index > 0 && <Text dimColor> | </Text>}
+                <Text
+                  bold={isSelected}
+                  inverse={isSelected && activeField === 'type'}
+                  color={isSelected ? 'green' : activeField === 'type' ? 'white' : 'gray'}
+                >
+                  {option.label}
+                </Text>
+              </Text>
+            );
+          })}
+        </Box>
+        {title.length > 3 && (
+          <Text dimColor> (inferred)</Text>
+        )}
+      </Box>
+
+      {/* Effort field */}
+      <Box marginBottom={1}>
+        <Box width={12}>
+          <Text bold={activeField === 'effort'} color={activeField === 'effort' ? 'cyan' : undefined}>
+            Effort:
+          </Text>
+        </Box>
+        <Box>
+          {EFFORT_OPTIONS.map((option, index) => {
+            const isSelected = index === selectedEffortIndex;
+            return (
+              <Text key={option.value}>
+                {index > 0 && <Text dimColor> | </Text>}
+                <Text
+                  bold={isSelected}
+                  inverse={isSelected && activeField === 'effort'}
+                  color={isSelected ? 'green' : activeField === 'effort' ? 'white' : 'gray'}
+                >
+                  {option.label}
+                </Text>
+              </Text>
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* Footer hints */}
+      <Box marginTop={1} borderTop borderColor="gray">
+        <Text dimColor>
+          Type is inferred from keywords: fix/bug → Bug Fix, test → Test, doc → Docs, refactor → Refactor
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * QueueView component - main task queue display
  */
 export function QueueView(): React.ReactElement {
@@ -766,13 +1079,17 @@ export function QueueView(): React.ReactElement {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailTask, setDetailTask] = useState<TaskWithProject | null>(null);
 
+  // Quick create dialog state
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+
   // Load tasks and project names, set up refresh interval
   useEffect(() => {
     const loadTasks = () => {
       try {
         const pendingTasks = TaskRepository.findPending();
-        const projects = listProjects();
-        const projectMap = new Map(projects.map(p => [p.id, p.name]));
+        const projectList = listProjects();
+        const projectMap = new Map(projectList.map(p => [p.id, p.name]));
 
         const tasksWithProjects: TaskWithProject[] = pendingTasks.map(task => ({
           ...task,
@@ -780,6 +1097,7 @@ export function QueueView(): React.ReactElement {
         }));
 
         setTasks(tasksWithProjects);
+        setProjects(projectList);
         setLoading(false);
       } catch (error) {
         console.error('Failed to load tasks:', error);
@@ -851,6 +1169,11 @@ export function QueueView(): React.ReactElement {
       return;
     }
 
+    // If quick create dialog is open, don't handle main view keys (dialog has its own handler)
+    if (showQuickCreate) {
+      return;
+    }
+
     if (searchActive) {
       // Escape clears search and exits search mode
       if (key.escape) {
@@ -868,6 +1191,12 @@ export function QueueView(): React.ReactElement {
     // '/' key activates search
     if (input === '/') {
       setSearchActive(true);
+      return;
+    }
+
+    // 'c' key opens quick create dialog
+    if (input === 'c' && projects.length > 0) {
+      setShowQuickCreate(true);
       return;
     }
 
@@ -942,10 +1271,14 @@ export function QueueView(): React.ReactElement {
           <Text dimColor>No pending tasks in the queue.</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Add a project and create tasks to see them here.</Text>
+          <Text dimColor>
+            {projects.length > 0
+              ? 'Press c to create a new task.'
+              : 'Add a project first to create tasks.'}
+          </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>/: Search</Text>
+          <Text dimColor>/: Search  {projects.length > 0 ? 'c: Create' : ''}</Text>
         </Box>
       </Box>
     );
@@ -957,6 +1290,16 @@ export function QueueView(): React.ReactElement {
   // Handle closing detail view
   const handleCloseDetail = useCallback(() => {
     setDetailTask(null);
+  }, []);
+
+  // Handle closing quick create dialog
+  const handleCloseQuickCreate = useCallback(() => {
+    setShowQuickCreate(false);
+  }, []);
+
+  // Handle task creation - triggers refresh
+  const handleTaskCreated = useCallback(() => {
+    // Task list will refresh automatically via the interval
   }, []);
 
   // Reset selection when filter results change
@@ -971,13 +1314,26 @@ export function QueueView(): React.ReactElement {
     return <TaskDetailView task={detailTask} onClose={handleCloseDetail} />;
   }
 
+  // Render quick create dialog if open
+  if (showQuickCreate) {
+    return (
+      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+        <QuickCreateDialog
+          projects={projects}
+          onClose={handleCloseQuickCreate}
+          onCreate={handleTaskCreated}
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
       <Box paddingX={1} marginBottom={0}>
         <Text bold color="blue">Task Queue</Text>
         {!searchActive && (
-          <Text dimColor> — /: Search  Tab: filters  ↑↓: select  Enter: details</Text>
+          <Text dimColor> — /: Search  c: Create  Tab: filters  ↑↓: select  Enter: details</Text>
         )}
       </Box>
 
