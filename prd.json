@@ -1,1 +1,21 @@
-{"project":"metaralph","branchName":"self-improve/test-1768506258724","description":"The file src/collaboration/discussion.ts doesn't have corresponding test coverage. Adding tests would improve reliability.","userStories":[{"id":"SI-1768506258724","title":"Add tests for discussion.ts","description":"The file src/collaboration/discussion.ts doesn't have corresponding test coverage. Adding tests would improve reliability.","acceptanceCriteria":["Test file exists for src/collaboration/discussion.ts","All new tests pass","Code coverage increased or maintained","Typecheck passes"],"priority":1,"passes":true,"notes":"Target file: src/collaboration/discussion.ts"}]}
+{
+  "project": "metaralph",
+  "branchName": "self-improve/add-tests-for-prd-builder-ts-1768507102663",
+  "description": "The file src/collaboration/prd-builder.ts doesn't have corresponding test coverage. Adding tests would improve reliability.",
+  "userStories": [
+    {
+      "id": "SI-1768507102663",
+      "title": "Add tests for prd-builder.ts",
+      "description": "The file src/collaboration/prd-builder.ts doesn't have corresponding test coverage. Adding tests would improve reliability.",
+      "acceptanceCriteria": [
+        "Test file exists for src/collaboration/prd-builder.ts",
+        "All new tests pass",
+        "Code coverage increased or maintained",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Target file: src/collaboration/prd-builder.ts"
+    }
+  ]
+}
