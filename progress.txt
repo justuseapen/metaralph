@@ -238,3 +238,21 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - For real-time updates, store projectPath in LoopWithProject and re-read PRD in loadLoops
   - Spinner frames work best with 100ms interval: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 ---
+
+## 2026-01-14 - US-112
+- What was implemented: Added pause and resume loop controls to LoopsView
+- Files changed:
+  - `src/cli/components/LoopsView.tsx` - Added:
+    - handlePauseLoop callback using LoopRunner.pause() for 'p' key
+    - handleResumeLoop callback using LoopRunner.resume() for 'r' key
+    - Updated useInput handler to respond to 'p' and 'r' keys
+    - Updated navigation hints to include 'p pause' and 'r resume'
+    - Added pause hint in running loop row: '(press p to pause)'
+    - Added resume hint in paused loop row: 'Paused - press r to resume'
+- **Learnings for future iterations:**
+  - LoopRunner.pause() marks loop as paused (takes effect after current iteration)
+  - LoopRunner.resume() restarts a paused loop - Ralph continues from prd.json state
+  - Use useCallback for handlers that reference state to avoid stale closures
+  - Status-specific visual hints help users discover available actions
+  - Pause/resume controls should check loop.status before taking action
+---
