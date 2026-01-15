@@ -295,3 +295,25 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Multiple escape handling: check current state and collapse inner views first before outer navigation
   - Red highlighting for failures: use both color="red" on Text and borderColor="red" on Box
 ---
+
+## 2026-01-14 - US-115
+- What was implemented: Added task search functionality to QueueView
+- Files changed:
+  - `src/cli/components/QueueView.tsx` - Major enhancements:
+    - Added '/' key handler to activate search mode
+    - Created SearchInput component with TextInput, result count, and ESC hint
+    - Implemented search filtering by title, project name, or task type (case-insensitive)
+    - Added 150ms debounce using useRef timer to avoid excessive re-renders
+    - Escape key clears search and exits search mode
+    - Created HighlightedText component for search term highlighting (yellow background)
+    - Added TaskWithProject interface to cache resolved project names
+    - Updated TaskRow to accept searchTerm and projectName props
+    - Shows "X of Y" count when filtering vs total count when not
+    - Shows "No tasks match..." message when search has no results
+- **Learnings for future iterations:**
+  - Debounce pattern: use useRef for timer, clear on new input, set searchTerm in setTimeout callback
+  - HighlightedText: split text at match index, render match with backgroundColor="yellow" color="black"
+  - Cache derived data (projectName) alongside source data to avoid repeated lookups
+  - For search UX: show immediate input feedback, debounce the expensive filter operation
+  - When search is active, return early from other key handlers to avoid conflicts
+---

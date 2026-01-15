@@ -232,8 +232,8 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "'/' opens search, filters by title/project/type, 150ms debounce, ESC clears, yellow highlight on matches"
     },
     {
       "id": "US-116",
