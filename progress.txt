@@ -643,3 +643,27 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Format: "Press [key] to [action]." appears below the message when shortcuts are provided
   - Workers don't have a shortcut since they start automatically when daemon processes tasks
 ---
+
+## 2026-01-15 - US-130
+- What was implemented: Added error handling wrapper for all dashboard views
+- Files changed:
+  - `src/cli/components/LoadingStates.tsx` - Added:
+    - ErrorBoundary class component that catches JavaScript errors in child components
+    - ErrorDisplay functional component showing user-friendly error messages
+    - useErrorHandler hook for async operation error handling
+    - getUserFriendlyMessage() function to detect error types (database, network, file, JSON)
+    - 'd' key toggles error details (name, message, stack trace)
+    - 'r' key retries if onRetry handler is provided
+  - `src/cli/dashboard.tsx` - Added:
+    - Import ErrorBoundary from LoadingStates.js
+    - getViewName() helper function for view names
+    - Each view wrapped in ErrorBoundary with appropriate viewName
+- **Learnings for future iterations:**
+  - React ErrorBoundary must be a class component (functional components can't catch errors)
+  - Use static getDerivedStateFromError() to update state on error
+  - componentDidCatch() for logging error info
+  - User-friendly messages: detect error patterns with message.toLowerCase().includes()
+  - Common error patterns: sqlite/database, network/fetch/timeout, enoent/permission, json/parse
+  - Stack trace display: slice first 6 lines to show relevant info without overwhelming
+  - ErrorBoundary needs key prop if you want it to reset when switching tabs
+---
