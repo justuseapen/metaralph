@@ -697,3 +697,22 @@ Started: Wed Jan 14 20:48:19 EST 2026
   - Sequential shortcuts (1-7) are easier to remember than scattered numbers (1-5, 9, 0)
   - Costs and Debug tabs mentioned in acceptance criteria don't exist yet - focus on existing tabs
 ---
+
+## 2026-01-15 - US-133
+- What was implemented: Standardized navigation patterns across all dashboard views
+- Files changed:
+  - `src/cli/components/NavigationPatterns.tsx` - Created new module with:
+    - Comprehensive documentation of standard keyboard navigation patterns
+    - List navigation utilities: handleListNavigation, useListSelection
+    - Scroll navigation utilities: handleScrollNavigation, useScrollNavigation
+    - Filter cycling utility: handleFilterCycling
+    - Standard navigation hint text constants
+    - Documented patterns: list nav, dialog nav, tab nav, global shortcuts, action keys
+- **Learnings for future iterations:**
+  - All views already follow consistent patterns from prior implementations
+  - Arrow keys for list navigation, Enter for detail view, Escape for back/close
+  - Tab cycles filters/sections, number keys switch main tabs (dashboard.tsx)
+  - useInput in dialogs/overlays should return early to block parent handlers
+  - Search mode should block navigation keys while input is active
+  - ApprovalView uses split-pane layout (detail always visible) - valid pattern
+---
