@@ -12,3 +12,13 @@ export {
   type StoryState,
   type ParallelBatch,
 } from './dependency-analyzer.js';
+
+export {
+  ParallelScheduler,
+  type WorkerState,
+  type StoryExecutionState,
+  type SchedulerStatus,
+  type ParallelExecutionSummary,
+  type ParallelSchedulerConfig,
+  type ParallelSchedulerEvents,
+} from './scheduler.js';
