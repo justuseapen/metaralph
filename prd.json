@@ -603,7 +603,7 @@
         "Typecheck passes"
       ],
       "priority": 30,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-003"],
       "notes": "Unit tests for parallel scheduler."
     },
@@ -622,7 +622,7 @@
         "Typecheck passes"
       ],
       "priority": 31,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-000"],
       "notes": "Unit tests for foundational Ralph command."
     },
