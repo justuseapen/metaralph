@@ -524,3 +524,19 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Reuses existing formatTimestamp() and truncateString() helper functions
   - Pattern: Import additional types from tdd module for typed receipt handling (PrReceipt, TestReceipt, IntegrationReceipt, ReviewReceipt)
 ---
+
+## 2026-01-21 - US-028
+- What was implemented: Added comprehensive unit tests for the dependency analyzer module
+- Files changed:
+  - src/parallel/dependency-analyzer.test.ts (new file - 721 lines, 45 tests)
+  - prd.json (marked US-028 as passes: true)
+- **Learnings for future iterations:**
+  - DependencyAnalyzer backward compatibility: `dependsOn: []` is treated the same as no `dependsOn` field
+  - The condition `story.dependsOn && story.dependsOn.length > 0` means only non-empty arrays use explicit dependencies
+  - Stories with priority 1 and no dependsOn have no implicit dependencies (no prior stories by priority)
+  - CycleDetectedError includes the cycle path array and a descriptive message
+  - Testing patterns: use helper function `createStory()` to create minimal UserStory objects
+  - Test import pattern: import from './dependency-analyzer.js' (with .js extension for ESM)
+  - getReadyStories() considers both `passes` field on stories AND the completedStories Set
+  - getParallelBatches() sorts stories within batches by priority for consistent ordering
+---

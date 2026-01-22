@@ -584,7 +584,7 @@
         "Typecheck passes"
       ],
       "priority": 29,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-002"],
       "notes": "Unit tests for dependency analysis."
     },
