@@ -609,3 +609,21 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Test sections: extractTestableRequirements (8), inferTestType (3), detectTestFramework (10), detectTestLocation (5), generate (15), generateUnitTests (4), generateIntegrationTests (1), generateE2eTests (2), verifyTestsFailing (5), getTestFilePath (4), others (7)
   - For AI client mocking, create mock object with messages.create method and use mockResolvedValue
 ---
+
+## 2026-01-22 - US-033
+- What was implemented: Added comprehensive unit tests for the Research Coordinator module (RESEARCH phase)
+- Files changed:
+  - src/tdd/research-coordinator.test.ts (new file - 74 tests covering all acceptance criteria)
+  - prd.json (marked US-033 as passes: true)
+- **Learnings for future iterations:**
+  - ResearchCoordinator is a module object with static methods (same pattern as TestGenerator)
+  - Mock AgentRepository for database operations (create, update, findById)
+  - Parallel agent spawning verified by tracking call timestamps and checking they occur within 50ms
+  - runWithTimeout() uses Promise.race with a timeout promise - test both resolution and rejection paths
+  - parseAgentResponse() handles multiple cases: valid JSON, JSON in markdown, malformed JSON, parse errors
+  - synthesizeFindings() combines findings from multiple agents into FrozenContracts with ui/api/db layers
+  - Test sections: createClient (2), getAgentCreator (6), agent creators (5 x 2), parseAgentResponse (9), synthesizeFindings (7), calculateMetrics (6), runWithTimeout (3), runAgent (9), runParallel (15), loadRelevantFiles (7), buildImplementationGuidance (5)
+  - For testing parallel execution: mock all agents and verify startTimes are within small time window
+  - Partial success: when some agents fail, success=true if at least one succeeded, with error message listing failed agents
+  - Mock fs module with both default and named exports for readdirSync with withFileTypes: true option
+---

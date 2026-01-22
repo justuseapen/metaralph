@@ -680,7 +680,7 @@
         "Typecheck passes"
       ],
       "priority": 34,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-016"],
       "notes": "Unit tests for RESEARCH phase."
     },
