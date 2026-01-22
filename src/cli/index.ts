@@ -26,6 +26,7 @@ import {
   getRegisteredSelfProjects,
   type RiskLevel,
 } from '../self-improve/index.js';
+import { executeRalph, displaySummary, validatePrd } from './ralph.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -757,6 +758,76 @@ program
       }
     } catch (error) {
       console.error(`✗ Self-improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+// Ralph command - native Ralph execution without external scripts
+program
+  .command('ralph [path]')
+  .description('Run Ralph loops natively without external ralph.sh scripts')
+  .option('-i, --iterations <n>', 'Maximum iterations before stopping', '10')
+  .option('-t, --tool <tool>', 'Tool to use for execution (claude or cursor)', 'claude')
+  .option('-p, --parallel', 'Enable parallel story execution (experimental)')
+  .option('-w, --max-workers <n>', 'Maximum concurrent workers for parallel mode', '3')
+  .action(async (projectPath: string | undefined, options: {
+    iterations?: string;
+    tool?: string;
+    parallel?: boolean;
+    maxWorkers?: string;
+  }) => {
+    // Default path to current directory
+    const targetPath = projectPath ? path.resolve(projectPath) : process.cwd();
+
+    // Validate path exists
+    if (!fs.existsSync(targetPath)) {
+      console.error(`✗ Directory not found: ${targetPath}`);
+      process.exit(1);
+    }
+
+    // Validate prd.json exists before starting
+    const prdPath = path.join(targetPath, 'prd.json');
+    const prdValidation = validatePrd(prdPath);
+    if (!prdValidation.valid) {
+      console.error(`✗ ${prdValidation.error}`);
+      process.exit(1);
+    }
+
+    // Validate tool option
+    const tool = options.tool as 'claude' | 'cursor';
+    if (tool !== 'claude' && tool !== 'cursor') {
+      console.error(`✗ Invalid tool: ${options.tool}. Must be 'claude' or 'cursor'.`);
+      process.exit(1);
+    }
+
+    // Parse options
+    const iterations = parseInt(options.iterations ?? '10', 10);
+    const maxWorkers = parseInt(options.maxWorkers ?? '3', 10);
+
+    if (isNaN(iterations) || iterations < 1) {
+      console.error(`✗ Invalid iterations: ${options.iterations}. Must be a positive number.`);
+      process.exit(1);
+    }
+
+    if (isNaN(maxWorkers) || maxWorkers < 1) {
+      console.error(`✗ Invalid max-workers: ${options.maxWorkers}. Must be a positive number.`);
+      process.exit(1);
+    }
+
+    try {
+      const result = await executeRalph(targetPath, {
+        iterations,
+        tool,
+        parallel: options.parallel ?? false,
+        maxWorkers,
+      });
+
+      displaySummary(result);
+
+      // Exit with appropriate code
+      process.exit(result.success ? 0 : 1);
+    } catch (error) {
+      console.error(`✗ Ralph execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
