@@ -9,3 +9,10 @@ export {
   type CreatePhaseInput,
   type UpdatePhaseInput,
 } from './phase-repository.js';
+
+export {
+  TestRepository,
+  type CreateTestInput,
+  type UpdateTestInput,
+  type TestStatusCounts,
+} from './test-repository.js';

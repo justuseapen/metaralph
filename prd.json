@@ -206,7 +206,7 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-007"],
       "notes": "Repository for storing generated test metadata. Can run parallel with US-008."
     },
