@@ -23,6 +23,9 @@ export {
   type CreateBugInput,
   type UpdateBugInput,
   type BugPriorityCounts,
+  ReceiptRepository,
+  type CreateReceiptInput,
+  type UpdateReceiptInput,
 } from './repositories/index.js';
 
 // Export all types

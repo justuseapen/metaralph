@@ -29,3 +29,9 @@ export {
   type UpdateBugInput,
   type BugPriorityCounts,
 } from './bug-repository.js';
+
+export {
+  ReceiptRepository,
+  type CreateReceiptInput,
+  type UpdateReceiptInput,
+} from './receipt-repository.js';
