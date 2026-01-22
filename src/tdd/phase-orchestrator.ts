@@ -17,10 +17,19 @@ import {
   type TddResult,
   type AutonomousTddConfig,
   type PhaseOrchestratorEvents,
+  type FrozenContracts,
+  type Bug,
   DEFAULT_TDD_CONFIG,
 } from './types.js';
-import { PhaseRepository } from './repositories/index.js';
+import { PhaseRepository, BugRepository } from './repositories/index.js';
 import { type UserStory } from '../collaboration/prd-builder.js';
+import { TestGenerator, type TestFramework } from './test-generator.js';
+import { ResearchCoordinator } from './research-coordinator.js';
+import { GreenPhase, type GreenPhaseResult } from './green-phase.js';
+import { ContractValidator, type ContractValidationResult } from './contract-validator.js';
+import { BugClassifier, type BugClassificationResult, type AutoFixResult } from './bug-classifier.js';
+import { ReceiptBuilder } from './receipt-builder.js';
+import { Rollback, type Checkpoint } from '../self-improve/rollback.js';
 
 /**
  * Valid phase transitions in the TDD workflow
@@ -90,6 +99,13 @@ export class PhaseOrchestrator extends EventEmitter {
   private config: AutonomousTddConfig;
   private currentExecutionId: string | null = null;
   private refineIterationCount = 0;
+  private checkpoint: Checkpoint | null = null;
+
+  // Phase results stored during execution
+  private testFiles: string[] = [];
+  private frozenContracts: FrozenContracts | null = null;
+  private bugs: Bug[] = [];
+  private currentRefinePhaseId: string | null = null;
 
   constructor(config?: Partial<AutonomousTddConfig>) {
     super();
@@ -106,7 +122,11 @@ export class PhaseOrchestrator extends EventEmitter {
   /**
    * Run the full autonomous TDD workflow
    *
-   * This is a stub implementation that will be wired up with phase executors later.
+   * Executes all six phases in sequence:
+   * RED -> RESEARCH -> GREEN -> INTEGRATE -> REFINE -> COMMIT
+   *
+   * The REFINE phase loops until P0/P1 bugs are resolved (up to maxRefineIterations).
+   * On the final iteration, escalates to opus model for difficult bugs.
    *
    * @param task - Task context with user story and PRD
    * @param project - Project context with path and name
@@ -121,80 +141,63 @@ export class PhaseOrchestrator extends EventEmitter {
     this.currentExecutionId = executionId;
     this.refineIterationCount = 0;
 
+    // Reset state
+    this.testFiles = [];
+    this.frozenContracts = null;
+    this.bugs = [];
+    this.currentRefinePhaseId = null;
+
     const phases: TddPhaseRecord[] = [];
 
+    // Create project object for Rollback
+    const projectForRollback = {
+      id: executionId,
+      name: project.name,
+      path: project.path,
+      group_id: null,
+      deploy_config: null,
+      added_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     try {
-      // TODO: Create checkpoint before starting (Rollback.createCheckpoint)
+      // Create checkpoint before starting
+      this.checkpoint = await Rollback.createCheckpoint(
+        projectForRollback,
+        `TDD workflow start for ${task.userStory.title}`
+      );
 
-      // Execute each phase in order
-      for (const phase of PHASE_ORDER) {
-        // Create phase record
-        const phaseRecord = PhaseRepository.create({
-          executionId,
-          phase,
-          status: 'running',
-          startedAt: new Date().toISOString(),
-        });
-        phases.push(phaseRecord);
-
-        // Emit phase started event
-        this.emitPhaseStarted(executionId, phase);
-
-        try {
-          // TODO: Execute actual phase logic
-          // For now, this is a stub that just marks the phase as completed
-          await this.executePhaseStub(phase, task, project);
-
-          // Handle REFINE phase loop
-          if (phase === 'refine') {
-            // Check if we need to loop (P0/P1 bugs exist)
-            const shouldLoop = await this.shouldRefineLoop(executionId);
-            if (shouldLoop && this.refineIterationCount < this.config.maxRefineIterations) {
-              this.refineIterationCount++;
-              // Note: In full implementation, this would re-execute refine phase
-            }
-          }
-
-          // Update phase as completed
-          const completedAt = new Date().toISOString();
-          PhaseRepository.update(phaseRecord.id, {
-            status: 'completed',
-            completedAt,
-            metrics: { iterationCount: phase === 'refine' ? this.refineIterationCount : undefined },
-          });
-
-          // Emit phase completed event
-          this.emitPhaseCompleted(executionId, phase, {});
-        } catch (phaseError) {
-          // Update phase as failed
-          PhaseRepository.update(phaseRecord.id, {
-            status: 'failed',
-            completedAt: new Date().toISOString(),
-          });
-
-          // Handle phase failure
-          const failure: PhaseFailure = {
-            executionId,
-            phase,
-            error: phaseError instanceof Error ? phaseError.message : String(phaseError),
-            failedAt: new Date().toISOString(),
-            recoverable: false,
-          };
-          await this.handlePhaseFailure(executionId, phase, failure.error);
-
-          throw phaseError;
+      // Execute phases: RED, RESEARCH, GREEN, INTEGRATE
+      for (const phase of ['red', 'research', 'green', 'integrate'] as TddPhase[]) {
+        const phaseRecord = await this.executePhase(phase, task, project, executionId, phases);
+        if (!phaseRecord) {
+          throw new Error(`Phase ${phase} failed to create record`);
         }
       }
+
+      // Execute REFINE phase with loop
+      await this.executeRefinePhaseWithLoop(task, project, executionId, phases);
+
+      // Execute COMMIT phase
+      await this.executePhase('commit', task, project, executionId, phases);
+
+      // Build receipt
+      const receipt = ReceiptBuilder.build(executionId);
 
       // All phases completed successfully
       return {
         success: true,
         executionId,
         phases,
+        receipt,
         totalDurationMs: Date.now() - startTime,
       };
     } catch (error) {
-      // TODO: Rollback to checkpoint on failure
+      // Rollback to checkpoint on failure
+      if (this.checkpoint) {
+        await Rollback.rollbackToCheckpoint(projectForRollback, this.checkpoint);
+      }
+
       return {
         success: false,
         executionId,
@@ -204,7 +207,327 @@ export class PhaseOrchestrator extends EventEmitter {
       };
     } finally {
       this.currentExecutionId = null;
+      this.checkpoint = null;
     }
+  }
+
+  /**
+   * Execute a single phase
+   */
+  private async executePhase(
+    phase: TddPhase,
+    task: TaskContext,
+    project: ProjectContext,
+    executionId: string,
+    phases: TddPhaseRecord[]
+  ): Promise<TddPhaseRecord> {
+    // Create phase record
+    const phaseRecord = PhaseRepository.create({
+      executionId,
+      phase,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    });
+    phases.push(phaseRecord);
+
+    // Emit phase started event
+    this.emitPhaseStarted(executionId, phase);
+
+    try {
+      // Execute actual phase logic
+      const metrics = await this.executePhaseLogic(phase, task, project, phaseRecord.id);
+
+      // Update phase as completed
+      const completedAt = new Date().toISOString();
+      PhaseRepository.update(phaseRecord.id, {
+        status: 'completed',
+        completedAt,
+        metrics,
+      });
+
+      // Emit phase completed event
+      this.emitPhaseCompleted(executionId, phase, metrics);
+
+      return phaseRecord;
+    } catch (phaseError) {
+      // Update phase as failed
+      PhaseRepository.update(phaseRecord.id, {
+        status: 'failed',
+        completedAt: new Date().toISOString(),
+      });
+
+      // Handle phase failure
+      const errorMessage = phaseError instanceof Error ? phaseError.message : String(phaseError);
+      await this.handlePhaseFailure(executionId, phase, errorMessage);
+
+      throw phaseError;
+    }
+  }
+
+  /**
+   * Execute the actual phase logic
+   */
+  private async executePhaseLogic(
+    phase: TddPhase,
+    task: TaskContext,
+    project: ProjectContext,
+    phaseId: string
+  ): Promise<Record<string, unknown>> {
+    const projectContext = {
+      path: project.path,
+      name: project.name,
+    };
+
+    switch (phase) {
+      case 'red': {
+        // RED Phase: Generate tests
+        const testGeneratorProject = {
+          ...projectContext,
+          testFramework: this.detectTestFramework(project.path),
+          srcDir: 'src',
+          testLocation: '__tests__' as const,
+        };
+
+        const testResult = await TestGenerator.generate(
+          { userStory: task.userStory, prdJson: task.prdJson },
+          testGeneratorProject,
+          phaseId,
+          {}
+        );
+
+        if (!testResult.success) {
+          throw new Error(`RED phase failed: ${testResult.error}`);
+        }
+
+        // Store test files for GREEN phase (derive from generated tests)
+        this.testFiles = testResult.tests.map((t) => t.filePath);
+
+        return {
+          testFilesGenerated: this.testFiles.length,
+          testFiles: this.testFiles,
+          metrics: testResult.metrics,
+        };
+      }
+
+      case 'research': {
+        // RESEARCH Phase: Analyze patterns and freeze contracts
+        const researchContext = {
+          userStory: task.userStory,
+          prdJson: task.prdJson,
+          projectPath: project.path,
+          projectName: project.name,
+        };
+
+        const researchResult = await ResearchCoordinator.runParallel(
+          undefined, // Use all agent types
+          researchContext,
+          phaseId,
+          {}
+        );
+
+        if (!researchResult.success) {
+          throw new Error(`RESEARCH phase failed: ${researchResult.error}`);
+        }
+
+        // Store frozen contracts for GREEN and INTEGRATE phases
+        this.frozenContracts = researchResult.frozenContracts;
+
+        return {
+          frozenContracts: this.frozenContracts,
+          patternsDiscovered: researchResult.metrics.patternsDiscovered,
+          agentsSucceeded: researchResult.metrics.agentsSucceeded,
+          agentsFailed: researchResult.metrics.agentsFailed,
+        };
+      }
+
+      case 'green': {
+        // GREEN Phase: Implement until tests pass
+        if (!this.frozenContracts) {
+          throw new Error('GREEN phase requires frozen contracts from RESEARCH phase');
+        }
+
+        const greenResult = await GreenPhase.run(
+          {
+            userStory: task.userStory,
+            prdJson: task.prdJson,
+            testFiles: this.testFiles,
+          },
+          {
+            ...projectContext,
+            testFramework: this.detectTestFramework(project.path),
+          },
+          this.frozenContracts,
+          {
+            maxGreenRetries: this.config.maxGreenRetries,
+            executionTimeoutMs: this.config.timeouts.green,
+          }
+        );
+
+        if (!greenResult.success) {
+          throw new Error(`GREEN phase failed after ${greenResult.attempts} attempts: ${greenResult.error}`);
+        }
+
+        return {
+          attempts: greenResult.attempts,
+          testsPassed: greenResult.testResults?.passed ?? false,
+          metrics: greenResult.metrics,
+        };
+      }
+
+      case 'integrate': {
+        // INTEGRATE Phase: Validate contracts across layers
+        if (!this.frozenContracts) {
+          throw new Error('INTEGRATE phase requires frozen contracts from RESEARCH phase');
+        }
+
+        const validationResult = await ContractValidator.validate(
+          this.frozenContracts,
+          projectContext,
+          {}
+        );
+
+        if (!validationResult.passed) {
+          throw new Error(
+            `INTEGRATE phase failed: ${validationResult.errors.map((e) => e.message).join(', ')}`
+          );
+        }
+
+        return {
+          contractsValidated: validationResult.totalContractsValidated,
+          contractsFailed: validationResult.totalContractsFailed,
+          layersChecked: validationResult.layerResults.map((r) => r.layer),
+          errors: validationResult.errors.map((e) => e.message),
+        };
+      }
+
+      case 'refine': {
+        // REFINE Phase: AI code review and bug fixing
+        // This is called from the loop handler, so just return metrics
+        return this.executeRefineIteration(task, project, phaseId);
+      }
+
+      case 'commit': {
+        // COMMIT Phase: Build receipts and create PR
+        const receipt = ReceiptBuilder.build(this.currentExecutionId!);
+
+        // Create PR with receipts
+        const prResult = await ReceiptBuilder.createPr(
+          {
+            storyId: task.userStory.id,
+            title: task.userStory.title,
+            description: task.userStory.description,
+          },
+          receipt,
+          {
+            path: project.path,
+            baseBranch: 'main',
+          }
+        );
+
+        return {
+          prCreated: prResult.success,
+          prUrl: prResult.prUrl,
+          prTitle: prResult.title,
+          error: prResult.error,
+        };
+      }
+
+      default:
+        throw new Error(`Unknown phase: ${phase}`);
+    }
+  }
+
+  /**
+   * Execute a single REFINE iteration (AI review + auto-fix)
+   */
+  private async executeRefineIteration(
+    task: TaskContext,
+    project: ProjectContext,
+    phaseId: string
+  ): Promise<Record<string, unknown>> {
+    const projectContext = {
+      path: project.path,
+      name: project.name,
+    };
+
+    // Load code changes for review
+    const codeChanges = await BugClassifier.loadCodeChangesFromGit(projectContext);
+
+    // Perform AI code review
+    const isFinalIteration = this.refineIterationCount >= this.config.maxRefineIterations - 1;
+    const reviewResult = await BugClassifier.aiReview(
+      projectContext,
+      codeChanges,
+      phaseId,
+      {}
+    );
+
+    if (!reviewResult.success) {
+      throw new Error(`REFINE AI review failed: ${reviewResult.error}`);
+    }
+
+    // Update bugs list
+    this.bugs = reviewResult.bugs;
+    this.currentRefinePhaseId = phaseId;
+
+    // If there are P0/P1 bugs, attempt auto-fix
+    const hasP0P1Bugs = this.bugs.some(
+      (bug) => bug.status === 'open' && (bug.severity === 'P0' || bug.severity === 'P1')
+    );
+
+    let autoFixResult: AutoFixResult | null = null;
+    if (hasP0P1Bugs) {
+      autoFixResult = await BugClassifier.autoFix(this.bugs, projectContext, {
+        isFinalIteration,
+      });
+
+      // Update bugs with fixed status
+      this.bugs = autoFixResult.bugs;
+    }
+
+    return {
+      totalBugsFound: reviewResult.metrics.totalBugsFound,
+      p0Count: reviewResult.metrics.p0Count,
+      p1Count: reviewResult.metrics.p1Count,
+      p2Count: reviewResult.metrics.p2Count,
+      p3Count: reviewResult.metrics.p3Count,
+      bugsFixed: autoFixResult?.metrics.p0Fixed ?? 0 + (autoFixResult?.metrics.p1Fixed ?? 0),
+      refineIteration: this.refineIterationCount + 1,
+      opusEscalationUsed: isFinalIteration,
+    };
+  }
+
+  /**
+   * Execute the REFINE phase with loop until P0/P1 bugs are resolved
+   */
+  private async executeRefinePhaseWithLoop(
+    task: TaskContext,
+    project: ProjectContext,
+    executionId: string,
+    phases: TddPhaseRecord[]
+  ): Promise<void> {
+    this.refineIterationCount = 0;
+
+    do {
+      // Execute REFINE phase iteration
+      await this.executePhase('refine', task, project, executionId, phases);
+      this.refineIterationCount++;
+
+      // Check if we can exit the loop
+      if (this.currentRefinePhaseId) {
+        const canExit = BugRepository.canExitRefineLoop(this.currentRefinePhaseId);
+        if (canExit) {
+          break;
+        }
+      }
+    } while (this.refineIterationCount < this.config.maxRefineIterations);
+  }
+
+  /**
+   * Detect test framework from project
+   */
+  private detectTestFramework(projectPath: string): TestFramework {
+    return GreenPhase.detectTestFramework(projectPath);
   }
 
   /**
@@ -280,9 +603,10 @@ export class PhaseOrchestrator extends EventEmitter {
     // Emit phase failed event
     this.emitPhaseFailed(executionId, phase, error);
 
-    // TODO: Trigger rollback to checkpoint
-    // For now, just log the failure
+    // Log the failure
     console.error(`Phase ${phase} failed for execution ${executionId}: ${error}`);
+
+    // Note: Rollback is handled in the main runAutonomous catch block
   }
 
   /**
@@ -306,31 +630,7 @@ export class PhaseOrchestrator extends EventEmitter {
     return this.refineIterationCount;
   }
 
-  // ============ Private Methods ============
-
-  /**
-   * Stub implementation for phase execution
-   * Will be replaced with actual phase logic in later stories
-   */
-  private async executePhaseStub(
-    phase: TddPhase,
-    _task: TaskContext,
-    _project: ProjectContext
-  ): Promise<void> {
-    // Simulate async phase execution
-    // In real implementation, this would call the actual phase executor
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-
-  /**
-   * Check if the REFINE phase should loop again
-   * Will be replaced with actual bug checking logic
-   */
-  private async shouldRefineLoop(_executionId: string): Promise<boolean> {
-    // TODO: Check if P0/P1 bugs exist via BugRepository.canExitRefineLoop()
-    // For now, return false (no loop needed)
-    return false;
-  }
+  // ============ Private Event Emitters ============
 
   /**
    * Emit phase:started event
