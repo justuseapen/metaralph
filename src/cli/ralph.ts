@@ -18,6 +18,10 @@ import {
   type WorkerState,
   type SchedulerStatus,
 } from '../parallel/scheduler.js';
+import {
+  ConflictDetector,
+  type ConflictStrategy,
+} from '../parallel/conflict-detector.js';
 
 /**
  * PRD structure for Ralph execution
@@ -41,6 +45,8 @@ export interface RalphOptions {
   parallel?: boolean;
   /** Maximum concurrent workers for parallel mode (default: 3) */
   maxWorkers?: number;
+  /** Conflict detection strategy for parallel mode (default: 'pessimistic') */
+  conflictStrategy?: ConflictStrategy;
 }
 
 /**
@@ -78,6 +84,9 @@ export interface RalphResult {
     estimatedSequentialTimeMs: number;
     timeSavingsMs: number;
     timeSavingsPercent: number;
+    conflictStrategy: ConflictStrategy;
+    conflictsDetected: number;
+    conflictedFiles: string[];
   };
 }
 
@@ -295,6 +304,7 @@ export async function executeRalph(
     tool = 'claude',
     parallel = false,
     maxWorkers = 3,
+    conflictStrategy = 'pessimistic',
   } = options;
 
   const startTime = Date.now();
@@ -328,6 +338,9 @@ export async function executeRalph(
   console.log(`Max iters:    ${maxIterations}`);
   console.log(`Tool:         ${tool}`);
   console.log(`Parallel:     ${parallel ? `Yes (${maxWorkers} workers)` : 'No'}`);
+  if (parallel) {
+    console.log(`Conflicts:    ${conflictStrategy} strategy`);
+  }
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
   // Check if already complete
@@ -346,7 +359,7 @@ export async function executeRalph(
 
   // Parallel execution mode
   if (parallel) {
-    return executeParallel(projectPath, prd, maxIterations, tool, maxWorkers, startTime);
+    return executeParallel(projectPath, prd, maxIterations, tool, maxWorkers, conflictStrategy, startTime);
   }
 
   // Sequential execution loop
@@ -431,12 +444,20 @@ async function executeParallel(
   _maxIterations: number,
   tool: 'claude' | 'cursor',
   maxWorkers: number,
+  conflictStrategy: ConflictStrategy,
   startTime: number
 ): Promise<RalphResult> {
   const totalStories = prd.userStories.length;
   const incompleteBefore = prd.userStories.filter(s => !s.passes).length;
 
-  console.log(`\n🚀 Starting parallel execution with ${maxWorkers} workers...\n`);
+  console.log(`\n🚀 Starting parallel execution with ${maxWorkers} workers (${conflictStrategy} conflict strategy)...\n`);
+
+  // Create conflict detector for tracking and predictions
+  const conflictDetector = new ConflictDetector({
+    strategy: conflictStrategy,
+    projectPath,
+    prd,
+  });
 
   // Create scheduler
   const scheduler = new ParallelScheduler({
@@ -510,6 +531,9 @@ async function executeParallel(
     ? Math.round((timeSavingsMs / estimatedSequentialTimeMs) * 100)
     : 0;
 
+  // Get conflict detection stats
+  const conflictStats = conflictDetector.getStats();
+
   return {
     success: summary.success,
     completed: summary.completed,
@@ -526,6 +550,9 @@ async function executeParallel(
       estimatedSequentialTimeMs,
       timeSavingsMs,
       timeSavingsPercent,
+      conflictStrategy,
+      conflictsDetected: conflictStats.totalConflicts,
+      conflictedFiles: conflictStats.conflictedFiles,
     },
   };
 }
@@ -581,6 +608,7 @@ export function displaySummary(result: RalphResult): void {
   if (result.parallel) {
     // Parallel execution summary
     console.log(`Mode:             Parallel (${result.parallel.maxConcurrencyAchieved} max workers)`);
+    console.log(`Conflict mode:    ${result.parallel.conflictStrategy}`);
     console.log(`Batches:          ${result.parallel.batchesExecuted}`);
     console.log(`Stories:          ${result.storiesCompleted}/${result.totalStories} completed`);
     if (result.parallel.storiesFailed > 0) {
@@ -588,6 +616,10 @@ export function displaySummary(result: RalphResult): void {
     }
     if (result.parallel.storiesSkipped > 0) {
       console.log(`  Skipped:        ${result.parallel.storiesSkipped} (blocked by failed dependencies)`);
+    }
+    if (result.parallel.conflictsDetected > 0) {
+      console.log(`Conflicts:        ${result.parallel.conflictsDetected} detected`);
+      console.log(`  Files:          ${result.parallel.conflictedFiles.slice(0, 5).join(', ')}${result.parallel.conflictedFiles.length > 5 ? '...' : ''}`);
     }
     console.log(`Time elapsed:     ${formatDuration(result.timeElapsedMs)}`);
     console.log(`Est. sequential:  ${formatDuration(result.parallel.estimatedSequentialTimeMs)}`);

@@ -22,3 +22,13 @@ export {
   type ParallelSchedulerConfig,
   type ParallelSchedulerEvents,
 } from './scheduler.js';
+
+export {
+  ConflictDetector,
+  type ConflictStrategy,
+  type FileChange,
+  type FileConflict,
+  type PredictedChanges,
+  type SchedulingDecision,
+  type ConflictDetectorConfig,
+} from './conflict-detector.js';

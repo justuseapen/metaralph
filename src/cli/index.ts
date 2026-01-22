@@ -770,11 +770,13 @@ program
   .option('-t, --tool <tool>', 'Tool to use for execution (claude or cursor)', 'claude')
   .option('-p, --parallel', 'Enable parallel story execution (experimental)')
   .option('-w, --max-workers <n>', 'Maximum concurrent workers for parallel mode', '3')
+  .option('-c, --conflict-strategy <strategy>', 'Conflict strategy for parallel mode (pessimistic or optimistic)', 'pessimistic')
   .action(async (projectPath: string | undefined, options: {
     iterations?: string;
     tool?: string;
     parallel?: boolean;
     maxWorkers?: string;
+    conflictStrategy?: string;
   }) => {
     // Default path to current directory
     const targetPath = projectPath ? path.resolve(projectPath) : process.cwd();
@@ -814,12 +816,20 @@ program
       process.exit(1);
     }
 
+    // Validate conflict strategy
+    const conflictStrategy = options.conflictStrategy as 'pessimistic' | 'optimistic';
+    if (conflictStrategy !== 'pessimistic' && conflictStrategy !== 'optimistic') {
+      console.error(`✗ Invalid conflict-strategy: ${options.conflictStrategy}. Must be 'pessimistic' or 'optimistic'.`);
+      process.exit(1);
+    }
+
     try {
       const result = await executeRalph(targetPath, {
         iterations,
         tool,
         parallel: options.parallel ?? false,
         maxWorkers,
+        conflictStrategy,
       });
 
       displaySummary(result);
