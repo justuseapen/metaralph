@@ -7,6 +7,13 @@
  * This workflow produces production-ready PRs with P0/P1 bugs = 0.
  */
 
+// Export repositories
+export {
+  PhaseRepository,
+  type CreatePhaseInput,
+  type UpdatePhaseInput,
+} from './repositories/index.js';
+
 // Export all types
 export {
   // Phase types
