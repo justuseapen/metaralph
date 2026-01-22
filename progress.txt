@@ -29,3 +29,19 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Export functions from new modules for import in index.ts (e.g., `executeRalph`, `displaySummary`, `validatePrd`)
   - CLI option parsing: use `parseInt()` for numeric options, validate before use
 ---
+
+## 2026-01-21 - US-001
+- What was implemented: Updated RalphSpawner to use native Claude CLI execution instead of ralph.sh scripts
+- Files changed:
+  - src/workers/ralph-spawner.ts (refactored spawn() and monitor(), removed findRalphScript())
+  - src/cli/index.ts (updated ralph command description)
+  - ROADMAP.md (updated example to use native metaralph ralph command)
+  - prd.json (marked US-001 as passes: true)
+- **Learnings for future iterations:**
+  - RalphSpawner.spawn() now uses buildRalphPrompt() to generate the Ralph agent prompt
+  - The prompt is passed to Claude CLI via `--print --dangerously-skip-permissions -p <prompt>`
+  - Each spawn() call represents a single iteration in native mode (iterationsUsed = 1)
+  - The same prompt pattern is used in both src/cli/ralph.ts (for CLI) and src/workers/ralph-spawner.ts (for programmatic use)
+  - When removing old functions, ensure no dangling references exist elsewhere in the codebase
+  - Archive and historical PRD files can be left unchanged as they document the history
+---

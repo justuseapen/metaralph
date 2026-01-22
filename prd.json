@@ -44,7 +44,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-000"],
       "notes": "Refactors spawner to use native execution. Enables self-improvement without external scripts."
     },
