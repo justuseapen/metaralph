@@ -15,6 +15,17 @@ export {
   type PhaseFailure,
 } from './phase-orchestrator.js';
 
+// Export Test Generator (RED phase)
+export {
+  TestGenerator,
+  type TestFramework,
+  type TestGeneratorProjectContext,
+  type TestableRequirement,
+  type TestGenerationResult,
+  type TestVerificationResult,
+  type TestGeneratorConfig,
+} from './test-generator.js';
+
 // Export repositories
 export {
   PhaseRepository,
