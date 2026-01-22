@@ -7,6 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { initDatabase, type DatabaseInstance } from '../db/index.js';
+import type { TddPhase, TddPhaseRecord, AutonomousTddConfig } from '../tdd/types.js';
 
 /**
  * Status of an execution
@@ -28,6 +29,22 @@ export interface Execution {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /**
+   * Current TDD phase (if TDD workflow is enabled)
+   */
+  currentPhase: TddPhase | null;
+  /**
+   * History of TDD phase executions
+   */
+  phaseHistory: TddPhaseRecord[] | null;
+  /**
+   * Whether TDD workflow is enabled for this execution
+   */
+  tddEnabled: boolean;
+  /**
+   * Configuration for TDD workflow (if enabled)
+   */
+  tddConfig: AutonomousTddConfig | null;
 }
 
 /**
@@ -44,6 +61,11 @@ interface ExecutionRow {
   output_log: string | null;
   error_log: string | null;
   created_at: string;
+  // TDD fields
+  current_phase: string | null;
+  phase_history: string | null;
+  tdd_enabled: number;
+  tdd_config: string | null;
 }
 
 /**
@@ -52,6 +74,14 @@ interface ExecutionRow {
 export interface CreateExecutionInput {
   taskId: string;
   projectId: string;
+  /**
+   * Enable TDD workflow for this execution
+   */
+  tddEnabled?: boolean;
+  /**
+   * Configuration for TDD workflow (if enabled)
+   */
+  tddConfig?: AutonomousTddConfig;
 }
 
 /**
@@ -76,6 +106,26 @@ function rowToExecution(row: ExecutionRow): Execution {
   const iterationsMatch = row.output_log?.match(/Iterations used: (\d+)/);
   const iterationsUsed = iterationsMatch ? parseInt(iterationsMatch[1], 10) : 0;
 
+  // Parse phase history from JSON
+  let phaseHistory: TddPhaseRecord[] | null = null;
+  if (row.phase_history) {
+    try {
+      phaseHistory = JSON.parse(row.phase_history) as TddPhaseRecord[];
+    } catch {
+      // Invalid JSON, leave as null
+    }
+  }
+
+  // Parse TDD config from JSON
+  let tddConfig: AutonomousTddConfig | null = null;
+  if (row.tdd_config) {
+    try {
+      tddConfig = JSON.parse(row.tdd_config) as AutonomousTddConfig;
+    } catch {
+      // Invalid JSON, leave as null
+    }
+  }
+
   return {
     id: row.id,
     taskId: row.task_id,
@@ -88,6 +138,10 @@ function rowToExecution(row: ExecutionRow): Execution {
     startedAt: row.started_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
+    currentPhase: row.current_phase as TddPhase | null,
+    phaseHistory,
+    tddEnabled: row.tdd_enabled === 1,
+    tddConfig,
   };
 }
 
@@ -105,13 +159,15 @@ export const ExecutionRepository = {
     try {
       const id = uuidv4();
       const now = new Date().toISOString();
+      const tddEnabled = input.tddEnabled ?? false;
+      const tddConfig = input.tddConfig ? JSON.stringify(input.tddConfig) : null;
 
       database.prepare(`
         INSERT INTO executions (
-          id, task_id, project_id, status, created_at
+          id, task_id, project_id, status, created_at, tdd_enabled, tdd_config
         )
-        VALUES (?, ?, ?, ?, ?)
-      `).run(id, input.taskId, input.projectId, 'pending', now);
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, input.taskId, input.projectId, 'pending', now, tddEnabled ? 1 : 0, tddConfig);
 
       return {
         id,
@@ -125,6 +181,10 @@ export const ExecutionRepository = {
         startedAt: null,
         completedAt: null,
         createdAt: now,
+        currentPhase: null,
+        phaseHistory: null,
+        tddEnabled,
+        tddConfig: input.tddConfig ?? null,
       };
     } finally {
       if (shouldCloseDb) {
@@ -275,6 +335,67 @@ export const ExecutionRepository = {
         ORDER BY created_at DESC
       `).all(projectId) as ExecutionRow[];
       return rows.map(rowToExecution);
+    } finally {
+      if (shouldCloseDb) {
+        database.close();
+      }
+    }
+  },
+
+  /**
+   * Update the current TDD phase for an execution
+   */
+  updateCurrentPhase(id: string, phase: TddPhase | null, db?: DatabaseInstance): boolean {
+    const shouldCloseDb = !db;
+    const database = db ?? initDatabase();
+
+    try {
+      const result = database.prepare(`
+        UPDATE executions SET current_phase = ? WHERE id = ?
+      `).run(phase, id);
+
+      return result.changes > 0;
+    } finally {
+      if (shouldCloseDb) {
+        database.close();
+      }
+    }
+  },
+
+  /**
+   * Append a phase record to the execution's phase history
+   */
+  appendPhaseHistory(id: string, record: TddPhaseRecord, db?: DatabaseInstance): boolean {
+    const shouldCloseDb = !db;
+    const database = db ?? initDatabase();
+
+    try {
+      // Get existing phase history
+      const existing = database.prepare('SELECT phase_history FROM executions WHERE id = ?').get(id) as { phase_history: string | null } | undefined;
+
+      if (!existing) {
+        return false;
+      }
+
+      // Parse existing history or start fresh
+      let history: TddPhaseRecord[] = [];
+      if (existing.phase_history) {
+        try {
+          history = JSON.parse(existing.phase_history) as TddPhaseRecord[];
+        } catch {
+          // Invalid JSON, start fresh
+        }
+      }
+
+      // Append new record
+      history.push(record);
+
+      // Update database
+      const result = database.prepare(`
+        UPDATE executions SET phase_history = ? WHERE id = ?
+      `).run(JSON.stringify(history), id);
+
+      return result.changes > 0;
     } finally {
       if (shouldCloseDb) {
         database.close();

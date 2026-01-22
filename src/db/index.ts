@@ -94,6 +94,32 @@ function migrateTasksTable(db: DatabaseInstance): void {
 }
 
 /**
+ * Migrate executions table to add TDD columns if they don't exist
+ * This handles upgrades from older schema versions
+ *
+ * @param db - The database instance
+ */
+function migrateExecutionsTable(db: DatabaseInstance): void {
+  // Get existing columns
+  const columns = db.prepare("PRAGMA table_info(executions)").all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((c) => c.name));
+
+  // Add new TDD columns if they don't exist
+  const migrations: Array<{ column: string; definition: string }> = [
+    { column: 'current_phase', definition: 'TEXT' },
+    { column: 'phase_history', definition: 'TEXT' },
+    { column: 'tdd_enabled', definition: 'INTEGER NOT NULL DEFAULT 0' },
+    { column: 'tdd_config', definition: 'TEXT' },
+  ];
+
+  for (const migration of migrations) {
+    if (!columnNames.has(migration.column)) {
+      db.exec(`ALTER TABLE executions ADD COLUMN ${migration.column} ${migration.definition}`);
+    }
+  }
+}
+
+/**
  * Create all required tables in the database
  * Uses IF NOT EXISTS to be idempotent
  *
@@ -190,10 +216,17 @@ function createTables(db: DatabaseInstance): void {
       output_log TEXT,
       error_log TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      current_phase TEXT,
+      phase_history TEXT,
+      tdd_enabled INTEGER NOT NULL DEFAULT 0,
+      tdd_config TEXT,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     )
   `);
+
+  // Add new columns to existing executions table if they don't exist (migration)
+  migrateExecutionsTable(db);
 
   // Learnings table - knowledge extracted from executions for self-improvement
   db.exec(`
@@ -318,6 +351,8 @@ function createTables(db: DatabaseInstance): void {
     CREATE INDEX IF NOT EXISTS idx_executions_task_id ON executions(task_id);
     CREATE INDEX IF NOT EXISTS idx_executions_project_id ON executions(project_id);
     CREATE INDEX IF NOT EXISTS idx_executions_status ON executions(status);
+    CREATE INDEX IF NOT EXISTS idx_executions_tdd_enabled ON executions(tdd_enabled);
+    CREATE INDEX IF NOT EXISTS idx_executions_current_phase ON executions(current_phase);
     CREATE INDEX IF NOT EXISTS idx_learnings_project_id ON learnings(project_id);
     CREATE INDEX IF NOT EXISTS idx_learnings_category ON learnings(category);
   `);
