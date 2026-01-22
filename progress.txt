@@ -266,3 +266,24 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Boolean fields use INTEGER (0/1) in SQLite, convert with === 1 when reading
   - Import TDD types directly from '../tdd/types.js' for type safety
 ---
+
+## 2026-01-21 - US-015
+- What was implemented: Implemented RED phase Test Generator for TDD workflow
+- Files changed:
+  - src/tdd/test-generator.ts (new file - ~600 lines with TestGenerator class)
+  - src/tdd/index.ts (added TestGenerator exports)
+  - prd.json (marked US-015 as passes: true)
+- **Learnings for future iterations:**
+  - TestGenerator.generate() is the main entry point - takes task context, project context, and phaseId
+  - extractTestableRequirements() parses PRD acceptance criteria into testable requirements
+  - Requirements are classified into unit/integration/e2e based on keywords in the criterion text
+  - Non-functional criteria (typecheck passes, lint passes) are filtered out
+  - Test framework detection checks package.json dependencies and scripts for vitest vs jest
+  - Test location detection checks for co-located tests (*.test.ts) vs __tests__ directories
+  - AI prompts use system prompts to guide test generation with proper framework syntax
+  - Tests are stored in database via TestRepository.create() with status='failing' (expected in RED phase)
+  - verifyTestsFailing() runs the test suite and confirms tests fail (exit code !== 0)
+  - extractTestCode() handles markdown code blocks in AI responses
+  - Generated tests are written to src/tdd/generated/ directory for co-located projects
+  - Follow existing patterns: createClient() method, optional config.anthropicClient for testing
+---
