@@ -301,7 +301,7 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-006"],
       "notes": "Extends existing Execution model to support TDD workflow state."
     },

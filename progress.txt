@@ -249,3 +249,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - TaskContext includes UserStory and prdJson; ProjectContext includes path and name
   - Phase execution uses PhaseRepository.create() with status='running', then update() with status='completed'
 ---
+
+## 2026-01-21 - US-014
+- What was implemented: Extended Execution model with TDD phase state tracking
+- Files changed:
+  - src/workers/execution.ts (added TDD fields to Execution interface, ExecutionRow, CreateExecutionInput; added updateCurrentPhase and appendPhaseHistory methods)
+  - src/db/index.ts (added TDD columns to executions table, added migrateExecutionsTable function, added indexes)
+  - prd.json (marked US-014 as passes: true)
+- **Learnings for future iterations:**
+  - The Execution interface now has currentPhase, phaseHistory, tddEnabled, and tddConfig fields
+  - TDD fields in database: current_phase (TEXT), phase_history (TEXT/JSON), tdd_enabled (INTEGER 0/1), tdd_config (TEXT/JSON)
+  - Migration pattern: create migrateXxxTable() function, check columns via PRAGMA table_info, add missing columns
+  - JSON fields (phaseHistory, tddConfig) are serialized with JSON.stringify on write, parsed with JSON.parse on read
+  - updateCurrentPhase(id, phase) - simple SET query to update current phase
+  - appendPhaseHistory(id, record) - reads existing history, appends record, writes back as JSON
+  - Boolean fields use INTEGER (0/1) in SQLite, convert with === 1 when reading
+  - Import TDD types directly from '../tdd/types.js' for type safety
+---
