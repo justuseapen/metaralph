@@ -27,6 +27,12 @@ import {
   type RiskLevel,
 } from '../self-improve/index.js';
 import { executeRalph, displaySummary, validatePrd } from './ralph.js';
+import {
+  PhaseOrchestrator,
+  type TddResult,
+  type TddPhaseRecord,
+  type PhaseOrchestratorEvents,
+} from '../tdd/index.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -531,6 +537,162 @@ function displayWorkersStatus(): void {
   console.log('──────────────────────────────────────────────────────────────────');
 }
 
+// ============ TDD Helper Functions ============
+
+/**
+ * Get emoji for a TDD phase
+ */
+function getPhaseEmoji(phase: string): string {
+  const emojis: Record<string, string> = {
+    red: '🔴',
+    research: '🔬',
+    green: '🟢',
+    integrate: '🔗',
+    refine: '✨',
+    commit: '📝',
+  };
+  return emojis[phase] || '⚡';
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * Display phase-specific metrics
+ */
+function displayPhaseMetrics(phase: string, metrics: Record<string, unknown>): void {
+  switch (phase) {
+    case 'red':
+      if (metrics.testFilesGenerated) {
+        console.log(`   Tests generated: ${metrics.testFilesGenerated}`);
+      }
+      break;
+    case 'research':
+      if (metrics.agentsSucceeded !== undefined) {
+        console.log(`   Agents succeeded: ${metrics.agentsSucceeded}/${(metrics.agentsSucceeded as number) + (metrics.agentsFailed as number || 0)}`);
+      }
+      if (metrics.patternsDiscovered) {
+        console.log(`   Patterns discovered: ${metrics.patternsDiscovered}`);
+      }
+      break;
+    case 'green':
+      if (metrics.attempts) {
+        console.log(`   Attempts: ${metrics.attempts}`);
+      }
+      if (metrics.testsPassed !== undefined) {
+        console.log(`   Tests passed: ${metrics.testsPassed ? 'Yes' : 'No'}`);
+      }
+      break;
+    case 'integrate':
+      if (metrics.contractsValidated !== undefined) {
+        console.log(`   Contracts validated: ${metrics.contractsValidated}`);
+        console.log(`   Contracts failed: ${metrics.contractsFailed || 0}`);
+      }
+      break;
+    case 'refine':
+      if (metrics.totalBugsFound !== undefined) {
+        console.log(`   Bugs found: ${metrics.totalBugsFound} (P0: ${metrics.p0Count || 0}, P1: ${metrics.p1Count || 0})`);
+        console.log(`   Bugs fixed: ${metrics.bugsFixed || 0}`);
+        console.log(`   Iteration: ${metrics.refineIteration || 1}`);
+      }
+      break;
+    case 'commit':
+      if (metrics.prCreated !== undefined) {
+        console.log(`   PR created: ${metrics.prCreated ? 'Yes' : 'No'}`);
+        if (metrics.prUrl) {
+          console.log(`   PR URL: ${metrics.prUrl}`);
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Display TDD receipt summary
+ */
+function displayTddReceipt(result: TddResult): void {
+  if (!result.receipt) {
+    console.log('  No receipt available.');
+    return;
+  }
+
+  const { testReceipt, integrationReceipt, reviewReceipt } = result.receipt;
+
+  // Test receipt
+  console.log('  Test Results:');
+  console.log(`    Total: ${testReceipt.totalTests}`);
+  console.log(`    Passed: ${testReceipt.passed}`);
+  console.log(`    Failed: ${testReceipt.failed}`);
+  if (testReceipt.coveragePercent !== undefined) {
+    console.log(`    Coverage: ${testReceipt.coveragePercent}%`);
+  }
+
+  // Integration receipt
+  console.log('  Contract Validation:');
+  console.log(`    Validated: ${integrationReceipt.contractsValidated}`);
+  console.log(`    Failed: ${integrationReceipt.contractsFailed}`);
+  console.log(`    Layers: ${integrationReceipt.layersChecked.join(', ')}`);
+
+  // Review receipt
+  console.log('  AI Review:');
+  console.log(`    Bugs found: ${reviewReceipt.totalBugsFound} (P0: ${reviewReceipt.p0Count}, P1: ${reviewReceipt.p1Count})`);
+  console.log(`    Bugs fixed: ${reviewReceipt.bugsFixed}`);
+  console.log(`    Refine iterations: ${reviewReceipt.refineIterations}`);
+  if (reviewReceipt.opusEscalationUsed) {
+    console.log(`    Opus escalation: Yes`);
+  }
+}
+
+/**
+ * Display TDD failure report
+ */
+function displayTddFailureReport(result: TddResult): void {
+  // Show which phases completed vs failed
+  const completedPhases = result.phases.filter((p: TddPhaseRecord) => p.status === 'completed');
+  const failedPhases = result.phases.filter((p: TddPhaseRecord) => p.status === 'failed');
+
+  if (completedPhases.length > 0) {
+    console.log('  Completed phases:');
+    for (const phase of completedPhases) {
+      console.log(`    ✅ ${phase.phase.toUpperCase()}`);
+    }
+  }
+
+  if (failedPhases.length > 0) {
+    console.log('  Failed phases:');
+    for (const phase of failedPhases) {
+      console.log(`    ❌ ${phase.phase.toUpperCase()}`);
+    }
+  }
+
+  // Show phase metrics for debugging
+  const lastPhase = result.phases[result.phases.length - 1];
+  if (lastPhase?.metrics && Object.keys(lastPhase.metrics).length > 0) {
+    console.log('  Last phase metrics:');
+    for (const [key, value] of Object.entries(lastPhase.metrics)) {
+      console.log(`    ${key}: ${JSON.stringify(value)}`);
+    }
+  }
+}
+
 // Chat command - interactive conversation with MetaRalph about a project
 program
   .command('chat <project>')
@@ -607,12 +769,18 @@ program
   .option('--max-executions <n>', 'Maximum number of changes to execute', '1')
   .option('--auto-merge', 'Automatically merge successful changes')
   .option('--project <id>', 'Run on specific self-managed project by ID or name')
+  .option('--tdd', 'Use TDD workflow (RED -> RESEARCH -> GREEN -> INTEGRATE -> REFINE -> COMMIT)')
+  .option('--max-refine <n>', 'Maximum REFINE iterations for TDD mode', '3')
+  .option('--max-green-retries <n>', 'Maximum GREEN phase retries for TDD mode', '2')
   .action(async (options: {
     dryRun?: boolean;
     autoOnly?: boolean;
     maxExecutions?: string;
     autoMerge?: boolean;
     project?: string;
+    tdd?: boolean;
+    maxRefine?: string;
+    maxGreenRetries?: string;
   }) => {
     console.log('MetaRalph Self-Improvement');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -659,6 +827,139 @@ program
       console.log(`  - ${project.name}: ${project.path}`);
     }
     console.log('');
+
+    // TDD mode execution
+    if (options.tdd) {
+      console.log('Mode: TDD WORKFLOW');
+      console.log('Phases: RED -> RESEARCH -> GREEN -> INTEGRATE -> REFINE -> COMMIT');
+      console.log('');
+
+      const maxRefine = parseInt(options.maxRefine || '3', 10);
+      const maxGreenRetries = parseInt(options.maxGreenRetries || '2', 10);
+
+      if (isNaN(maxRefine) || maxRefine < 1) {
+        console.error(`✗ Invalid max-refine: ${options.maxRefine}. Must be a positive number.`);
+        process.exit(1);
+      }
+
+      if (isNaN(maxGreenRetries) || maxGreenRetries < 1) {
+        console.error(`✗ Invalid max-green-retries: ${options.maxGreenRetries}. Must be a positive number.`);
+        process.exit(1);
+      }
+
+      try {
+        for (const project of projectsToProcess) {
+          console.log(`Running TDD workflow: ${project.name}`);
+          console.log('──────────────────────────────────────────────────────────────');
+
+          // First analyze to get opportunities
+          const analysis = await SelfImprovementEngine.analyze(project);
+
+          if (analysis.opportunities.length === 0) {
+            console.log('No improvement opportunities found.');
+            console.log('');
+            continue;
+          }
+
+          // Take the first opportunity (highest priority)
+          const opportunity = analysis.safeToAutoExecute[0] || analysis.opportunities[0];
+
+          console.log(`Selected opportunity: ${opportunity.title}`);
+          console.log(`  Category: ${opportunity.category}`);
+          console.log(`  Risk: ${opportunity.riskLevel}`);
+          console.log('');
+
+          // Generate PRD JSON for the opportunity
+          const prdJson = SelfImprovementEngine.generatePrdJson(project, opportunity);
+
+          // Create orchestrator with config
+          const orchestrator = new PhaseOrchestrator({
+            maxRefineIterations: maxRefine,
+            maxGreenRetries: maxGreenRetries,
+          });
+
+          // Set up real-time phase progress display
+          let currentPhaseStart = Date.now();
+
+          orchestrator.on('phase:started', (event: PhaseOrchestratorEvents['phase:started']) => {
+            currentPhaseStart = Date.now();
+            const phaseEmoji = getPhaseEmoji(event.phase);
+            console.log(`${phaseEmoji} Phase: ${event.phase.toUpperCase()} - Started`);
+          });
+
+          orchestrator.on('phase:completed', (event: PhaseOrchestratorEvents['phase:completed']) => {
+            const duration = Date.now() - currentPhaseStart;
+            const durationStr = formatDuration(duration);
+            console.log(`✅ Phase: ${event.phase.toUpperCase()} - Completed (${durationStr})`);
+
+            // Display phase-specific metrics
+            if (event.metrics) {
+              displayPhaseMetrics(event.phase, event.metrics);
+            }
+            console.log('');
+          });
+
+          orchestrator.on('phase:failed', (event: PhaseOrchestratorEvents['phase:failed']) => {
+            console.log(`❌ Phase: ${event.phase.toUpperCase()} - Failed`);
+            console.log(`   Error: ${event.error}`);
+            console.log('');
+          });
+
+          // Run the autonomous TDD workflow
+          const tddResult = await orchestrator.runAutonomous(
+            {
+              userStory: prdJson.userStories[0],
+              prdJson: JSON.stringify(prdJson),
+            },
+            {
+              path: project.path,
+              name: project.name,
+              branchName: prdJson.branchName,
+            }
+          );
+
+          // Display final summary
+          console.log('');
+          console.log('TDD Workflow Complete');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          if (tddResult.success) {
+            console.log('Status: ✅ SUCCESS');
+
+            if (tddResult.receipt?.prUrl) {
+              console.log(`PR URL: ${tddResult.receipt.prUrl}`);
+            }
+
+            console.log('');
+            console.log('Receipt Summary:');
+            displayTddReceipt(tddResult);
+          } else {
+            console.log('Status: ❌ FAILED');
+            console.log(`Error: ${tddResult.error || 'Unknown error'}`);
+
+            console.log('');
+            console.log('Failure Report:');
+            displayTddFailureReport(tddResult);
+          }
+
+          const totalDuration = formatDuration(tddResult.totalDurationMs);
+          console.log('');
+          console.log(`Total Duration: ${totalDuration}`);
+          console.log(`Phases Executed: ${tddResult.phases.length}`);
+          console.log('');
+
+          // Exit with appropriate code
+          if (!tddResult.success) {
+            process.exit(1);
+          }
+        }
+      } catch (error) {
+        console.error(`✗ TDD workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        process.exit(1);
+      }
+
+      return;
+    }
 
     try {
       for (const project of projectsToProcess) {
