@@ -95,3 +95,23 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - The displaySummary() function branches on result.parallel to show mode-specific output
   - Pattern: For CLI features with different modes, extend the result interface with optional mode-specific fields
 ---
+
+## 2026-01-21 - US-005
+- What was implemented: Added merge conflict detection for parallel execution
+- Files changed:
+  - src/parallel/conflict-detector.ts (new file - 520 lines)
+  - src/parallel/index.ts (added ConflictDetector exports)
+  - src/cli/index.ts (added --conflict-strategy option)
+  - src/cli/ralph.ts (integrated ConflictDetector, updated RalphOptions and RalphResult)
+  - prd.json (marked US-005 as passes: true)
+- **Learnings for future iterations:**
+  - ConflictDetector tracks files by workerId, storyId, and filePath with Maps and Sets
+  - Two strategies: pessimistic (block concurrent access) and optimistic (allow, merge later)
+  - AI-powered file prediction uses Claude API with a structured prompt requesting JSON output
+  - Heuristic fallback when AI unavailable uses keyword matching (e.g., "cli" -> src/cli/**/*.ts)
+  - Conflict types: concurrent_modify, create_modify, delete_modify
+  - pathsOverlap() handles both exact paths and glob patterns (* wildcards)
+  - getSchedulingDecisions() returns can/cannot run parallel decisions based on predictions
+  - Pattern: Use optional Anthropic client in config to allow testing without API calls
+  - Pattern: Add optional fields to result interface for feature-specific stats (parallel.conflictStrategy, conflictsDetected)
+---
