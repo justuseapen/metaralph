@@ -308,3 +308,23 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - ResearchResult includes metrics: agentsSpawned, agentsSucceeded, agentsFailed, patternsDiscovered, contractsIdentified, securityConcernsFound
   - Pattern: Use Promise.all for parallel execution, but handle individual failures with try/catch inside each promise
 ---
+
+## 2026-01-21 - US-017
+- What was implemented: Implemented GREEN phase for native Ralph execution with frozen contracts
+- Files changed:
+  - src/tdd/green-phase.ts (new file - ~520 lines with GreenPhase module)
+  - src/tdd/index.ts (added GreenPhase exports)
+  - prd.json (marked US-017 as passes: true)
+- **Learnings for future iterations:**
+  - GreenPhase.run() is the main entry point - takes task, project, frozenContracts, and config
+  - EnhancedPrd interface extends Prd with frozenContracts, testSpecs, and implementationContext
+  - Enhanced PRD is written to temporary file (.green-phase-prd.json) for the spawned Claude CLI
+  - Retry logic: maxGreenRetries + 1 attempts total, collecting previous errors for context
+  - buildGreenPhasePrompt() creates specialized prompt that tells Claude to implement code to make tests pass
+  - Test verification uses spawn to run vitest/jest and parses output for pass/fail counts
+  - Test framework detection follows same pattern as TestGenerator (check package.json deps/scripts)
+  - summarizeTestErrors() extracts error lines from test output for retry context (limited to 20 lines)
+  - GreenPhaseResult includes metrics: attemptsUsed, maxAttempts, testsPassedOnAttempt, totalTestsRun, finalTestsPassing
+  - Pattern: Clean up temporary files in both success and retry paths
+  - Pattern: Use timeout with child processes to prevent hanging (clearTimeout on completion)
+---
