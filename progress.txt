@@ -150,3 +150,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Index naming convention: idx_{tablename}_{columnname}
   - Receipts are stored as JSON TEXT in test_receipt, integration_receipt, review_receipt columns
 ---
+
+## 2026-01-21 - US-008
+- What was implemented: Created TDD phase repository for CRUD operations on TDD phase records
+- Files changed:
+  - src/tdd/repositories/phase-repository.ts (new file - 230 lines)
+  - src/tdd/repositories/index.ts (new file - module exports)
+  - src/tdd/index.ts (added PhaseRepository exports)
+  - prd.json (marked US-008 as passes: true)
+- **Learnings for future iterations:**
+  - Repository pattern uses optional db parameter for testing (db?: DatabaseInstance)
+  - Use `const database = db ?? initDatabase()` and track `shouldClose = !db` to manage connection lifecycle
+  - Row-to-record conversion pattern: define PhaseRow interface matching DB columns, then convert camelCase
+  - JSON columns (metrics) need JSON.stringify on write and JSON.parse on read
+  - Dynamic update queries: build updates[] and values[] arrays, then join with commas
+  - getCurrentPhase() should check for 'running' status first, then fall back to latest by created_at
+  - Repository index.ts re-exports for clean module structure (export from './phase-repository.js')
+---
