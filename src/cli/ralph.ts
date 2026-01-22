@@ -12,6 +12,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { type UserStory } from '../collaboration/prd-builder.js';
+import {
+  ParallelScheduler,
+  type ParallelExecutionSummary,
+  type WorkerState,
+  type SchedulerStatus,
+} from '../parallel/scheduler.js';
 
 /**
  * PRD structure for Ralph execution
@@ -63,6 +69,16 @@ export interface RalphResult {
   timeElapsedMs: number;
   error?: string;
   iterations: IterationResult[];
+  /** Parallel execution specific results */
+  parallel?: {
+    batchesExecuted: number;
+    maxConcurrencyAchieved: number;
+    storiesFailed: number;
+    storiesSkipped: number;
+    estimatedSequentialTimeMs: number;
+    timeSavingsMs: number;
+    timeSavingsPercent: number;
+  };
 }
 
 /**
@@ -328,9 +344,9 @@ export async function executeRalph(
     };
   }
 
-  // Parallel mode is a placeholder for future implementation (US-004)
+  // Parallel execution mode
   if (parallel) {
-    console.log(`⚠ Parallel mode not yet implemented. Running sequentially.`);
+    return executeParallel(projectPath, prd, maxIterations, tool, maxWorkers, startTime);
   }
 
   // Sequential execution loop
@@ -407,6 +423,136 @@ export async function executeRalph(
 }
 
 /**
+ * Execute Ralph in parallel mode
+ */
+async function executeParallel(
+  projectPath: string,
+  prd: RalphPrd,
+  _maxIterations: number,
+  tool: 'claude' | 'cursor',
+  maxWorkers: number,
+  startTime: number
+): Promise<RalphResult> {
+  const totalStories = prd.userStories.length;
+  const incompleteBefore = prd.userStories.filter(s => !s.passes).length;
+
+  console.log(`\n🚀 Starting parallel execution with ${maxWorkers} workers...\n`);
+
+  // Create scheduler
+  const scheduler = new ParallelScheduler({
+    projectPath,
+    prd,
+    tool,
+    maxWorkers,
+  });
+
+  // Track active workers for status display
+  const activeWorkers = new Map<string, WorkerState>();
+  let statusUpdateInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Set up event handlers for real-time status display
+  scheduler.on('worker:started', (worker: WorkerState) => {
+    activeWorkers.set(worker.workerId, worker);
+    console.log(`  ▶ ${worker.storyId}: Started (${worker.workerId})`);
+    updateStatusDisplay(activeWorkers, scheduler);
+  });
+
+  scheduler.on('worker:completed', (worker: WorkerState) => {
+    activeWorkers.delete(worker.workerId);
+    const duration = worker.completedAt ? worker.completedAt - worker.startedAt : 0;
+    console.log(`  ✓ ${worker.storyId}: Completed (${formatDuration(duration)})`);
+    updateStatusDisplay(activeWorkers, scheduler);
+  });
+
+  scheduler.on('worker:failed', (worker: WorkerState) => {
+    activeWorkers.delete(worker.workerId);
+    const duration = worker.completedAt ? worker.completedAt - worker.startedAt : 0;
+    console.log(`  ✗ ${worker.storyId}: Failed (${formatDuration(duration)})`);
+    if (worker.errorOutput) {
+      console.log(`    Error: ${worker.errorOutput.slice(0, 200)}...`);
+    }
+    updateStatusDisplay(activeWorkers, scheduler);
+  });
+
+  scheduler.on('story:skipped', (storyId: string, reason: string) => {
+    console.log(`  ⊘ ${storyId}: Skipped - ${reason}`);
+  });
+
+  scheduler.on('batch:completed', (batchNumber: number, _storiesCompleted: string[]) => {
+    console.log(`\n  ── Batch ${batchNumber} completed ──\n`);
+  });
+
+  // Start periodic status updates
+  statusUpdateInterval = setInterval(() => {
+    if (activeWorkers.size > 0) {
+      displayRunningWorkers(activeWorkers);
+    }
+  }, 10000); // Every 10 seconds
+
+  // Run parallel execution
+  let summary: ParallelExecutionSummary;
+  try {
+    summary = await scheduler.run();
+  } finally {
+    // Clean up interval
+    if (statusUpdateInterval) {
+      clearInterval(statusUpdateInterval);
+    }
+  }
+
+  const timeElapsedMs = Date.now() - startTime;
+
+  // Estimate sequential time (sum of average story time * incomplete stories)
+  // Using a rough estimate: each story takes ~30 seconds on average
+  const estimatedSequentialTimeMs = incompleteBefore * 30000;
+  const timeSavingsMs = Math.max(0, estimatedSequentialTimeMs - timeElapsedMs);
+  const timeSavingsPercent = estimatedSequentialTimeMs > 0
+    ? Math.round((timeSavingsMs / estimatedSequentialTimeMs) * 100)
+    : 0;
+
+  return {
+    success: summary.success,
+    completed: summary.completed,
+    iterationsUsed: summary.batchesExecuted,
+    storiesCompleted: summary.storiesCompleted,
+    totalStories,
+    timeElapsedMs,
+    iterations: [], // Parallel mode doesn't track individual iterations
+    parallel: {
+      batchesExecuted: summary.batchesExecuted,
+      maxConcurrencyAchieved: summary.maxConcurrency,
+      storiesFailed: summary.storiesFailed,
+      storiesSkipped: summary.storiesSkipped,
+      estimatedSequentialTimeMs,
+      timeSavingsMs,
+      timeSavingsPercent,
+    },
+  };
+}
+
+/**
+ * Update status display with current scheduler state
+ */
+function updateStatusDisplay(activeWorkers: Map<string, WorkerState>, scheduler: ParallelScheduler): void {
+  const status = scheduler.getStatus();
+  console.log(`\n  Status: ${status.completed}✓ completed | ${status.failed}✗ failed | ${status.skipped}⊘ skipped | ${status.running}▶ running | ${status.queued} queued\n`);
+}
+
+/**
+ * Display currently running workers with elapsed time
+ */
+function displayRunningWorkers(activeWorkers: Map<string, WorkerState>): void {
+  if (activeWorkers.size === 0) return;
+
+  console.log(`\n  ── Running Workers ──`);
+  for (const worker of activeWorkers.values()) {
+    const elapsed = Date.now() - worker.startedAt;
+    console.log(`    ${worker.workerId}: ${worker.storyId} - ${formatDuration(elapsed)}`);
+  }
+  console.log();
+}
+
+/**
  * Format duration for display
  */
 export function formatDuration(ms: number): string {
@@ -431,9 +577,28 @@ export function displaySummary(result: RalphResult): void {
   console.log(`Ralph Execution Summary`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`Status:           ${result.completed ? '✓ COMPLETE' : '✗ INCOMPLETE'}`);
-  console.log(`Iterations used:  ${result.iterationsUsed}`);
-  console.log(`Stories:          ${result.storiesCompleted}/${result.totalStories} completed`);
-  console.log(`Time elapsed:     ${formatDuration(result.timeElapsedMs)}`);
+
+  if (result.parallel) {
+    // Parallel execution summary
+    console.log(`Mode:             Parallel (${result.parallel.maxConcurrencyAchieved} max workers)`);
+    console.log(`Batches:          ${result.parallel.batchesExecuted}`);
+    console.log(`Stories:          ${result.storiesCompleted}/${result.totalStories} completed`);
+    if (result.parallel.storiesFailed > 0) {
+      console.log(`  Failed:         ${result.parallel.storiesFailed}`);
+    }
+    if (result.parallel.storiesSkipped > 0) {
+      console.log(`  Skipped:        ${result.parallel.storiesSkipped} (blocked by failed dependencies)`);
+    }
+    console.log(`Time elapsed:     ${formatDuration(result.timeElapsedMs)}`);
+    console.log(`Est. sequential:  ${formatDuration(result.parallel.estimatedSequentialTimeMs)}`);
+    console.log(`Time savings:     ${formatDuration(result.parallel.timeSavingsMs)} (${result.parallel.timeSavingsPercent}%)`);
+  } else {
+    // Sequential execution summary
+    console.log(`Mode:             Sequential`);
+    console.log(`Iterations used:  ${result.iterationsUsed}`);
+    console.log(`Stories:          ${result.storiesCompleted}/${result.totalStories} completed`);
+    console.log(`Time elapsed:     ${formatDuration(result.timeElapsedMs)}`);
+  }
 
   if (result.error) {
     console.log(`Error:            ${result.error}`);
