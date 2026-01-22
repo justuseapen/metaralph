@@ -571,3 +571,41 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Console output can be suppressed during tests by replacing console.log/console.error with mocks
   - The ralph command supports both sequential (default) and parallel execution modes
 ---
+
+## 2026-01-22 - US-031
+- What was implemented: Added comprehensive unit tests for the Phase Orchestrator module
+- Files changed:
+  - src/tdd/phase-orchestrator.test.ts (new file - 43 tests covering all acceptance criteria)
+  - prd.json (marked US-031 as passes: true)
+- **Learnings for future iterations:**
+  - PhaseOrchestrator extends EventEmitter, similar to ParallelScheduler pattern
+  - VALID_TRANSITIONS defines allowed phase transitions as Record<TddPhase | 'start', TddPhase[]>
+  - The 'start' pseudo-phase is used when no phases exist yet (only transitions to 'red')
+  - REFINE is special: can transition to itself (loop) or to COMMIT
+  - Mock all phase modules (TestGenerator, ResearchCoordinator, GreenPhase, ContractValidator, BugClassifier, ReceiptBuilder)
+  - Use vi.hoisted() pattern for declaring mock functions before vi.mock() calls
+  - Helper function pattern: createUserStory(), createTaskContext(), createProjectContext(), createPhaseRecord(), createFrozenContracts(), createBug()
+  - setupSuccessfulWorkflowMocks() helper sets up all mocks for a successful workflow run
+  - Test sections: constructor (4), canTransition (7), transitionToPhase (4), handlePhaseFailure (2), runAutonomous (9), REFINE phase loop (6), phase failure scenarios (5), event emissions (4), config access (2)
+  - For testing escalation, verify mockBugClassifierAutoFix is called with isFinalIteration flag on final REFINE iteration
+  - P0/P1 bug check determines whether autoFix is called - bugs with only P2/P3 severity skip auto-fix
+---
+
+## 2026-01-22 - US-032
+- What was implemented: Added comprehensive unit tests for the Test Generator module (RED phase)
+- Files changed:
+  - src/tdd/test-generator.test.ts (new file - 64 tests covering all acceptance criteria)
+  - prd.json (marked US-032 as passes: true)
+- **Learnings for future iterations:**
+  - TestGenerator is a module object with static methods, not a class (use object pattern for mocking)
+  - Mock node:fs with both default and named exports for ESM compatibility
+  - Mock node:child_process spawn for verifyTestsFailing tests using EventEmitter pattern
+  - extractTestableRequirements() filters non-functional criteria like "Typecheck passes", "Lint passes", "Build passes"
+  - inferTestType() uses keyword matching: API/database/endpoint -> integration, user/UI/page/click -> e2e, else -> unit
+  - detectTestFramework() checks package.json dependencies and scripts in order: vitest deps > jest deps > scripts > default to vitest
+  - detectTestLocation() checks for co-located .test.ts files vs __tests__ directories
+  - verifyTestsFailing() returns success=true when tests fail (expected in RED phase), success=false when tests pass
+  - storyIdToModuleName() converts "US-015" to "us015" (lowercase, remove hyphens)
+  - Test sections: extractTestableRequirements (8), inferTestType (3), detectTestFramework (10), detectTestLocation (5), generate (15), generateUnitTests (4), generateIntegrationTests (1), generateE2eTests (2), verifyTestsFailing (5), getTestFilePath (4), others (7)
+  - For AI client mocking, create mock object with messages.create method and use mockResolvedValue
+---

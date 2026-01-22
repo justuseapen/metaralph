@@ -641,7 +641,7 @@
         "Typecheck passes"
       ],
       "priority": 32,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-013"],
       "notes": "Unit tests for core orchestrator."
     },
@@ -661,7 +661,7 @@
         "Typecheck passes"
       ],
       "priority": 33,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-015"],
       "notes": "Unit tests for RED phase."
     },
