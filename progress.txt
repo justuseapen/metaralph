@@ -45,3 +45,21 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - When removing old functions, ensure no dangling references exist elsewhere in the codebase
   - Archive and historical PRD files can be left unchanged as they document the history
 ---
+
+## 2026-01-21 - US-002
+- What was implemented: Added dependency analyzer for prd.json to enable parallel story execution
+- Files changed:
+  - src/parallel/dependency-analyzer.ts (new file - 285 lines)
+  - src/parallel/index.ts (new file - module exports)
+  - src/collaboration/prd-builder.ts (added dependsOn field to UserStory interface)
+  - prd.json (marked US-002 as passes: true)
+- **Learnings for future iterations:**
+  - The DependencyAnalyzer class builds a DAG from UserStory dependencies
+  - Cycle detection uses DFS with a recursion stack to track the current path
+  - For backward compatibility: stories without dependsOn are treated as depending on all prior stories by priority
+  - getReadyStories() checks both the `passes` field and completion sets to determine readiness
+  - getParallelBatches() organizes stories into execution waves where each batch's dependencies are in previous batches
+  - Topological sort uses post-order DFS (visit dependencies first, then add to result)
+  - Export pattern: Create index.ts in the module directory to re-export classes and types
+  - The UserStory interface is in prd-builder.ts - add new optional fields there to extend story metadata
+---
