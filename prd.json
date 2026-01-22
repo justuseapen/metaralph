@@ -532,7 +532,7 @@
         "Typecheck passes"
       ],
       "priority": 26,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-013"],
       "notes": "Observation command for monitoring TDD progress."
     },

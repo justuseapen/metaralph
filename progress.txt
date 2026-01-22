@@ -472,3 +472,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use emojis for visual phase status (🔴 RED, 🔬 RESEARCH, 🟢 GREEN, etc.)
   - Pattern: Track phase start time with variable and compute duration on completion
 ---
+
+## 2026-01-21 - US-025
+- What was implemented: Added tdd-status CLI command to view TDD execution progress
+- Files changed:
+  - src/cli/index.ts (added ~205 lines for tdd-status command)
+  - prd.json (marked US-025 as passes: true)
+- **Learnings for future iterations:**
+  - The tdd-status command takes an execution ID and displays TDD progress for that execution
+  - Uses PhaseRepository.findByExecution() to get all phases and PhaseRepository.getCurrentPhase() for current phase
+  - Checks execution.tddEnabled to verify this is a TDD execution before displaying status
+  - Helper functions added: formatPhaseStatus(), calculatePhaseDuration(), formatTimestamp(), displayTimeEstimates()
+  - Time estimates use PHASE_TIME_TARGETS constants to calculate remaining time for running/pending phases
+  - Duration calculation handles: completed phases (start to end), running phases (start to now with * marker), and not started (N/A)
+  - Phase status formatting uses emoji indicators: ✅ Completed, 🔄 Running, ❌ Failed, ⏭️ Skipped, ⏳ Pending
+  - Reuses existing helper functions: getPhaseEmoji(), formatDuration(), displayPhaseMetrics()
+  - Pattern: Use tabular display format with consistent column widths for readability
+---
