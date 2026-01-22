@@ -496,7 +496,7 @@
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-015", "US-016", "US-017", "US-018", "US-020", "US-022"],
       "notes": "Integration - wires up all phases into the autonomous loop."
     },

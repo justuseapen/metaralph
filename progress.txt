@@ -432,3 +432,23 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use spawn() from node:child_process for running CLI commands with complex arguments
   - Pattern: Return success/failure result objects rather than throwing for recoverable errors
 ---
+
+## 2026-01-21 - US-023
+- What was implemented: Wired up PhaseOrchestrator with all phase modules for full autonomous TDD workflow
+- Files changed:
+  - src/tdd/phase-orchestrator.ts (added ~300 lines wiring all phases together)
+  - prd.json (marked US-023 as passes: true)
+- **Learnings for future iterations:**
+  - PhaseOrchestrator.runAutonomous() now executes all 6 phases in sequence: RED → RESEARCH → GREEN → INTEGRATE → REFINE → COMMIT
+  - Each phase is called via its module: TestGenerator.generate(), ResearchCoordinator.runParallel(), GreenPhase.run(), ContractValidator.validate(), BugClassifier.aiReview() + autoFix(), ReceiptBuilder.build() + createPr()
+  - Checkpoint is created via Rollback.createCheckpoint() before workflow starts
+  - On failure, automatic rollback via Rollback.rollbackToCheckpoint()
+  - REFINE phase loops until BugRepository.canExitRefineLoop() returns true (P0=0 AND P1=0) or maxRefineIterations reached
+  - On final REFINE iteration, isFinalIteration flag enables escalation to opus model
+  - Phase results are stored in instance variables (testFiles, frozenContracts, bugs, currentRefinePhaseId) for passing between phases
+  - TestGeneratorProjectContext requires srcDir and testLocation fields beyond basic path/name
+  - ResearchCoordinator.runParallel() takes ResearchContext with projectPath and projectName (not generic projectContext)
+  - For Rollback, create a simple object matching Project interface fields (id, name, path, group_id, deploy_config, added_at, updated_at)
+  - Pattern: Use executePhase() helper method to handle common phase logic (create record, emit events, error handling)
+  - Pattern: Use executePhaseLogic() switch statement to dispatch to correct phase implementation
+---
