@@ -31,12 +31,17 @@ import {
   PhaseOrchestrator,
   PhaseRepository,
   BugRepository,
+  ReceiptRepository,
   type TddResult,
   type TddPhaseRecord,
   type PhaseOrchestratorEvents,
   type TddPhase,
   type BugSeverity,
   type Bug,
+  type PrReceipt,
+  type TestReceipt,
+  type IntegrationReceipt,
+  type ReviewReceipt,
   PHASE_TIME_TARGETS,
 } from '../tdd/index.js';
 
@@ -1534,6 +1539,162 @@ function truncateString(str: string, maxLength: number): string {
     return str.padEnd(maxLength);
   }
   return str.slice(0, maxLength - 3) + '...';
+}
+
+// TDD Receipt command - view PR receipts for TDD executions
+program
+  .command('tdd-receipt <execution>')
+  .description('View PR receipt for a TDD execution')
+  .action((executionId: string) => {
+    displayTddReceipt2(executionId);
+  });
+
+/**
+ * Display TDD PR receipt for an execution
+ */
+function displayTddReceipt2(executionId: string): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  console.log('TDD PR Receipt');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  console.log(`Task ID:      ${execution.taskId}`);
+  console.log(`Status:       ${execution.status}`);
+  console.log('');
+
+  // Get receipt from database
+  const receipt = ReceiptRepository.findByExecution(executionId);
+
+  if (!receipt) {
+    console.log('No receipt found for this execution.');
+    console.log('');
+    console.log('Receipts are created during the COMMIT phase of the TDD workflow.');
+    console.log('If the workflow has not completed, no receipt will be available.');
+    console.log('');
+    return;
+  }
+
+  // Display PR URL if available
+  if (receipt.prUrl) {
+    console.log('Pull Request');
+    console.log('──────────────────────────────────────────────────────────────');
+    console.log(`PR URL: ${receipt.prUrl}`);
+    console.log('');
+  }
+
+  // Display test receipt
+  displayTestReceiptSection(receipt.testReceipt);
+  console.log('');
+
+  // Display integration receipt
+  displayIntegrationReceiptSection(receipt.integrationReceipt);
+  console.log('');
+
+  // Display review receipt
+  displayReviewReceiptSection(receipt.reviewReceipt);
+  console.log('');
+
+  // Display receipt metadata
+  console.log('Receipt Metadata');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log(`Receipt ID: ${receipt.id}`);
+  console.log(`Created:    ${formatTimestamp(receipt.createdAt)}`);
+  console.log('');
+}
+
+/**
+ * Display test receipt section
+ */
+function displayTestReceiptSection(testReceipt: TestReceipt): void {
+  console.log('Test Results');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  const passRate = testReceipt.totalTests > 0
+    ? Math.round((testReceipt.passed / testReceipt.totalTests) * 100)
+    : 0;
+
+  // Determine status indicator
+  const statusIndicator = testReceipt.failed === 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Total Tests: ${testReceipt.totalTests}`);
+  console.log(`   Passed:      ${testReceipt.passed} (${passRate}%)`);
+  console.log(`   Failed:      ${testReceipt.failed}`);
+  console.log(`   Skipped:     ${testReceipt.skipped}`);
+
+  if (testReceipt.coveragePercent !== undefined) {
+    const coverageIndicator = testReceipt.coveragePercent >= 80 ? '✅' :
+                              testReceipt.coveragePercent >= 60 ? '⚠️' : '❌';
+    console.log(`${coverageIndicator} Coverage:    ${testReceipt.coveragePercent}%`);
+  }
+
+  if (testReceipt.durationMs !== undefined) {
+    console.log(`   Duration:    ${formatDuration(testReceipt.durationMs)}`);
+  }
+}
+
+/**
+ * Display integration receipt section
+ */
+function displayIntegrationReceiptSection(integrationReceipt: IntegrationReceipt): void {
+  console.log('Contract Validation');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  const statusIndicator = integrationReceipt.contractsFailed === 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Contracts Validated: ${integrationReceipt.contractsValidated}`);
+  console.log(`   Contracts Failed:   ${integrationReceipt.contractsFailed}`);
+  console.log(`   Layers Checked:     ${integrationReceipt.layersChecked.join(', ') || 'none'}`);
+
+  if (integrationReceipt.errors && integrationReceipt.errors.length > 0) {
+    console.log('');
+    console.log('   Validation Errors:');
+    for (const error of integrationReceipt.errors.slice(0, 5)) {
+      console.log(`     - ${truncateString(error, 58)}`);
+    }
+    if (integrationReceipt.errors.length > 5) {
+      console.log(`     ... and ${integrationReceipt.errors.length - 5} more`);
+    }
+  }
+}
+
+/**
+ * Display review receipt section
+ */
+function displayReviewReceiptSection(reviewReceipt: ReviewReceipt): void {
+  console.log('AI Review');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  // Determine status based on P0/P1 counts
+  const openP0P1 = reviewReceipt.p0Count + reviewReceipt.p1Count - reviewReceipt.bugsFixed;
+  const statusIndicator = openP0P1 <= 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Total Bugs Found:   ${reviewReceipt.totalBugsFound}`);
+  console.log('');
+  console.log('   By Severity:');
+  console.log(`     🔴 P0 (Critical): ${reviewReceipt.p0Count}`);
+  console.log(`     🟠 P1 (High):     ${reviewReceipt.p1Count}`);
+  console.log(`     🟡 P2 (Medium):   ${reviewReceipt.p2Count}`);
+  console.log(`     🟢 P3 (Low):      ${reviewReceipt.p3Count}`);
+  console.log('');
+  console.log(`   Bugs Fixed:          ${reviewReceipt.bugsFixed}`);
+  console.log(`   Refine Iterations:   ${reviewReceipt.refineIterations}`);
+
+  if (reviewReceipt.opusEscalationUsed) {
+    console.log(`   Opus Escalation:     Yes (used for harder bugs)`);
+  }
 }
 
 // Default action (no subcommand) - launch dashboard
