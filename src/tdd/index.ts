@@ -12,6 +12,13 @@ export {
   PhaseRepository,
   type CreatePhaseInput,
   type UpdatePhaseInput,
+  TestRepository,
+  type CreateTestInput,
+  type UpdateTestInput,
+  type TestStatusCounts,
+  AgentRepository,
+  type CreateAgentInput,
+  type UpdateAgentInput,
 } from './repositories/index.js';
 
 // Export all types

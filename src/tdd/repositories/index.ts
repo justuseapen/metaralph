@@ -16,3 +16,9 @@ export {
   type UpdateTestInput,
   type TestStatusCounts,
 } from './test-repository.js';
+
+export {
+  AgentRepository,
+  type CreateAgentInput,
+  type UpdateAgentInput,
+} from './agent-repository.js';
