@@ -167,3 +167,18 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - getCurrentPhase() should check for 'running' status first, then fall back to latest by created_at
   - Repository index.ts re-exports for clean module structure (export from './phase-repository.js')
 ---
+
+## 2026-01-21 - US-009
+- What was implemented: Created generated tests repository for CRUD operations on test records
+- Files changed:
+  - src/tdd/repositories/test-repository.ts (new file - ~260 lines)
+  - src/tdd/repositories/index.ts (added TestRepository exports)
+  - prd.json (marked US-009 as passes: true)
+- **Learnings for future iterations:**
+  - TestRepository follows identical patterns to PhaseRepository for consistency
+  - countByStatus() uses GROUP BY to aggregate counts across statuses in a single query
+  - TestStatusCounts interface provides total count plus individual status counts (failing, passing, error, skipped)
+  - findById() is included as a helper even though not in acceptance criteria - useful for update() return value
+  - The optional errorMessage field maps to nullable error_message column - use `?? undefined` for null->undefined conversion
+  - Generated tests default to 'failing' status - this is the expected TDD state for newly created tests
+---
