@@ -26,6 +26,24 @@ import {
   getRegisteredSelfProjects,
   type RiskLevel,
 } from '../self-improve/index.js';
+import { executeRalph, displaySummary, validatePrd } from './ralph.js';
+import {
+  PhaseOrchestrator,
+  PhaseRepository,
+  BugRepository,
+  ReceiptRepository,
+  type TddResult,
+  type TddPhaseRecord,
+  type PhaseOrchestratorEvents,
+  type TddPhase,
+  type BugSeverity,
+  type Bug,
+  type PrReceipt,
+  type TestReceipt,
+  type IntegrationReceipt,
+  type ReviewReceipt,
+  PHASE_TIME_TARGETS,
+} from '../tdd/index.js';
 
 // Get package.json path for version info
 const __filename = fileURLToPath(import.meta.url);
@@ -530,6 +548,162 @@ function displayWorkersStatus(): void {
   console.log('──────────────────────────────────────────────────────────────────');
 }
 
+// ============ TDD Helper Functions ============
+
+/**
+ * Get emoji for a TDD phase
+ */
+function getPhaseEmoji(phase: string): string {
+  const emojis: Record<string, string> = {
+    red: '🔴',
+    research: '🔬',
+    green: '🟢',
+    integrate: '🔗',
+    refine: '✨',
+    commit: '📝',
+  };
+  return emojis[phase] || '⚡';
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * Display phase-specific metrics
+ */
+function displayPhaseMetrics(phase: string, metrics: Record<string, unknown>): void {
+  switch (phase) {
+    case 'red':
+      if (metrics.testFilesGenerated) {
+        console.log(`   Tests generated: ${metrics.testFilesGenerated}`);
+      }
+      break;
+    case 'research':
+      if (metrics.agentsSucceeded !== undefined) {
+        console.log(`   Agents succeeded: ${metrics.agentsSucceeded}/${(metrics.agentsSucceeded as number) + (metrics.agentsFailed as number || 0)}`);
+      }
+      if (metrics.patternsDiscovered) {
+        console.log(`   Patterns discovered: ${metrics.patternsDiscovered}`);
+      }
+      break;
+    case 'green':
+      if (metrics.attempts) {
+        console.log(`   Attempts: ${metrics.attempts}`);
+      }
+      if (metrics.testsPassed !== undefined) {
+        console.log(`   Tests passed: ${metrics.testsPassed ? 'Yes' : 'No'}`);
+      }
+      break;
+    case 'integrate':
+      if (metrics.contractsValidated !== undefined) {
+        console.log(`   Contracts validated: ${metrics.contractsValidated}`);
+        console.log(`   Contracts failed: ${metrics.contractsFailed || 0}`);
+      }
+      break;
+    case 'refine':
+      if (metrics.totalBugsFound !== undefined) {
+        console.log(`   Bugs found: ${metrics.totalBugsFound} (P0: ${metrics.p0Count || 0}, P1: ${metrics.p1Count || 0})`);
+        console.log(`   Bugs fixed: ${metrics.bugsFixed || 0}`);
+        console.log(`   Iteration: ${metrics.refineIteration || 1}`);
+      }
+      break;
+    case 'commit':
+      if (metrics.prCreated !== undefined) {
+        console.log(`   PR created: ${metrics.prCreated ? 'Yes' : 'No'}`);
+        if (metrics.prUrl) {
+          console.log(`   PR URL: ${metrics.prUrl}`);
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Display TDD receipt summary
+ */
+function displayTddReceipt(result: TddResult): void {
+  if (!result.receipt) {
+    console.log('  No receipt available.');
+    return;
+  }
+
+  const { testReceipt, integrationReceipt, reviewReceipt } = result.receipt;
+
+  // Test receipt
+  console.log('  Test Results:');
+  console.log(`    Total: ${testReceipt.totalTests}`);
+  console.log(`    Passed: ${testReceipt.passed}`);
+  console.log(`    Failed: ${testReceipt.failed}`);
+  if (testReceipt.coveragePercent !== undefined) {
+    console.log(`    Coverage: ${testReceipt.coveragePercent}%`);
+  }
+
+  // Integration receipt
+  console.log('  Contract Validation:');
+  console.log(`    Validated: ${integrationReceipt.contractsValidated}`);
+  console.log(`    Failed: ${integrationReceipt.contractsFailed}`);
+  console.log(`    Layers: ${integrationReceipt.layersChecked.join(', ')}`);
+
+  // Review receipt
+  console.log('  AI Review:');
+  console.log(`    Bugs found: ${reviewReceipt.totalBugsFound} (P0: ${reviewReceipt.p0Count}, P1: ${reviewReceipt.p1Count})`);
+  console.log(`    Bugs fixed: ${reviewReceipt.bugsFixed}`);
+  console.log(`    Refine iterations: ${reviewReceipt.refineIterations}`);
+  if (reviewReceipt.opusEscalationUsed) {
+    console.log(`    Opus escalation: Yes`);
+  }
+}
+
+/**
+ * Display TDD failure report
+ */
+function displayTddFailureReport(result: TddResult): void {
+  // Show which phases completed vs failed
+  const completedPhases = result.phases.filter((p: TddPhaseRecord) => p.status === 'completed');
+  const failedPhases = result.phases.filter((p: TddPhaseRecord) => p.status === 'failed');
+
+  if (completedPhases.length > 0) {
+    console.log('  Completed phases:');
+    for (const phase of completedPhases) {
+      console.log(`    ✅ ${phase.phase.toUpperCase()}`);
+    }
+  }
+
+  if (failedPhases.length > 0) {
+    console.log('  Failed phases:');
+    for (const phase of failedPhases) {
+      console.log(`    ❌ ${phase.phase.toUpperCase()}`);
+    }
+  }
+
+  // Show phase metrics for debugging
+  const lastPhase = result.phases[result.phases.length - 1];
+  if (lastPhase?.metrics && Object.keys(lastPhase.metrics).length > 0) {
+    console.log('  Last phase metrics:');
+    for (const [key, value] of Object.entries(lastPhase.metrics)) {
+      console.log(`    ${key}: ${JSON.stringify(value)}`);
+    }
+  }
+}
+
 // Chat command - interactive conversation with MetaRalph about a project
 program
   .command('chat <project>')
@@ -606,12 +780,18 @@ program
   .option('--max-executions <n>', 'Maximum number of changes to execute', '1')
   .option('--auto-merge', 'Automatically merge successful changes')
   .option('--project <id>', 'Run on specific self-managed project by ID or name')
+  .option('--tdd', 'Use TDD workflow (RED -> RESEARCH -> GREEN -> INTEGRATE -> REFINE -> COMMIT)')
+  .option('--max-refine <n>', 'Maximum REFINE iterations for TDD mode', '3')
+  .option('--max-green-retries <n>', 'Maximum GREEN phase retries for TDD mode', '2')
   .action(async (options: {
     dryRun?: boolean;
     autoOnly?: boolean;
     maxExecutions?: string;
     autoMerge?: boolean;
     project?: string;
+    tdd?: boolean;
+    maxRefine?: string;
+    maxGreenRetries?: string;
   }) => {
     console.log('MetaRalph Self-Improvement');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -658,6 +838,139 @@ program
       console.log(`  - ${project.name}: ${project.path}`);
     }
     console.log('');
+
+    // TDD mode execution
+    if (options.tdd) {
+      console.log('Mode: TDD WORKFLOW');
+      console.log('Phases: RED -> RESEARCH -> GREEN -> INTEGRATE -> REFINE -> COMMIT');
+      console.log('');
+
+      const maxRefine = parseInt(options.maxRefine || '3', 10);
+      const maxGreenRetries = parseInt(options.maxGreenRetries || '2', 10);
+
+      if (isNaN(maxRefine) || maxRefine < 1) {
+        console.error(`✗ Invalid max-refine: ${options.maxRefine}. Must be a positive number.`);
+        process.exit(1);
+      }
+
+      if (isNaN(maxGreenRetries) || maxGreenRetries < 1) {
+        console.error(`✗ Invalid max-green-retries: ${options.maxGreenRetries}. Must be a positive number.`);
+        process.exit(1);
+      }
+
+      try {
+        for (const project of projectsToProcess) {
+          console.log(`Running TDD workflow: ${project.name}`);
+          console.log('──────────────────────────────────────────────────────────────');
+
+          // First analyze to get opportunities
+          const analysis = await SelfImprovementEngine.analyze(project);
+
+          if (analysis.opportunities.length === 0) {
+            console.log('No improvement opportunities found.');
+            console.log('');
+            continue;
+          }
+
+          // Take the first opportunity (highest priority)
+          const opportunity = analysis.safeToAutoExecute[0] || analysis.opportunities[0];
+
+          console.log(`Selected opportunity: ${opportunity.title}`);
+          console.log(`  Category: ${opportunity.category}`);
+          console.log(`  Risk: ${opportunity.riskLevel}`);
+          console.log('');
+
+          // Generate PRD JSON for the opportunity
+          const prdJson = SelfImprovementEngine.generatePrdJson(project, opportunity);
+
+          // Create orchestrator with config
+          const orchestrator = new PhaseOrchestrator({
+            maxRefineIterations: maxRefine,
+            maxGreenRetries: maxGreenRetries,
+          });
+
+          // Set up real-time phase progress display
+          let currentPhaseStart = Date.now();
+
+          orchestrator.on('phase:started', (event: PhaseOrchestratorEvents['phase:started']) => {
+            currentPhaseStart = Date.now();
+            const phaseEmoji = getPhaseEmoji(event.phase);
+            console.log(`${phaseEmoji} Phase: ${event.phase.toUpperCase()} - Started`);
+          });
+
+          orchestrator.on('phase:completed', (event: PhaseOrchestratorEvents['phase:completed']) => {
+            const duration = Date.now() - currentPhaseStart;
+            const durationStr = formatDuration(duration);
+            console.log(`✅ Phase: ${event.phase.toUpperCase()} - Completed (${durationStr})`);
+
+            // Display phase-specific metrics
+            if (event.metrics) {
+              displayPhaseMetrics(event.phase, event.metrics);
+            }
+            console.log('');
+          });
+
+          orchestrator.on('phase:failed', (event: PhaseOrchestratorEvents['phase:failed']) => {
+            console.log(`❌ Phase: ${event.phase.toUpperCase()} - Failed`);
+            console.log(`   Error: ${event.error}`);
+            console.log('');
+          });
+
+          // Run the autonomous TDD workflow
+          const tddResult = await orchestrator.runAutonomous(
+            {
+              userStory: prdJson.userStories[0],
+              prdJson: JSON.stringify(prdJson),
+            },
+            {
+              path: project.path,
+              name: project.name,
+              branchName: prdJson.branchName,
+            }
+          );
+
+          // Display final summary
+          console.log('');
+          console.log('TDD Workflow Complete');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          if (tddResult.success) {
+            console.log('Status: ✅ SUCCESS');
+
+            if (tddResult.receipt?.prUrl) {
+              console.log(`PR URL: ${tddResult.receipt.prUrl}`);
+            }
+
+            console.log('');
+            console.log('Receipt Summary:');
+            displayTddReceipt(tddResult);
+          } else {
+            console.log('Status: ❌ FAILED');
+            console.log(`Error: ${tddResult.error || 'Unknown error'}`);
+
+            console.log('');
+            console.log('Failure Report:');
+            displayTddFailureReport(tddResult);
+          }
+
+          const totalDuration = formatDuration(tddResult.totalDurationMs);
+          console.log('');
+          console.log(`Total Duration: ${totalDuration}`);
+          console.log(`Phases Executed: ${tddResult.phases.length}`);
+          console.log('');
+
+          // Exit with appropriate code
+          if (!tddResult.success) {
+            process.exit(1);
+          }
+        }
+      } catch (error) {
+        console.error(`✗ TDD workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        process.exit(1);
+      }
+
+      return;
+    }
 
     try {
       for (const project of projectsToProcess) {
@@ -760,6 +1073,629 @@ program
       process.exit(1);
     }
   });
+
+// Ralph command - native Ralph execution without external scripts
+program
+  .command('ralph [path]')
+  .description('Run Ralph loops natively using Claude Code CLI')
+  .option('-i, --iterations <n>', 'Maximum iterations before stopping', '10')
+  .option('-t, --tool <tool>', 'Tool to use for execution (claude or cursor)', 'claude')
+  .option('-p, --parallel', 'Enable parallel story execution (experimental)')
+  .option('-w, --max-workers <n>', 'Maximum concurrent workers for parallel mode', '3')
+  .option('-c, --conflict-strategy <strategy>', 'Conflict strategy for parallel mode (pessimistic or optimistic)', 'pessimistic')
+  .action(async (projectPath: string | undefined, options: {
+    iterations?: string;
+    tool?: string;
+    parallel?: boolean;
+    maxWorkers?: string;
+    conflictStrategy?: string;
+  }) => {
+    // Default path to current directory
+    const targetPath = projectPath ? path.resolve(projectPath) : process.cwd();
+
+    // Validate path exists
+    if (!fs.existsSync(targetPath)) {
+      console.error(`✗ Directory not found: ${targetPath}`);
+      process.exit(1);
+    }
+
+    // Validate prd.json exists before starting
+    const prdPath = path.join(targetPath, 'prd.json');
+    const prdValidation = validatePrd(prdPath);
+    if (!prdValidation.valid) {
+      console.error(`✗ ${prdValidation.error}`);
+      process.exit(1);
+    }
+
+    // Validate tool option
+    const tool = options.tool as 'claude' | 'cursor';
+    if (tool !== 'claude' && tool !== 'cursor') {
+      console.error(`✗ Invalid tool: ${options.tool}. Must be 'claude' or 'cursor'.`);
+      process.exit(1);
+    }
+
+    // Parse options
+    const iterations = parseInt(options.iterations ?? '10', 10);
+    const maxWorkers = parseInt(options.maxWorkers ?? '3', 10);
+
+    if (isNaN(iterations) || iterations < 1) {
+      console.error(`✗ Invalid iterations: ${options.iterations}. Must be a positive number.`);
+      process.exit(1);
+    }
+
+    if (isNaN(maxWorkers) || maxWorkers < 1) {
+      console.error(`✗ Invalid max-workers: ${options.maxWorkers}. Must be a positive number.`);
+      process.exit(1);
+    }
+
+    // Validate conflict strategy
+    const conflictStrategy = options.conflictStrategy as 'pessimistic' | 'optimistic';
+    if (conflictStrategy !== 'pessimistic' && conflictStrategy !== 'optimistic') {
+      console.error(`✗ Invalid conflict-strategy: ${options.conflictStrategy}. Must be 'pessimistic' or 'optimistic'.`);
+      process.exit(1);
+    }
+
+    try {
+      const result = await executeRalph(targetPath, {
+        iterations,
+        tool,
+        parallel: options.parallel ?? false,
+        maxWorkers,
+        conflictStrategy,
+      });
+
+      displaySummary(result);
+
+      // Exit with appropriate code
+      process.exit(result.success ? 0 : 1);
+    } catch (error) {
+      console.error(`✗ Ralph execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+// TDD Status command - view TDD execution progress
+program
+  .command('tdd-status <execution>')
+  .description('View TDD execution progress and phase history')
+  .action((executionId: string) => {
+    displayTddStatus(executionId);
+  });
+
+/**
+ * Display TDD execution status
+ */
+function displayTddStatus(executionId: string): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  console.log('TDD Execution Status');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  console.log(`Task ID:      ${execution.taskId}`);
+  console.log(`Status:       ${execution.status}`);
+  console.log('');
+
+  // Get all phases from database
+  const phases = PhaseRepository.findByExecution(executionId);
+
+  if (phases.length === 0) {
+    console.log('No phases have been executed yet.');
+    console.log('');
+    return;
+  }
+
+  // Display current phase
+  const currentPhase = PhaseRepository.getCurrentPhase(executionId);
+  if (currentPhase) {
+    const emoji = getPhaseEmoji(currentPhase.phase);
+    console.log('Current Phase');
+    console.log('──────────────────────────────────────────────────────────────');
+    console.log(`${emoji} ${currentPhase.phase.toUpperCase()} - ${currentPhase.status}`);
+
+    if (currentPhase.startedAt) {
+      console.log(`Started: ${currentPhase.startedAt}`);
+    }
+    if (currentPhase.status === 'running' && currentPhase.startedAt) {
+      const elapsed = Date.now() - new Date(currentPhase.startedAt).getTime();
+      console.log(`Elapsed: ${formatDuration(elapsed)}`);
+    }
+    console.log('');
+  }
+
+  // Display phase history with durations
+  console.log('Phase History');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Phase        | Status      | Duration    | Started');
+  console.log('─────────────┼─────────────┼─────────────┼───────────────────────');
+
+  for (const phase of phases) {
+    const emoji = getPhaseEmoji(phase.phase);
+    const statusDisplay = formatPhaseStatus(phase.status);
+    const duration = calculatePhaseDuration(phase);
+    const startedAt = phase.startedAt ? formatTimestamp(phase.startedAt) : 'N/A';
+
+    console.log(`${emoji} ${phase.phase.padEnd(9)} | ${statusDisplay.padEnd(11)} | ${duration.padEnd(11)} | ${startedAt}`);
+
+    // Display phase-specific metrics inline if available
+    if (phase.metrics && Object.keys(phase.metrics).length > 0) {
+      displayPhaseMetrics(phase.phase, phase.metrics);
+    }
+  }
+
+  console.log('');
+
+  // Calculate elapsed time and estimated remaining
+  displayTimeEstimates(phases, execution.status);
+
+  console.log('');
+}
+
+/**
+ * Format phase status with appropriate indicator
+ */
+function formatPhaseStatus(status: string): string {
+  switch (status) {
+    case 'completed':
+      return '✅ Completed';
+    case 'running':
+      return '🔄 Running';
+    case 'failed':
+      return '❌ Failed';
+    case 'skipped':
+      return '⏭️ Skipped';
+    case 'pending':
+    default:
+      return '⏳ Pending';
+  }
+}
+
+/**
+ * Calculate duration between phase start and completion
+ */
+function calculatePhaseDuration(phase: TddPhaseRecord): string {
+  if (!phase.startedAt) {
+    return 'N/A';
+  }
+
+  const startTime = new Date(phase.startedAt).getTime();
+
+  if (phase.completedAt) {
+    const endTime = new Date(phase.completedAt).getTime();
+    return formatDuration(endTime - startTime);
+  }
+
+  if (phase.status === 'running') {
+    // Still running - show elapsed
+    return formatDuration(Date.now() - startTime) + '*';
+  }
+
+  return 'N/A';
+}
+
+/**
+ * Format timestamp to a shorter display format
+ */
+function formatTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Display time estimates (elapsed and estimated remaining)
+ */
+function displayTimeEstimates(phases: TddPhaseRecord[], executionStatus: string): void {
+  console.log('Time Summary');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  // Calculate total elapsed time
+  let totalElapsed = 0;
+  for (const phase of phases) {
+    if (phase.startedAt) {
+      const startTime = new Date(phase.startedAt).getTime();
+      if (phase.completedAt) {
+        totalElapsed += new Date(phase.completedAt).getTime() - startTime;
+      } else if (phase.status === 'running') {
+        totalElapsed += Date.now() - startTime;
+      }
+    }
+  }
+
+  console.log(`Elapsed:   ${formatDuration(totalElapsed)}`);
+
+  // Estimate remaining time based on phases not yet completed
+  if (executionStatus === 'running') {
+    const phaseOrder: TddPhase[] = ['red', 'research', 'green', 'integrate', 'refine', 'commit'];
+    const completedPhases = new Set(phases.filter(p => p.status === 'completed').map(p => p.phase));
+    const runningPhases = phases.filter(p => p.status === 'running');
+
+    let estimatedRemaining = 0;
+
+    // For running phase, estimate remaining time
+    for (const running of runningPhases) {
+      if (running.startedAt) {
+        const elapsed = Date.now() - new Date(running.startedAt).getTime();
+        const target = PHASE_TIME_TARGETS[running.phase as keyof typeof PHASE_TIME_TARGETS];
+        if (target > elapsed) {
+          estimatedRemaining += target - elapsed;
+        }
+      }
+    }
+
+    // Add time for phases not yet started
+    for (const phaseName of phaseOrder) {
+      if (!completedPhases.has(phaseName) && !runningPhases.some(p => p.phase === phaseName)) {
+        estimatedRemaining += PHASE_TIME_TARGETS[phaseName as keyof typeof PHASE_TIME_TARGETS];
+      }
+    }
+
+    if (estimatedRemaining > 0) {
+      console.log(`Estimated: ~${formatDuration(estimatedRemaining)} remaining`);
+    }
+  } else if (executionStatus === 'completed') {
+    console.log(`Status:    Complete`);
+  } else if (executionStatus === 'failed') {
+    console.log(`Status:    Failed`);
+  }
+}
+
+// TDD Bugs command - view bugs found during TDD refinement
+program
+  .command('tdd-bugs <execution>')
+  .description('View bugs found during TDD refinement phase')
+  .option('-s, --severity <level>', 'Filter by severity (P0, P1, P2, P3)')
+  .action((executionId: string, options: { severity?: string }) => {
+    displayTddBugs(executionId, options.severity as BugSeverity | undefined);
+  });
+
+/**
+ * Display TDD bugs for an execution
+ */
+function displayTddBugs(executionId: string, severityFilter?: BugSeverity): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  // Validate severity filter if provided
+  if (severityFilter) {
+    const validSeverities: BugSeverity[] = ['P0', 'P1', 'P2', 'P3'];
+    if (!validSeverities.includes(severityFilter)) {
+      console.error(`✗ Invalid severity: ${severityFilter}. Must be P0, P1, P2, or P3.`);
+      process.exit(1);
+    }
+  }
+
+  console.log('TDD Bugs Report');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  if (severityFilter) {
+    console.log(`Severity Filter: ${severityFilter}`);
+  }
+  console.log('');
+
+  // Get all REFINE phases for this execution
+  const phases = PhaseRepository.findByExecution(executionId);
+  const refinePhases = phases.filter(p => p.phase === 'refine');
+
+  if (refinePhases.length === 0) {
+    console.log('No REFINE phases have been executed yet.');
+    console.log('Bugs are found during the REFINE phase of the TDD workflow.');
+    console.log('');
+    return;
+  }
+
+  // Collect all bugs from all REFINE phases
+  let allBugs: Bug[] = [];
+  for (const phase of refinePhases) {
+    const phaseBugs = severityFilter
+      ? BugRepository.findBySeverity(phase.id, severityFilter)
+      : BugRepository.findByPhase(phase.id);
+    allBugs = allBugs.concat(phaseBugs);
+  }
+
+  if (allBugs.length === 0) {
+    if (severityFilter) {
+      console.log(`No ${severityFilter} bugs found.`);
+    } else {
+      console.log('No bugs found during refinement.');
+    }
+    console.log('');
+    return;
+  }
+
+  // Display severity counts
+  displayBugSeverityCounts(allBugs);
+  console.log('');
+
+  // Display bug table
+  console.log('Bugs');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Severity | Category     | Status   | Description                                    | File');
+  console.log('─────────┼──────────────┼──────────┼────────────────────────────────────────────────┼────────────────────────');
+
+  for (const bug of allBugs) {
+    const severityDisplay = formatBugSeverity(bug.severity);
+    const categoryDisplay = bug.category.padEnd(12);
+    const statusDisplay = formatBugStatus(bug.status).padEnd(8);
+    const descriptionDisplay = truncateString(bug.description, 46);
+    const fileDisplay = truncateString(bug.filePath, 22);
+
+    console.log(`${severityDisplay}  | ${categoryDisplay} | ${statusDisplay} | ${descriptionDisplay} | ${fileDisplay}`);
+    if (bug.lineNumber) {
+      console.log(`         |              |          | Line: ${bug.lineNumber}`);
+    }
+  }
+
+  console.log('');
+  console.log(`Total: ${allBugs.length} bug(s)`);
+  console.log('');
+}
+
+/**
+ * Display bug counts by severity
+ */
+function displayBugSeverityCounts(bugs: Bug[]): void {
+  const counts = {
+    P0: { total: 0, open: 0, fixed: 0 },
+    P1: { total: 0, open: 0, fixed: 0 },
+    P2: { total: 0, open: 0, fixed: 0 },
+    P3: { total: 0, open: 0, fixed: 0 },
+  };
+
+  for (const bug of bugs) {
+    const severity = bug.severity as keyof typeof counts;
+    counts[severity].total++;
+    if (bug.status === 'open') {
+      counts[severity].open++;
+    } else if (bug.status === 'fixed') {
+      counts[severity].fixed++;
+    }
+  }
+
+  console.log('Severity Counts');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Level | Total | Open | Fixed');
+  console.log('──────┼───────┼──────┼──────');
+  console.log(`P0    |   ${String(counts.P0.total).padStart(3)} |  ${String(counts.P0.open).padStart(3)} |  ${String(counts.P0.fixed).padStart(3)}`);
+  console.log(`P1    |   ${String(counts.P1.total).padStart(3)} |  ${String(counts.P1.open).padStart(3)} |  ${String(counts.P1.fixed).padStart(3)}`);
+  console.log(`P2    |   ${String(counts.P2.total).padStart(3)} |  ${String(counts.P2.open).padStart(3)} |  ${String(counts.P2.fixed).padStart(3)}`);
+  console.log(`P3    |   ${String(counts.P3.total).padStart(3)} |  ${String(counts.P3.open).padStart(3)} |  ${String(counts.P3.fixed).padStart(3)}`);
+
+  const totalOpen = counts.P0.open + counts.P1.open + counts.P2.open + counts.P3.open;
+  const totalFixed = counts.P0.fixed + counts.P1.fixed + counts.P2.fixed + counts.P3.fixed;
+  console.log('──────┼───────┼──────┼──────');
+  console.log(`Total |   ${String(bugs.length).padStart(3)} |  ${String(totalOpen).padStart(3)} |  ${String(totalFixed).padStart(3)}`);
+}
+
+/**
+ * Format bug severity with color indicator
+ */
+function formatBugSeverity(severity: BugSeverity): string {
+  switch (severity) {
+    case 'P0':
+      return '🔴 P0  ';
+    case 'P1':
+      return '🟠 P1  ';
+    case 'P2':
+      return '🟡 P2  ';
+    case 'P3':
+      return '🟢 P3  ';
+    default:
+      return `   ${severity}  `;
+  }
+}
+
+/**
+ * Format bug status
+ */
+function formatBugStatus(status: string): string {
+  switch (status) {
+    case 'open':
+      return 'Open';
+    case 'fixed':
+      return 'Fixed';
+    case 'wontfix':
+      return 'Wontfix';
+    case 'deferred':
+      return 'Deferred';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Truncate a string to a maximum length with ellipsis
+ */
+function truncateString(str: string, maxLength: number): string {
+  if (str.length <= maxLength) {
+    return str.padEnd(maxLength);
+  }
+  return str.slice(0, maxLength - 3) + '...';
+}
+
+// TDD Receipt command - view PR receipts for TDD executions
+program
+  .command('tdd-receipt <execution>')
+  .description('View PR receipt for a TDD execution')
+  .action((executionId: string) => {
+    displayTddReceipt2(executionId);
+  });
+
+/**
+ * Display TDD PR receipt for an execution
+ */
+function displayTddReceipt2(executionId: string): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  console.log('TDD PR Receipt');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  console.log(`Task ID:      ${execution.taskId}`);
+  console.log(`Status:       ${execution.status}`);
+  console.log('');
+
+  // Get receipt from database
+  const receipt = ReceiptRepository.findByExecution(executionId);
+
+  if (!receipt) {
+    console.log('No receipt found for this execution.');
+    console.log('');
+    console.log('Receipts are created during the COMMIT phase of the TDD workflow.');
+    console.log('If the workflow has not completed, no receipt will be available.');
+    console.log('');
+    return;
+  }
+
+  // Display PR URL if available
+  if (receipt.prUrl) {
+    console.log('Pull Request');
+    console.log('──────────────────────────────────────────────────────────────');
+    console.log(`PR URL: ${receipt.prUrl}`);
+    console.log('');
+  }
+
+  // Display test receipt
+  displayTestReceiptSection(receipt.testReceipt);
+  console.log('');
+
+  // Display integration receipt
+  displayIntegrationReceiptSection(receipt.integrationReceipt);
+  console.log('');
+
+  // Display review receipt
+  displayReviewReceiptSection(receipt.reviewReceipt);
+  console.log('');
+
+  // Display receipt metadata
+  console.log('Receipt Metadata');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log(`Receipt ID: ${receipt.id}`);
+  console.log(`Created:    ${formatTimestamp(receipt.createdAt)}`);
+  console.log('');
+}
+
+/**
+ * Display test receipt section
+ */
+function displayTestReceiptSection(testReceipt: TestReceipt): void {
+  console.log('Test Results');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  const passRate = testReceipt.totalTests > 0
+    ? Math.round((testReceipt.passed / testReceipt.totalTests) * 100)
+    : 0;
+
+  // Determine status indicator
+  const statusIndicator = testReceipt.failed === 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Total Tests: ${testReceipt.totalTests}`);
+  console.log(`   Passed:      ${testReceipt.passed} (${passRate}%)`);
+  console.log(`   Failed:      ${testReceipt.failed}`);
+  console.log(`   Skipped:     ${testReceipt.skipped}`);
+
+  if (testReceipt.coveragePercent !== undefined) {
+    const coverageIndicator = testReceipt.coveragePercent >= 80 ? '✅' :
+                              testReceipt.coveragePercent >= 60 ? '⚠️' : '❌';
+    console.log(`${coverageIndicator} Coverage:    ${testReceipt.coveragePercent}%`);
+  }
+
+  if (testReceipt.durationMs !== undefined) {
+    console.log(`   Duration:    ${formatDuration(testReceipt.durationMs)}`);
+  }
+}
+
+/**
+ * Display integration receipt section
+ */
+function displayIntegrationReceiptSection(integrationReceipt: IntegrationReceipt): void {
+  console.log('Contract Validation');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  const statusIndicator = integrationReceipt.contractsFailed === 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Contracts Validated: ${integrationReceipt.contractsValidated}`);
+  console.log(`   Contracts Failed:   ${integrationReceipt.contractsFailed}`);
+  console.log(`   Layers Checked:     ${integrationReceipt.layersChecked.join(', ') || 'none'}`);
+
+  if (integrationReceipt.errors && integrationReceipt.errors.length > 0) {
+    console.log('');
+    console.log('   Validation Errors:');
+    for (const error of integrationReceipt.errors.slice(0, 5)) {
+      console.log(`     - ${truncateString(error, 58)}`);
+    }
+    if (integrationReceipt.errors.length > 5) {
+      console.log(`     ... and ${integrationReceipt.errors.length - 5} more`);
+    }
+  }
+}
+
+/**
+ * Display review receipt section
+ */
+function displayReviewReceiptSection(reviewReceipt: ReviewReceipt): void {
+  console.log('AI Review');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  // Determine status based on P0/P1 counts
+  const openP0P1 = reviewReceipt.p0Count + reviewReceipt.p1Count - reviewReceipt.bugsFixed;
+  const statusIndicator = openP0P1 <= 0 ? '✅' : '❌';
+
+  console.log(`${statusIndicator} Total Bugs Found:   ${reviewReceipt.totalBugsFound}`);
+  console.log('');
+  console.log('   By Severity:');
+  console.log(`     🔴 P0 (Critical): ${reviewReceipt.p0Count}`);
+  console.log(`     🟠 P1 (High):     ${reviewReceipt.p1Count}`);
+  console.log(`     🟡 P2 (Medium):   ${reviewReceipt.p2Count}`);
+  console.log(`     🟢 P3 (Low):      ${reviewReceipt.p3Count}`);
+  console.log('');
+  console.log(`   Bugs Fixed:          ${reviewReceipt.bugsFixed}`);
+  console.log(`   Refine Iterations:   ${reviewReceipt.refineIterations}`);
+
+  if (reviewReceipt.opusEscalationUsed) {
+    console.log(`   Opus Escalation:     Yes (used for harder bugs)`);
+  }
+}
 
 // Default action (no subcommand) - launch dashboard
 program.action(() => {

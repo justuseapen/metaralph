@@ -25,6 +25,8 @@ export interface UserStory {
   priority: number;
   passes: boolean;
   notes: string;
+  /** Optional array of story IDs that this story depends on */
+  dependsOn?: string[];
 }
 
 /**

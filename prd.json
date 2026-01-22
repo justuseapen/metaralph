@@ -1,21 +1,708 @@
 {
   "project": "metaralph",
-  "branchName": "self-improve/add-tests-for-prd-builder-ts-1768507102663",
-  "description": "The file src/collaboration/prd-builder.ts doesn't have corresponding test coverage. Adding tests would improve reliability.",
+  "branchName": "ralph/enhanced-tdd-workflow",
+  "description": "Implement native Ralph execution with parallel scheduling, then build the autonomous 6-phase TDD workflow (RED → RESEARCH → GREEN → INTEGRATE → REFINE → COMMIT) that produces production-ready PRs with P0/P1 bugs = 0",
   "userStories": [
     {
-      "id": "SI-1768507102663",
-      "title": "Add tests for prd-builder.ts",
-      "description": "The file src/collaboration/prd-builder.ts doesn't have corresponding test coverage. Adding tests would improve reliability.",
+      "id": "US-000",
+      "title": "Add native metaralph ralph command",
+      "description": "As a user, I want to run Ralph loops directly through metaRalph CLI without needing external ralph.sh scripts, making metaRalph self-contained.",
       "acceptanceCriteria": [
-        "Test file exists for src/collaboration/prd-builder.ts",
-        "All new tests pass",
-        "Code coverage increased or maintained",
+        "Add 'ralph <path>' command to src/cli/index.ts",
+        "Path defaults to current directory if not specified",
+        "Add --iterations <n> option (default: 10)",
+        "Add --tool <claude|cursor> option (default: claude)",
+        "Add --parallel option to enable parallel story execution (default: false)",
+        "Add --max-workers <n> option for parallel mode (default: 3)",
+        "Command reads prd.json from target directory",
+        "Validates prd.json exists and has valid structure",
+        "Implements loop: spawn Claude Code → wait → check for <promise>COMPLETE</promise> → update iteration count → repeat",
+        "Uses spawn() to run 'claude' CLI command with appropriate args",
+        "Captures stdout/stderr and displays real-time progress",
+        "Detects completion via <promise>COMPLETE</promise> in output",
+        "Stops when all user stories pass or max iterations reached",
+        "Displays summary: iterations used, stories completed, time elapsed",
+        "Exit code 0 on success, 1 on failure/incomplete",
         "Typecheck passes"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Target file: src/collaboration/prd-builder.ts"
+      "dependsOn": [],
+      "notes": "FOUNDATION - This makes metaRalph self-contained. No external ralph.sh dependency. Must be completed first so metaRalph can build itself."
+    },
+    {
+      "id": "US-001",
+      "title": "Update RalphSpawner to use native execution",
+      "description": "As a developer, I need RalphSpawner to use native Claude Code execution instead of looking for ralph.sh scripts.",
+      "acceptanceCriteria": [
+        "Remove findRalphScript() function from ralph-spawner.ts",
+        "Update spawn() to directly spawn 'claude' CLI command",
+        "Pass CLAUDE.md path and prd.json context to claude command",
+        "Update monitor() to handle native execution output",
+        "Remove all references to ralph.sh from the codebase",
+        "Existing tests still pass",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "dependsOn": ["US-000"],
+      "notes": "Refactors spawner to use native execution. Enables self-improvement without external scripts."
+    },
+    {
+      "id": "US-002",
+      "title": "Add dependency analyzer for prd.json",
+      "description": "As a developer, I need to analyze story dependencies so metaRalph can determine which stories can run in parallel.",
+      "acceptanceCriteria": [
+        "Create src/parallel/dependency-analyzer.ts",
+        "Parse prd.json and extract dependsOn arrays from each story",
+        "Build directed acyclic graph (DAG) of story dependencies",
+        "Validate DAG has no cycles (throw error if cycles detected)",
+        "Implement getReadyStories() - returns stories with all dependencies satisfied",
+        "Implement getDependents(storyId) - returns stories that depend on given story",
+        "Implement getExecutionOrder() - returns topologically sorted story list",
+        "Implement getParallelBatches() - returns array of batches that can run concurrently",
+        "Handle stories with no dependsOn field (treat as depending on all prior stories by priority)",
+        "Export DependencyAnalyzer class",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "dependsOn": ["US-001"],
+      "notes": "Core parallel execution capability. Analyzes PRD to find parallelization opportunities."
+    },
+    {
+      "id": "US-003",
+      "title": "Add parallel scheduler",
+      "description": "As a developer, I need a scheduler that orchestrates multiple Claude Code workers executing stories in parallel.",
+      "acceptanceCriteria": [
+        "Create src/parallel/scheduler.ts",
+        "Implement ParallelScheduler class with maxWorkers config",
+        "Use DependencyAnalyzer to determine ready stories",
+        "Spawn up to maxWorkers Claude Code instances for ready stories",
+        "Each worker gets a single story to implement (filtered prd.json)",
+        "Monitor all workers, track completion/failure",
+        "When a story completes, check for newly ready stories and spawn workers",
+        "Handle worker failures: mark story failed, skip dependent stories",
+        "Implement getStatus() - returns current worker states and progress",
+        "Emit events: 'worker:started', 'worker:completed', 'worker:failed', 'batch:completed'",
+        "Return final summary: stories completed, failed, skipped, total time",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "dependsOn": ["US-002"],
+      "notes": "Orchestrates parallel execution. Respects dependencies, maximizes concurrency."
+    },
+    {
+      "id": "US-004",
+      "title": "Wire parallel execution into ralph command",
+      "description": "As a user, I want metaralph ralph --parallel to execute independent stories concurrently.",
+      "acceptanceCriteria": [
+        "When --parallel flag is set, use ParallelScheduler instead of sequential loop",
+        "Display real-time status of all active workers",
+        "Show which stories are: running, queued, completed, failed, blocked",
+        "Display estimated time savings from parallelization",
+        "Final summary shows: batches executed, max concurrency achieved, total time vs sequential estimate",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "dependsOn": ["US-003"],
+      "notes": "CLI integration for parallel execution."
+    },
+    {
+      "id": "US-005",
+      "title": "Add merge conflict detection for parallel execution",
+      "description": "As a developer, I need to detect and handle when parallel workers modify the same files.",
+      "acceptanceCriteria": [
+        "Create src/parallel/conflict-detector.ts",
+        "Track which files each worker modifies during execution",
+        "Detect when two workers touch the same file",
+        "Strategy 1: Pessimistic - stories touching same files run sequentially",
+        "Strategy 2: Optimistic - let workers run, later finisher handles merge",
+        "Add --conflict-strategy <pessimistic|optimistic> option (default: pessimistic)",
+        "Implement predictFileChanges(story) - AI predicts files story will modify",
+        "Use predictions to improve scheduling decisions",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "dependsOn": ["US-003"],
+      "notes": "Handles file conflicts in parallel execution. Critical for correctness."
+    },
+    {
+      "id": "US-006",
+      "title": "Create TDD type definitions",
+      "description": "As a developer, I need TypeScript types for the TDD workflow so all modules share consistent interfaces.",
+      "acceptanceCriteria": [
+        "Create src/tdd/types.ts with all type definitions",
+        "Define TddPhase type: 'red' | 'research' | 'green' | 'integrate' | 'refine' | 'commit'",
+        "Define PhaseStatus type: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'",
+        "Define BugSeverity type: 'P0' | 'P1' | 'P2' | 'P3'",
+        "Define ResearchAgentType: 'patterns' | 'contracts' | 'testing' | 'security' | 'performance'",
+        "Define interfaces: TddPhaseRecord, GeneratedTest, ResearchAgent, ResearchFindings, Bug, PrReceipt",
+        "Define AutonomousTddConfig interface with maxRefineIterations, maxGreenRetries, timeouts",
+        "Define PHASE_TIME_TARGETS constant with default durations per phase",
+        "Export all types from src/tdd/index.ts",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "dependsOn": ["US-001"],
+      "notes": "TDD Foundation - types for the 6-phase workflow. Can run in parallel with US-002 through US-005."
+    },
+    {
+      "id": "US-007",
+      "title": "Add TDD database schema",
+      "description": "As a developer, I need database tables to persist TDD execution state so workflows can recover from interruptions.",
+      "acceptanceCriteria": [
+        "Add tdd_phases table (id, execution_id, phase, status, started_at, completed_at, metrics, created_at)",
+        "Add generated_tests table (id, phase_id, test_type, file_path, test_content, status, created_at)",
+        "Add research_agents table (id, phase_id, agent_type, status, findings, started_at, completed_at)",
+        "Add contracts table (id, execution_id, layer, contract_type, definition, frozen_at)",
+        "Add bugs table (id, phase_id, severity, category, description, file_path, line_number, status, fixed_at)",
+        "Add pr_receipts table (id, execution_id, test_receipt, integration_receipt, review_receipt, pr_url)",
+        "Add foreign key constraints to executions table",
+        "Add indexes on execution_id and phase_id columns",
+        "Migration runs successfully on existing database",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "dependsOn": ["US-006"],
+      "notes": "TDD Foundation - database schema must exist before repositories can be created."
+    },
+    {
+      "id": "US-008",
+      "title": "Create TDD phase repository",
+      "description": "As a developer, I need CRUD operations for TDD phases so the orchestrator can track phase state.",
+      "acceptanceCriteria": [
+        "Create src/tdd/repositories/phase-repository.ts",
+        "Implement create(input) - creates new phase record",
+        "Implement update(id, input) - updates phase status and metrics",
+        "Implement findById(id) - retrieves phase by ID",
+        "Implement findByExecution(executionId) - retrieves all phases for execution",
+        "Implement getCurrentPhase(executionId) - returns running or latest phase",
+        "Implement getPhaseHistory(executionId) - returns ordered phase list",
+        "All methods accept optional db parameter for testing",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "dependsOn": ["US-007"],
+      "notes": "Repository pattern following existing codebase conventions."
+    },
+    {
+      "id": "US-009",
+      "title": "Create generated tests repository",
+      "description": "As a developer, I need CRUD operations for generated tests so the RED phase can store test artifacts.",
+      "acceptanceCriteria": [
+        "Create src/tdd/repositories/test-repository.ts",
+        "Implement create(input) - creates test record",
+        "Implement update(id, input) - updates test status (failing/passing)",
+        "Implement findByPhase(phaseId) - retrieves all tests for a phase",
+        "Implement findByType(phaseId, testType) - filter by unit/integration/e2e",
+        "Implement countByStatus(phaseId) - returns counts by status",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "dependsOn": ["US-007"],
+      "notes": "Repository for storing generated test metadata. Can run parallel with US-008."
+    },
+    {
+      "id": "US-010",
+      "title": "Create research agents repository",
+      "description": "As a developer, I need CRUD operations for research agents so parallel research can be tracked.",
+      "acceptanceCriteria": [
+        "Create src/tdd/repositories/agent-repository.ts",
+        "Implement create(input) - creates agent record",
+        "Implement update(id, input) - updates status and findings",
+        "Implement findByPhase(phaseId) - retrieves all agents for a phase",
+        "Implement findByType(phaseId, agentType) - retrieves specific agent",
+        "Implement allCompleted(phaseId) - checks if all agents finished",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "dependsOn": ["US-007"],
+      "notes": "Repository for tracking parallel research agents. Can run parallel with US-008, US-009."
+    },
+    {
+      "id": "US-011",
+      "title": "Create bugs repository",
+      "description": "As a developer, I need CRUD operations for bugs so the REFINE phase can track bug resolution.",
+      "acceptanceCriteria": [
+        "Create src/tdd/repositories/bug-repository.ts",
+        "Implement create(input) - creates bug record",
+        "Implement update(id, input) - updates bug status",
+        "Implement findByPhase(phaseId) - retrieves all bugs for a phase",
+        "Implement findBySeverity(phaseId, severity) - filter by P0/P1/P2/P3",
+        "Implement findOpen(phaseId) - retrieves unresolved bugs",
+        "Implement countOpenByPriority(phaseId) - returns {p0: n, p1: n, p2: n, p3: n}",
+        "Implement canExitRefineLoop(phaseId) - returns true when P0=0 AND P1=0",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "dependsOn": ["US-007"],
+      "notes": "Critical for REFINE phase loop exit condition. Can run parallel with US-008 through US-010."
+    },
+    {
+      "id": "US-012",
+      "title": "Create PR receipts repository",
+      "description": "As a developer, I need CRUD operations for PR receipts so the COMMIT phase can store documentation.",
+      "acceptanceCriteria": [
+        "Create src/tdd/repositories/receipt-repository.ts",
+        "Implement create(input) - creates receipt record",
+        "Implement update(id, input) - updates receipt with PR URL",
+        "Implement findByExecution(executionId) - retrieves receipt for execution",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "dependsOn": ["US-007"],
+      "notes": "Repository for PR receipt documentation. Can run parallel with US-008 through US-011."
+    },
+    {
+      "id": "US-013",
+      "title": "Create Phase Orchestrator skeleton",
+      "description": "As a developer, I need the core orchestrator that manages autonomous phase transitions.",
+      "acceptanceCriteria": [
+        "Create src/tdd/phase-orchestrator.ts",
+        "Implement PhaseOrchestrator class with constructor accepting config",
+        "Implement runAutonomous(task, project) method signature (stub implementation)",
+        "Implement transitionToPhase(executionId, phase) - validates and transitions",
+        "Implement canTransition(executionId, targetPhase) - checks valid transitions",
+        "Implement handlePhaseFailure(executionId, phase, error) - triggers rollback",
+        "Define phase transition rules: red→research→green→integrate→refine→commit",
+        "Allow refine to loop back to itself (up to maxRefineIterations)",
+        "Emit events: 'phase:started', 'phase:completed', 'phase:failed'",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "dependsOn": ["US-008"],
+      "notes": "Core orchestrator - stub implementation first, will be wired up later."
+    },
+    {
+      "id": "US-014",
+      "title": "Extend Execution model for TDD",
+      "description": "As a developer, I need the Execution model to track TDD phase state.",
+      "acceptanceCriteria": [
+        "Add currentPhase field to Execution interface (TddPhase | null)",
+        "Add phaseHistory field to Execution interface (TddPhaseRecord[] | null)",
+        "Add tddEnabled field to Execution interface (boolean)",
+        "Add tddConfig field to Execution interface (AutonomousTddConfig | null)",
+        "Update ExecutionRepository.create() to accept new fields",
+        "Add ExecutionRepository.updateCurrentPhase(id, phase)",
+        "Add ExecutionRepository.appendPhaseHistory(id, record)",
+        "Update database schema with new columns",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": true,
+      "dependsOn": ["US-006"],
+      "notes": "Extends existing Execution model to support TDD workflow state."
+    },
+    {
+      "id": "US-015",
+      "title": "Implement RED phase - Test Generator",
+      "description": "As a developer, I need the RED phase to generate failing tests from PRD acceptance criteria.",
+      "acceptanceCriteria": [
+        "Create src/tdd/test-generator.ts",
+        "Implement TestGenerator.generate(task, project) - main entry point",
+        "Implement extractTestableRequirements(prdJson) - parse PRD for test cases",
+        "Implement generateUnitTests(requirements, projectContext) - create unit test stubs",
+        "Implement generateIntegrationTests(requirements) - create integration test stubs",
+        "Implement generateE2eTests(userStories) - create E2E test scenarios",
+        "Use Claude API to generate meaningful test assertions",
+        "Detect project test framework (vitest/jest) and generate appropriate syntax",
+        "Write test files to appropriate locations (co-located or __tests__)",
+        "Implement verifyTestsFailing(testFiles) - run tests and confirm they fail",
+        "Store generated tests in database via test-repository",
+        "Return list of GeneratedTest records",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": true,
+      "dependsOn": ["US-009", "US-013"],
+      "notes": "RED phase - writes tests before implementation. TDD core principle."
+    },
+    {
+      "id": "US-016",
+      "title": "Implement RESEARCH phase - Research Coordinator",
+      "description": "As a developer, I need the RESEARCH phase to spawn parallel AI agents for codebase analysis.",
+      "acceptanceCriteria": [
+        "Create src/tdd/research-coordinator.ts",
+        "Implement ResearchCoordinator.runParallel(agentTypes, context) - spawns all agents",
+        "Use Promise.all to run 5 agents concurrently via Claude API",
+        "Implement createPatternsAgent(context) - researches code patterns in project",
+        "Implement createContractsAgent(context) - researches API contracts/interfaces",
+        "Implement createTestingAgent(context) - researches testing strategies",
+        "Implement createSecurityAgent(context) - researches security concerns",
+        "Implement createPerformanceAgent(context) - researches performance patterns",
+        "Each agent receives: task PRD, project structure, relevant file contents",
+        "Implement synthesizeFindings(agentResults) - combine agent outputs",
+        "Return frozenContracts object with synthesized implementation guidance",
+        "Store agent records and findings in database",
+        "Handle individual agent failures gracefully (continue with partial results)",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": true,
+      "dependsOn": ["US-010", "US-013"],
+      "notes": "RESEARCH phase - parallel AI agents for 5x speedup."
+    },
+    {
+      "id": "US-017",
+      "title": "Implement GREEN phase - Native Ralph Execution",
+      "description": "As a developer, I need the GREEN phase to run native Ralph execution with frozen contracts until tests pass.",
+      "acceptanceCriteria": [
+        "Create src/tdd/green-phase.ts",
+        "Implement GreenPhase.run(task, project, frozenContracts, config) - main entry",
+        "Generate enhanced PRD JSON including: original requirements + frozen contracts + test specs",
+        "Use native metaralph ralph command (US-000) for execution",
+        "After execution completes, run test suite to check if tests pass",
+        "If tests fail and attempts < maxGreenRetries, regenerate PRD with error context and retry",
+        "Track attempt count and test results in phase metrics",
+        "Return success/failure with implementation details",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": true,
+      "dependsOn": ["US-004", "US-013"],
+      "notes": "GREEN phase - implementation until tests pass. Uses native Ralph execution."
+    },
+    {
+      "id": "US-018",
+      "title": "Implement INTEGRATE phase - Contract Validator",
+      "description": "As a developer, I need the INTEGRATE phase to validate contracts across all layers.",
+      "acceptanceCriteria": [
+        "Create src/tdd/contract-validator.ts",
+        "Implement ContractValidator.validate(frozenContracts, project) - main entry",
+        "Implement extractImplementedContracts(project) - parse contracts from code",
+        "Implement validateUIContract(uiCode, apiContract) - check frontend matches API",
+        "Implement validateAPIContract(apiCode, dbSchema) - check API matches DB",
+        "Implement checkErrorBoundaries(project) - verify error handling exists",
+        "Use Claude API to analyze contract compatibility",
+        "Store validation results in contracts table",
+        "Return validation report with pass/fail status and errors",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": true,
+      "dependsOn": ["US-013"],
+      "notes": "INTEGRATE phase - validates UI↔API↔DB contracts."
+    },
+    {
+      "id": "US-019",
+      "title": "Implement REFINE phase - Bug Classifier",
+      "description": "As a developer, I need the REFINE phase to find and classify bugs by severity.",
+      "acceptanceCriteria": [
+        "Create src/tdd/bug-classifier.ts",
+        "Implement BugClassifier.aiReview(project, codeChanges) - AI code review",
+        "Use Claude API to analyze code for bugs with severity classification",
+        "Classify bugs as P0 (critical), P1 (high), P2 (medium), P3 (low)",
+        "Classify bug categories: logic, security, performance, style, compatibility",
+        "Implement parseBugsFromReview(reviewOutput) - extract structured bugs",
+        "Store bugs in database via bug-repository",
+        "Return list of Bug records",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": true,
+      "dependsOn": ["US-011", "US-013"],
+      "notes": "REFINE phase - AI-powered bug detection and classification."
+    },
+    {
+      "id": "US-020",
+      "title": "Implement REFINE phase - Auto Fix Loop",
+      "description": "As a developer, I need the REFINE phase to automatically fix P0/P1 bugs until resolved.",
+      "acceptanceCriteria": [
+        "Add BugClassifier.autoFix(bugs, project) method",
+        "For each P0/P1 bug, generate fix using Claude API with bug context",
+        "Apply fixes to code files",
+        "Run tests after each fix to verify no regressions",
+        "Update bug status to 'fixed' or 'wontfix' based on result",
+        "Implement escalation: on final iteration, use claude-opus-4-20250514 model for harder bugs",
+        "Track fix attempts and success rate in phase metrics",
+        "Return updated bug list",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": true,
+      "dependsOn": ["US-019"],
+      "notes": "REFINE phase - autonomous bug fixing with model escalation."
+    },
+    {
+      "id": "US-021",
+      "title": "Implement COMMIT phase - Receipt Builder",
+      "description": "As a developer, I need the COMMIT phase to generate comprehensive PR receipts.",
+      "acceptanceCriteria": [
+        "Create src/tdd/receipt-builder.ts",
+        "Implement ReceiptBuilder.build(executionId) - main entry",
+        "Implement buildTestReceipt(executionId) - compile test results",
+        "Include: total tests, passed, failed, skipped, coverage percentage",
+        "Implement buildIntegrationReceipt(executionId) - compile contract validation",
+        "Include: contracts validated, contracts failed, layers checked",
+        "Implement buildReviewReceipt(executionId) - compile bug resolution",
+        "Include: total bugs found, P0/P1 counts, bugs fixed, iterations required",
+        "Implement generatePrBody(receipts) - format markdown PR description",
+        "Store receipt in database via receipt-repository",
+        "Return complete PrReceipt",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": true,
+      "dependsOn": ["US-012", "US-013"],
+      "notes": "COMMIT phase - generates comprehensive documentation."
+    },
+    {
+      "id": "US-022",
+      "title": "Implement COMMIT phase - PR Creation",
+      "description": "As a developer, I need the COMMIT phase to create a GitHub PR with receipts.",
+      "acceptanceCriteria": [
+        "Add ReceiptBuilder.createPr(task, receipt, project) method",
+        "Generate PR title from task title",
+        "Generate PR body using receipt markdown template",
+        "Include sections: Summary, Test Coverage, Contract Validation, AI Review, Receipts",
+        "Use gh pr create command to create PR",
+        "Store PR URL in receipt record",
+        "Return PR URL",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": true,
+      "dependsOn": ["US-021"],
+      "notes": "COMMIT phase - final PR creation with gh CLI."
+    },
+    {
+      "id": "US-023",
+      "title": "Wire up Phase Orchestrator with all phases",
+      "description": "As a developer, I need the orchestrator to execute all phases in sequence.",
+      "acceptanceCriteria": [
+        "Update PhaseOrchestrator.runAutonomous() to call all phases",
+        "Create checkpoint before starting (Rollback.createCheckpoint)",
+        "Execute RED phase, transition on success",
+        "Execute RESEARCH phase, transition on success",
+        "Execute GREEN phase with retry loop, transition on success",
+        "Execute INTEGRATE phase, transition on success",
+        "Execute REFINE phase with bug fix loop until P0/P1=0 or max iterations",
+        "On final REFINE iteration, escalate to opus model",
+        "Execute COMMIT phase, create PR",
+        "On any unrecoverable failure, rollback to checkpoint",
+        "Return TddResult with success status, PR URL, and receipt",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": true,
+      "dependsOn": ["US-015", "US-016", "US-017", "US-018", "US-020", "US-022"],
+      "notes": "Integration - wires up all phases into the autonomous loop."
+    },
+    {
+      "id": "US-024",
+      "title": "Add TDD mode to self-improve command",
+      "description": "As a user, I want to run TDD workflow via metaralph self-improve --tdd.",
+      "acceptanceCriteria": [
+        "Add --tdd flag to self-improve command in src/cli/index.ts",
+        "Add --max-refine <n> option (default: 3)",
+        "Add --max-green-retries <n> option (default: 2)",
+        "When --tdd flag set, use PhaseOrchestrator.runAutonomous() instead of standard execution",
+        "Display phase progress in real-time (phase name, status, duration)",
+        "On completion, display PR URL and receipt summary",
+        "On failure, display detailed failure report",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": true,
+      "dependsOn": ["US-023"],
+      "notes": "CLI integration with existing self-improve command."
+    },
+    {
+      "id": "US-025",
+      "title": "Add tdd-status CLI command",
+      "description": "As a user, I want to view TDD execution progress via metaralph tdd-status.",
+      "acceptanceCriteria": [
+        "Add tdd-status <execution> command to CLI",
+        "Display current phase and status",
+        "Display phase history with durations",
+        "Display phase metrics (tests generated, bugs found, etc.)",
+        "Show elapsed time and estimated remaining",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": true,
+      "dependsOn": ["US-013"],
+      "notes": "Observation command for monitoring TDD progress."
+    },
+    {
+      "id": "US-026",
+      "title": "Add tdd-bugs CLI command",
+      "description": "As a user, I want to view bugs found during refinement via metaralph tdd-bugs.",
+      "acceptanceCriteria": [
+        "Add tdd-bugs <execution> command to CLI",
+        "Add --severity <P0|P1|P2|P3> filter option",
+        "Display bugs in table format: severity, category, status, description, file",
+        "Show counts by severity",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": true,
+      "dependsOn": ["US-011"],
+      "notes": "Observation command for viewing bugs found."
+    },
+    {
+      "id": "US-027",
+      "title": "Add tdd-receipt CLI command",
+      "description": "As a user, I want to view PR receipts via metaralph tdd-receipt.",
+      "acceptanceCriteria": [
+        "Add tdd-receipt <execution> command to CLI",
+        "Display test receipt: total, passed, failed, coverage",
+        "Display integration receipt: contracts validated, status",
+        "Display review receipt: bugs found, fixed, iterations",
+        "Display PR URL if created",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": true,
+      "dependsOn": ["US-012"],
+      "notes": "Observation command for viewing PR receipts."
+    },
+    {
+      "id": "US-028",
+      "title": "Add tests for dependency analyzer",
+      "description": "As a developer, I need tests for the dependency analyzer to ensure correct DAG construction.",
+      "acceptanceCriteria": [
+        "Create src/parallel/dependency-analyzer.test.ts",
+        "Test DAG construction from prd.json",
+        "Test cycle detection",
+        "Test getReadyStories with various dependency states",
+        "Test getParallelBatches output",
+        "Test backward compatibility (stories without dependsOn)",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": true,
+      "dependsOn": ["US-002"],
+      "notes": "Unit tests for dependency analysis."
+    },
+    {
+      "id": "US-029",
+      "title": "Add tests for parallel scheduler",
+      "description": "As a developer, I need tests for the parallel scheduler to ensure correct orchestration.",
+      "acceptanceCriteria": [
+        "Create src/parallel/scheduler.test.ts",
+        "Test worker spawning and monitoring",
+        "Test dependency-respecting scheduling",
+        "Test failure handling and dependent story skipping",
+        "Test max workers limit",
+        "Mock Claude CLI for unit tests",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "passes": true,
+      "dependsOn": ["US-003"],
+      "notes": "Unit tests for parallel scheduler."
+    },
+    {
+      "id": "US-030",
+      "title": "Add tests for native Ralph command",
+      "description": "As a developer, I need tests for the native Ralph command to ensure reliable execution.",
+      "acceptanceCriteria": [
+        "Create src/cli/ralph-command.test.ts",
+        "Test prd.json validation",
+        "Test iteration loop with mock Claude CLI",
+        "Test completion detection via <promise>COMPLETE</promise>",
+        "Test max iterations limit",
+        "Test error handling and exit codes",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "passes": true,
+      "dependsOn": ["US-000"],
+      "notes": "Unit tests for foundational Ralph command."
+    },
+    {
+      "id": "US-031",
+      "title": "Add tests for Phase Orchestrator",
+      "description": "As a developer, I need tests for the Phase Orchestrator to ensure reliable execution.",
+      "acceptanceCriteria": [
+        "Create src/tdd/phase-orchestrator.test.ts",
+        "Test phase transition rules (valid and invalid)",
+        "Test rollback on phase failure",
+        "Test max iterations limit on REFINE phase",
+        "Test escalation to opus on final REFINE iteration",
+        "Mock all phase implementations for unit testing",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "passes": true,
+      "dependsOn": ["US-013"],
+      "notes": "Unit tests for core orchestrator."
+    },
+    {
+      "id": "US-032",
+      "title": "Add tests for Test Generator",
+      "description": "As a developer, I need tests for the Test Generator to ensure quality test generation.",
+      "acceptanceCriteria": [
+        "Create src/tdd/test-generator.test.ts",
+        "Test PRD parsing for testable requirements",
+        "Test unit test generation with mocked Claude API",
+        "Test integration test generation",
+        "Test E2E test generation",
+        "Test test framework detection (vitest vs jest)",
+        "Test verifyTestsFailing behavior",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 33,
+      "passes": true,
+      "dependsOn": ["US-015"],
+      "notes": "Unit tests for RED phase."
+    },
+    {
+      "id": "US-033",
+      "title": "Add tests for Research Coordinator",
+      "description": "As a developer, I need tests for the Research Coordinator to ensure parallel execution works.",
+      "acceptanceCriteria": [
+        "Create src/tdd/research-coordinator.test.ts",
+        "Test parallel agent spawning with Promise.all",
+        "Test individual agent failure handling (partial results)",
+        "Test findings synthesis",
+        "Test timeout handling",
+        "Mock Claude API calls",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 34,
+      "passes": true,
+      "dependsOn": ["US-016"],
+      "notes": "Unit tests for RESEARCH phase."
+    },
+    {
+      "id": "US-034",
+      "title": "Add tests for Bug Classifier",
+      "description": "As a developer, I need tests for the Bug Classifier to ensure accurate severity classification.",
+      "acceptanceCriteria": [
+        "Create src/tdd/bug-classifier.test.ts",
+        "Test bug severity classification (P0-P3)",
+        "Test bug category classification",
+        "Test autoFix behavior",
+        "Test canExitRefineLoop logic (P0=0 AND P1=0)",
+        "Test escalation to opus model",
+        "Mock Claude API calls",
+        "All tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 35,
+      "passes": true,
+      "dependsOn": ["US-019", "US-020"],
+      "notes": "Unit tests for REFINE phase."
     }
   ]
 }
