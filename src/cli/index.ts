@@ -29,9 +29,12 @@ import {
 import { executeRalph, displaySummary, validatePrd } from './ralph.js';
 import {
   PhaseOrchestrator,
+  PhaseRepository,
   type TddResult,
   type TddPhaseRecord,
   type PhaseOrchestratorEvents,
+  type TddPhase,
+  PHASE_TIME_TARGETS,
 } from '../tdd/index.js';
 
 // Get package.json path for version info
@@ -1142,6 +1145,208 @@ program
       process.exit(1);
     }
   });
+
+// TDD Status command - view TDD execution progress
+program
+  .command('tdd-status <execution>')
+  .description('View TDD execution progress and phase history')
+  .action((executionId: string) => {
+    displayTddStatus(executionId);
+  });
+
+/**
+ * Display TDD execution status
+ */
+function displayTddStatus(executionId: string): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  console.log('TDD Execution Status');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  console.log(`Task ID:      ${execution.taskId}`);
+  console.log(`Status:       ${execution.status}`);
+  console.log('');
+
+  // Get all phases from database
+  const phases = PhaseRepository.findByExecution(executionId);
+
+  if (phases.length === 0) {
+    console.log('No phases have been executed yet.');
+    console.log('');
+    return;
+  }
+
+  // Display current phase
+  const currentPhase = PhaseRepository.getCurrentPhase(executionId);
+  if (currentPhase) {
+    const emoji = getPhaseEmoji(currentPhase.phase);
+    console.log('Current Phase');
+    console.log('──────────────────────────────────────────────────────────────');
+    console.log(`${emoji} ${currentPhase.phase.toUpperCase()} - ${currentPhase.status}`);
+
+    if (currentPhase.startedAt) {
+      console.log(`Started: ${currentPhase.startedAt}`);
+    }
+    if (currentPhase.status === 'running' && currentPhase.startedAt) {
+      const elapsed = Date.now() - new Date(currentPhase.startedAt).getTime();
+      console.log(`Elapsed: ${formatDuration(elapsed)}`);
+    }
+    console.log('');
+  }
+
+  // Display phase history with durations
+  console.log('Phase History');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Phase        | Status      | Duration    | Started');
+  console.log('─────────────┼─────────────┼─────────────┼───────────────────────');
+
+  for (const phase of phases) {
+    const emoji = getPhaseEmoji(phase.phase);
+    const statusDisplay = formatPhaseStatus(phase.status);
+    const duration = calculatePhaseDuration(phase);
+    const startedAt = phase.startedAt ? formatTimestamp(phase.startedAt) : 'N/A';
+
+    console.log(`${emoji} ${phase.phase.padEnd(9)} | ${statusDisplay.padEnd(11)} | ${duration.padEnd(11)} | ${startedAt}`);
+
+    // Display phase-specific metrics inline if available
+    if (phase.metrics && Object.keys(phase.metrics).length > 0) {
+      displayPhaseMetrics(phase.phase, phase.metrics);
+    }
+  }
+
+  console.log('');
+
+  // Calculate elapsed time and estimated remaining
+  displayTimeEstimates(phases, execution.status);
+
+  console.log('');
+}
+
+/**
+ * Format phase status with appropriate indicator
+ */
+function formatPhaseStatus(status: string): string {
+  switch (status) {
+    case 'completed':
+      return '✅ Completed';
+    case 'running':
+      return '🔄 Running';
+    case 'failed':
+      return '❌ Failed';
+    case 'skipped':
+      return '⏭️ Skipped';
+    case 'pending':
+    default:
+      return '⏳ Pending';
+  }
+}
+
+/**
+ * Calculate duration between phase start and completion
+ */
+function calculatePhaseDuration(phase: TddPhaseRecord): string {
+  if (!phase.startedAt) {
+    return 'N/A';
+  }
+
+  const startTime = new Date(phase.startedAt).getTime();
+
+  if (phase.completedAt) {
+    const endTime = new Date(phase.completedAt).getTime();
+    return formatDuration(endTime - startTime);
+  }
+
+  if (phase.status === 'running') {
+    // Still running - show elapsed
+    return formatDuration(Date.now() - startTime) + '*';
+  }
+
+  return 'N/A';
+}
+
+/**
+ * Format timestamp to a shorter display format
+ */
+function formatTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Display time estimates (elapsed and estimated remaining)
+ */
+function displayTimeEstimates(phases: TddPhaseRecord[], executionStatus: string): void {
+  console.log('Time Summary');
+  console.log('──────────────────────────────────────────────────────────────');
+
+  // Calculate total elapsed time
+  let totalElapsed = 0;
+  for (const phase of phases) {
+    if (phase.startedAt) {
+      const startTime = new Date(phase.startedAt).getTime();
+      if (phase.completedAt) {
+        totalElapsed += new Date(phase.completedAt).getTime() - startTime;
+      } else if (phase.status === 'running') {
+        totalElapsed += Date.now() - startTime;
+      }
+    }
+  }
+
+  console.log(`Elapsed:   ${formatDuration(totalElapsed)}`);
+
+  // Estimate remaining time based on phases not yet completed
+  if (executionStatus === 'running') {
+    const phaseOrder: TddPhase[] = ['red', 'research', 'green', 'integrate', 'refine', 'commit'];
+    const completedPhases = new Set(phases.filter(p => p.status === 'completed').map(p => p.phase));
+    const runningPhases = phases.filter(p => p.status === 'running');
+
+    let estimatedRemaining = 0;
+
+    // For running phase, estimate remaining time
+    for (const running of runningPhases) {
+      if (running.startedAt) {
+        const elapsed = Date.now() - new Date(running.startedAt).getTime();
+        const target = PHASE_TIME_TARGETS[running.phase as keyof typeof PHASE_TIME_TARGETS];
+        if (target > elapsed) {
+          estimatedRemaining += target - elapsed;
+        }
+      }
+    }
+
+    // Add time for phases not yet started
+    for (const phaseName of phaseOrder) {
+      if (!completedPhases.has(phaseName) && !runningPhases.some(p => p.phase === phaseName)) {
+        estimatedRemaining += PHASE_TIME_TARGETS[phaseName as keyof typeof PHASE_TIME_TARGETS];
+      }
+    }
+
+    if (estimatedRemaining > 0) {
+      console.log(`Estimated: ~${formatDuration(estimatedRemaining)} remaining`);
+    }
+  } else if (executionStatus === 'completed') {
+    console.log(`Status:    Complete`);
+  } else if (executionStatus === 'failed') {
+    console.log(`Status:    Failed`);
+  }
+}
 
 // Default action (no subcommand) - launch dashboard
 program.action(() => {
