@@ -13,6 +13,7 @@
  * 5. Stores the receipt in the database
  */
 
+import { spawn } from 'node:child_process';
 import { type DatabaseInstance, initDatabase } from '../db/index.js';
 import {
   type PrReceipt,
@@ -119,6 +120,42 @@ export interface PrBodyInput {
   reviewReceipt: ReviewReceipt;
   /** Additional context */
   additionalContext?: string;
+}
+
+/**
+ * Task context for PR creation
+ */
+export interface PrTaskContext {
+  /** Story ID (e.g., US-001) */
+  storyId?: string;
+  /** Task title */
+  title: string;
+  /** Task description */
+  description?: string;
+}
+
+/**
+ * Project context for PR creation
+ */
+export interface PrProjectContext {
+  /** Project directory path */
+  path: string;
+  /** Base branch for PR (defaults to main/master) */
+  baseBranch?: string;
+}
+
+/**
+ * Result of PR creation
+ */
+export interface CreatePrResult {
+  /** Whether PR creation succeeded */
+  success: boolean;
+  /** PR URL (if created) */
+  prUrl?: string;
+  /** Error message (if failed) */
+  error?: string;
+  /** PR title used */
+  title: string;
 }
 
 /**
@@ -548,5 +585,191 @@ export const ReceiptBuilder = {
     db?: DatabaseInstance
   ): PrReceipt | null {
     return ReceiptRepository.update(receiptId, { prUrl }, db);
+  },
+
+  /**
+   * Create a GitHub PR with receipts
+   *
+   * Creates a pull request on GitHub using the `gh` CLI command.
+   * The PR includes the full receipt documentation in the body.
+   *
+   * @param task - Task context (title, description, storyId)
+   * @param receipt - The PR receipt with test, integration, and review results
+   * @param project - Project context (path, baseBranch)
+   * @param config - Optional configuration
+   * @returns CreatePrResult with success status and PR URL
+   */
+  async createPr(
+    task: PrTaskContext,
+    receipt: PrReceipt,
+    project: PrProjectContext,
+    config?: ReceiptBuilderConfig
+  ): Promise<CreatePrResult> {
+    const db = config?.db ?? initDatabase();
+    const shouldClose = !config?.db;
+
+    try {
+      // Generate PR title from task
+      const title = this.generatePrTitle(task);
+
+      // Generate PR body using receipts
+      const body = this.generatePrBody({
+        taskTitle: task.title,
+        taskDescription: task.description,
+        testReceipt: receipt.testReceipt,
+        integrationReceipt: receipt.integrationReceipt,
+        reviewReceipt: receipt.reviewReceipt,
+      });
+
+      // Determine base branch (defaults to main, falls back to master)
+      const baseBranch = project.baseBranch ?? (await this.detectBaseBranch(project.path));
+
+      // Create PR using gh CLI
+      const prUrl = await this.runGhPrCreate(project.path, title, body, baseBranch);
+
+      // Store PR URL in receipt
+      ReceiptRepository.update(receipt.id, { prUrl }, db);
+
+      return {
+        success: true,
+        prUrl,
+        title,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: errorMessage,
+        title: this.generatePrTitle(task),
+      };
+    } finally {
+      if (shouldClose) {
+        db.close();
+      }
+    }
+  },
+
+  /**
+   * Generate PR title from task context
+   *
+   * Format: [Story ID] Task Title (if story ID present)
+   * Or just: Task Title
+   *
+   * @param task - Task context
+   * @returns Formatted PR title
+   */
+  generatePrTitle(task: PrTaskContext): string {
+    if (task.storyId) {
+      return `[${task.storyId}] ${task.title}`;
+    }
+    return task.title;
+  },
+
+  /**
+   * Detect the base branch (main or master) for the repository
+   *
+   * @param projectPath - Path to the project
+   * @returns Base branch name
+   */
+  async detectBaseBranch(projectPath: string): Promise<string> {
+    return new Promise((resolve) => {
+      const git = spawn('git', ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+        cwd: projectPath,
+        shell: true,
+      });
+
+      let stdout = '';
+      git.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      git.on('close', (code) => {
+        if (code === 0 && stdout.trim()) {
+          // Output is like "origin/main" - extract branch name
+          const branch = stdout.trim().replace(/^origin\//, '');
+          resolve(branch);
+        } else {
+          // Fallback: check if 'main' exists, otherwise use 'master'
+          const checkMain = spawn('git', ['show-ref', '--verify', '--quiet', 'refs/heads/main'], {
+            cwd: projectPath,
+            shell: true,
+          });
+          checkMain.on('close', (mainCode) => {
+            resolve(mainCode === 0 ? 'main' : 'master');
+          });
+        }
+      });
+    });
+  },
+
+  /**
+   * Run gh pr create command
+   *
+   * @param projectPath - Path to the project
+   * @param title - PR title
+   * @param body - PR body (markdown)
+   * @param baseBranch - Base branch for PR
+   * @returns PR URL
+   * @throws Error if PR creation fails
+   */
+  async runGhPrCreate(
+    projectPath: string,
+    title: string,
+    body: string,
+    baseBranch: string
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Use gh pr create with --body-file stdin to handle complex markdown
+      const args = [
+        'pr',
+        'create',
+        '--title',
+        title,
+        '--base',
+        baseBranch,
+        '--body',
+        body,
+      ];
+
+      const gh = spawn('gh', args, {
+        cwd: projectPath,
+        shell: true,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      gh.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      gh.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      gh.on('close', (code) => {
+        if (code === 0) {
+          // gh pr create outputs the PR URL on success
+          const prUrl = stdout.trim();
+          if (prUrl.startsWith('https://')) {
+            resolve(prUrl);
+          } else {
+            // Try to extract URL from output
+            const urlMatch = stdout.match(/https:\/\/github\.com\/[^\s]+/);
+            if (urlMatch) {
+              resolve(urlMatch[0]);
+            } else {
+              reject(new Error(`PR created but could not extract URL. Output: ${stdout}`));
+            }
+          }
+        } else {
+          reject(new Error(`gh pr create failed with code ${code}: ${stderr || stdout}`));
+        }
+      });
+
+      gh.on('error', (error) => {
+        reject(new Error(`Failed to spawn gh command: ${error.message}`));
+      });
+    });
   },
 };

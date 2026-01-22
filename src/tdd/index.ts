@@ -81,6 +81,9 @@ export {
   type ContractValidationSummary,
   type BugResolutionSummary,
   type PrBodyInput,
+  type PrTaskContext,
+  type PrProjectContext,
+  type CreatePrResult,
 } from './receipt-builder.js';
 
 // Export repositories
