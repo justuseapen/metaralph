@@ -328,3 +328,24 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Clean up temporary files in both success and retry paths
   - Pattern: Use timeout with child processes to prevent hanging (clearTimeout on completion)
 ---
+
+## 2026-01-21 - US-018
+- What was implemented: Implemented INTEGRATE phase Contract Validator for validating contracts across UI/API/DB layers
+- Files changed:
+  - src/tdd/contract-validator.ts (new file - ~650 lines with ContractValidator module)
+  - src/tdd/index.ts (added ContractValidator exports)
+  - prd.json (marked US-018 as passes: true)
+- **Learnings for future iterations:**
+  - ContractValidator.validate() is the main entry point - takes frozenContracts, project context, and config
+  - Validation is done in three steps: extractImplementedContracts(), validateUIContract(), validateAPIContract()
+  - AI-powered extraction uses Claude to parse TypeScript interfaces/types from source files
+  - Layer validation compares frozen contracts from RESEARCH phase against implemented contracts
+  - checkErrorBoundaries() verifies error handling exists in UI code
+  - ValidationError interface captures contractType, layer, message, filePath, and severity (error/warning)
+  - LayerValidationResult tracks per-layer validation: contractsValidated, contractsFailed, errors, warnings
+  - loadSourceFiles() excludes test files and directories to focus on production code
+  - storeValidationResult() persists validated contracts to the contracts table with frozen_at timestamp
+  - ContractValidationResult includes receipt: IntegrationReceipt for PR documentation
+  - Pattern: Return partial results even on errors - set passed=false but include what was validated
+  - Pattern: Use warnings for non-blocking issues (e.g., missing error boundaries in non-UI projects)
+---
