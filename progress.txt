@@ -133,3 +133,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - PrReceipt has three sub-receipts: TestReceipt, IntegrationReceipt, ReviewReceipt
   - PhaseOrchestratorEvents follow Node.js EventEmitter pattern with typed event payloads
 ---
+
+## 2026-01-21 - US-007
+- What was implemented: Added TDD database schema for persisting TDD execution state
+- Files changed:
+  - src/db/index.ts (added 6 new tables and indexes)
+  - prd.json (marked US-007 as passes: true)
+- **Learnings for future iterations:**
+  - Database tables follow existing patterns: TEXT PRIMARY KEY, datetime defaults, foreign key constraints
+  - TDD tables are: tdd_phases, generated_tests, research_agents, contracts, bugs, pr_receipts
+  - All TDD tables use foreign keys to either executions or tdd_phases tables with ON DELETE CASCADE
+  - The generated_tests table includes error_message column for test errors (status='error')
+  - The research_agents table includes duration_ms column for tracking agent execution time
+  - The bugs table tracks fix_attempts and has suggested_fix column for AI-generated fixes
+  - pr_receipts has a UNIQUE constraint on execution_id (one receipt per execution)
+  - Index naming convention: idx_{tablename}_{columnname}
+  - Receipts are stored as JSON TEXT in test_receipt, integration_receipt, review_receipt columns
+---
