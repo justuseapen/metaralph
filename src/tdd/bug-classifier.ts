@@ -16,6 +16,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import {
   type Bug,
   type BugSeverity,
@@ -104,6 +105,80 @@ export interface BugClassificationResult {
 }
 
 /**
+ * Configuration for the auto-fix loop
+ */
+export interface AutoFixConfig {
+  /** Anthropic client (optional, created if not provided) */
+  anthropicClient?: Anthropic;
+  /** Max tokens for AI responses */
+  maxTokens?: number;
+  /** Default model to use for fix generation */
+  model?: string;
+  /** Model to use for escalation on final iteration */
+  escalationModel?: string;
+  /** Whether this is the final iteration (triggers escalation) */
+  isFinalIteration?: boolean;
+  /** Timeout for fix generation in ms */
+  timeoutMs?: number;
+}
+
+/**
+ * Result of the auto-fix loop
+ */
+export interface AutoFixResult {
+  /** Whether all P0/P1 bugs were fixed */
+  success: boolean;
+  /** All bugs (with updated status) */
+  bugs: Bug[];
+  /** Error message if something failed */
+  error?: string;
+  /** Total duration in ms */
+  totalDurationMs: number;
+  /** Auto-fix metrics */
+  metrics: AutoFixMetrics;
+}
+
+/**
+ * Metrics about the auto-fix process
+ */
+export interface AutoFixMetrics {
+  /** Total bugs processed */
+  totalBugsProcessed: number;
+  /** P0 bugs fixed */
+  p0Fixed: number;
+  /** P1 bugs fixed */
+  p1Fixed: number;
+  /** P2 bugs fixed */
+  p2Fixed: number;
+  /** P3 bugs fixed */
+  p3Fixed: number;
+  /** Bugs that couldn't be fixed */
+  unfixable: number;
+  /** Total fix attempts made */
+  totalAttempts: number;
+  /** Success rate (fixed / processed) */
+  successRate: number;
+  /** Whether escalation to opus model was used */
+  escalationUsed: boolean;
+  /** Tests passed after fixes */
+  testsPassedAfterFixes: boolean;
+}
+
+/**
+ * A generated fix for a bug
+ */
+interface GeneratedFix {
+  /** The file path to modify */
+  filePath: string;
+  /** Original content of the file */
+  originalContent: string;
+  /** New content with fix applied */
+  newContent: string;
+  /** Explanation of the fix */
+  explanation: string;
+}
+
+/**
  * Metrics about the bug classification
  */
 export interface BugClassificationMetrics {
@@ -145,6 +220,17 @@ const DEFAULT_CONFIG: Required<Omit<BugClassifierConfig, 'anthropicClient'>> = {
   maxTokens: 8192,
   model: 'claude-sonnet-4-20250514',
   timeoutMs: 10 * 60 * 1000, // 10 minutes
+};
+
+/**
+ * Default configuration for auto-fix
+ */
+const DEFAULT_AUTOFIX_CONFIG: Required<Omit<AutoFixConfig, 'anthropicClient'>> = {
+  maxTokens: 8192,
+  model: 'claude-sonnet-4-20250514',
+  escalationModel: 'claude-opus-4-20250514',
+  isFinalIteration: false,
+  timeoutMs: 5 * 60 * 1000, // 5 minutes per fix
 };
 
 /**
@@ -716,6 +802,497 @@ If no bugs are found, return: { "bugs": [], "summary": "No bugs found" }`;
         modifiedFiles: [],
         newFiles: [],
       };
+    }
+  },
+
+  /**
+   * Automatically fix P0/P1 bugs using AI
+   *
+   * This method iterates through bugs, generates fixes using Claude API,
+   * applies them to files, and runs tests to verify no regressions.
+   *
+   * @param bugs - List of bugs to fix (P0/P1 are prioritized)
+   * @param project - Project context
+   * @param config - Optional configuration
+   * @param db - Optional database instance
+   * @returns Auto-fix result with updated bugs and metrics
+   */
+  async autoFix(
+    bugs: Bug[],
+    project: BugClassifierProjectContext,
+    config: AutoFixConfig = {},
+    db?: DatabaseInstance
+  ): Promise<AutoFixResult> {
+    const startTime = Date.now();
+    const mergedConfig = { ...DEFAULT_AUTOFIX_CONFIG, ...config };
+
+    // Determine which model to use
+    const modelToUse = mergedConfig.isFinalIteration
+      ? mergedConfig.escalationModel
+      : mergedConfig.model;
+
+    // Initialize metrics
+    const metrics: AutoFixMetrics = {
+      totalBugsProcessed: 0,
+      p0Fixed: 0,
+      p1Fixed: 0,
+      p2Fixed: 0,
+      p3Fixed: 0,
+      unfixable: 0,
+      totalAttempts: 0,
+      successRate: 0,
+      escalationUsed: mergedConfig.isFinalIteration,
+      testsPassedAfterFixes: false,
+    };
+
+    // Filter to only P0/P1 bugs that are still open
+    const bugsToFix = bugs.filter(
+      (bug) => bug.status === 'open' && (bug.severity === 'P0' || bug.severity === 'P1')
+    );
+
+    // Also keep track of P2/P3 for potential fixes if time permits
+    const lowerPriorityBugs = bugs.filter(
+      (bug) => bug.status === 'open' && (bug.severity === 'P2' || bug.severity === 'P3')
+    );
+
+    const allBugsToProcess = [...bugsToFix, ...lowerPriorityBugs];
+    metrics.totalBugsProcessed = allBugsToProcess.length;
+
+    if (allBugsToProcess.length === 0) {
+      return {
+        success: true,
+        bugs,
+        totalDurationMs: Date.now() - startTime,
+        metrics: {
+          ...metrics,
+          successRate: 1,
+          testsPassedAfterFixes: true,
+        },
+      };
+    }
+
+    try {
+      // Get or create Anthropic client
+      const client = config.anthropicClient ?? this.createClient();
+
+      // Process each bug
+      const updatedBugs: Bug[] = [...bugs];
+
+      for (const bug of allBugsToProcess) {
+        // Update fix attempts counter
+        metrics.totalAttempts++;
+        const currentAttempts = (bug.fixAttempts ?? 0) + 1;
+
+        try {
+          // Generate fix for the bug
+          const fix = await this.generateFix(bug, project, client, modelToUse, mergedConfig.maxTokens);
+
+          if (!fix) {
+            // No fix could be generated - mark as wontfix
+            const updatedBug = BugRepository.update(
+              bug.id,
+              { status: 'wontfix', fixAttempts: currentAttempts },
+              db
+            );
+            if (updatedBug) {
+              const bugIndex = updatedBugs.findIndex((b) => b.id === bug.id);
+              if (bugIndex !== -1) {
+                updatedBugs[bugIndex] = updatedBug;
+              }
+            }
+            metrics.unfixable++;
+            continue;
+          }
+
+          // Apply the fix to the file
+          const applySuccess = await this.applyFix(fix, project);
+          if (!applySuccess) {
+            // Failed to apply fix - update attempts but keep open
+            const updatedBug = BugRepository.update(
+              bug.id,
+              { fixAttempts: currentAttempts, suggestedFix: fix.explanation },
+              db
+            );
+            if (updatedBug) {
+              const bugIndex = updatedBugs.findIndex((b) => b.id === bug.id);
+              if (bugIndex !== -1) {
+                updatedBugs[bugIndex] = updatedBug;
+              }
+            }
+            metrics.unfixable++;
+            continue;
+          }
+
+          // Run tests to verify no regressions
+          const testsPass = await this.runTests(project);
+
+          if (testsPass) {
+            // Fix successful - update bug status to fixed
+            const updatedBug = BugRepository.update(
+              bug.id,
+              {
+                status: 'fixed',
+                fixAttempts: currentAttempts,
+                fixedAt: new Date().toISOString(),
+                suggestedFix: fix.explanation,
+              },
+              db
+            );
+            if (updatedBug) {
+              const bugIndex = updatedBugs.findIndex((b) => b.id === bug.id);
+              if (bugIndex !== -1) {
+                updatedBugs[bugIndex] = updatedBug;
+              }
+            }
+
+            // Update metrics based on severity
+            switch (bug.severity) {
+              case 'P0':
+                metrics.p0Fixed++;
+                break;
+              case 'P1':
+                metrics.p1Fixed++;
+                break;
+              case 'P2':
+                metrics.p2Fixed++;
+                break;
+              case 'P3':
+                metrics.p3Fixed++;
+                break;
+            }
+          } else {
+            // Tests failed - revert the fix
+            await this.revertFix(fix, project);
+
+            // Update attempts but keep open
+            const updatedBug = BugRepository.update(
+              bug.id,
+              { fixAttempts: currentAttempts, suggestedFix: fix.explanation },
+              db
+            );
+            if (updatedBug) {
+              const bugIndex = updatedBugs.findIndex((b) => b.id === bug.id);
+              if (bugIndex !== -1) {
+                updatedBugs[bugIndex] = updatedBug;
+              }
+            }
+          }
+        } catch (fixError) {
+          // Error processing this bug - update attempts but continue
+          const updatedBug = BugRepository.update(
+            bug.id,
+            { fixAttempts: currentAttempts },
+            db
+          );
+          if (updatedBug) {
+            const bugIndex = updatedBugs.findIndex((b) => b.id === bug.id);
+            if (bugIndex !== -1) {
+              updatedBugs[bugIndex] = updatedBug;
+            }
+          }
+        }
+      }
+
+      // Calculate success rate
+      const totalFixed = metrics.p0Fixed + metrics.p1Fixed + metrics.p2Fixed + metrics.p3Fixed;
+      metrics.successRate = metrics.totalBugsProcessed > 0
+        ? totalFixed / metrics.totalBugsProcessed
+        : 1;
+
+      // Final test run to verify overall state
+      metrics.testsPassedAfterFixes = await this.runTests(project);
+
+      // Check if all P0/P1 bugs are fixed
+      const remainingP0P1 = updatedBugs.filter(
+        (bug) => bug.status === 'open' && (bug.severity === 'P0' || bug.severity === 'P1')
+      );
+      const success = remainingP0P1.length === 0;
+
+      return {
+        success,
+        bugs: updatedBugs,
+        totalDurationMs: Date.now() - startTime,
+        metrics,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        bugs,
+        error: errorMessage,
+        totalDurationMs: Date.now() - startTime,
+        metrics,
+      };
+    }
+  },
+
+  /**
+   * Generate a fix for a bug using Claude API
+   *
+   * @param bug - The bug to fix
+   * @param project - Project context
+   * @param client - Anthropic client
+   * @param model - Model to use
+   * @param maxTokens - Max tokens for response
+   * @returns Generated fix or null if unable to generate
+   */
+  async generateFix(
+    bug: Bug,
+    project: BugClassifierProjectContext,
+    client: Anthropic,
+    model: string,
+    maxTokens: number
+  ): Promise<GeneratedFix | null> {
+    // Read the file content
+    const fullPath = path.join(project.path, bug.filePath);
+    if (!fs.existsSync(fullPath)) {
+      return null;
+    }
+
+    const originalContent = fs.readFileSync(fullPath, 'utf-8');
+
+    // Build the fix prompt
+    const systemPrompt = `You are an expert code fixer. Your task is to fix bugs in code.
+You will be given:
+1. A bug description with severity, category, and location
+2. The file content containing the bug
+3. Any suggested fix from the original review
+
+Your job is to:
+1. Understand the bug
+2. Provide a fixed version of the file
+3. Explain your fix
+
+IMPORTANT: Respond with ONLY a JSON object in this exact format:
+{
+  "fixedCode": "the entire file content with the bug fixed",
+  "explanation": "brief explanation of what was fixed and why"
+}
+
+Do not include markdown code blocks around the JSON. Just return the raw JSON object.
+The fixedCode should be the COMPLETE file content, not just a snippet.
+Make minimal changes - only fix the specific bug, don't refactor or improve other code.`;
+
+    const userPrompt = `## Bug to Fix
+
+**Severity:** ${bug.severity}
+**Category:** ${bug.category}
+**File:** ${bug.filePath}
+**Line:** ${bug.lineNumber ?? 'unknown'}
+**Description:** ${bug.description}
+${bug.suggestedFix ? `**Suggested Fix:** ${bug.suggestedFix}` : ''}
+
+## File Content
+
+\`\`\`
+${this.truncateContent(originalContent, 15000)}
+\`\`\`
+
+Please provide the fixed version of this file.`;
+
+    try {
+      const response = await client.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const responseText =
+        response.content[0].type === 'text' ? response.content[0].text : '';
+
+      // Parse the response
+      const fix = this.parseFixResponse(responseText);
+      if (!fix) {
+        return null;
+      }
+
+      return {
+        filePath: bug.filePath,
+        originalContent,
+        newContent: fix.fixedCode,
+        explanation: fix.explanation,
+      };
+    } catch (error) {
+      return null;
+    }
+  },
+
+  /**
+   * Parse the fix response from Claude
+   */
+  parseFixResponse(response: string): { fixedCode: string; explanation: string } | null {
+    try {
+      // Try to parse directly as JSON
+      let jsonStr = response.trim();
+
+      // Handle markdown code blocks if present
+      const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1].trim();
+      }
+
+      // Find JSON object bounds if needed
+      if (!jsonStr.startsWith('{')) {
+        const start = jsonStr.indexOf('{');
+        const end = jsonStr.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          jsonStr = jsonStr.slice(start, end + 1);
+        }
+      }
+
+      const parsed = JSON.parse(jsonStr) as {
+        fixedCode?: string;
+        explanation?: string;
+      };
+
+      if (!parsed.fixedCode || !parsed.explanation) {
+        return null;
+      }
+
+      return {
+        fixedCode: parsed.fixedCode,
+        explanation: parsed.explanation,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Apply a generated fix to the file system
+   *
+   * @param fix - The fix to apply
+   * @param project - Project context
+   * @returns True if fix was applied successfully
+   */
+  async applyFix(fix: GeneratedFix, project: BugClassifierProjectContext): Promise<boolean> {
+    const fullPath = path.join(project.path, fix.filePath);
+
+    try {
+      // Create backup before applying
+      const backupPath = `${fullPath}.backup`;
+      fs.writeFileSync(backupPath, fix.originalContent, 'utf-8');
+
+      // Apply the fix
+      fs.writeFileSync(fullPath, fix.newContent, 'utf-8');
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  /**
+   * Revert a fix by restoring the original content
+   *
+   * @param fix - The fix to revert
+   * @param project - Project context
+   */
+  async revertFix(fix: GeneratedFix, project: BugClassifierProjectContext): Promise<void> {
+    const fullPath = path.join(project.path, fix.filePath);
+    const backupPath = `${fullPath}.backup`;
+
+    try {
+      // Restore from backup if it exists
+      if (fs.existsSync(backupPath)) {
+        const backupContent = fs.readFileSync(backupPath, 'utf-8');
+        fs.writeFileSync(fullPath, backupContent, 'utf-8');
+        fs.unlinkSync(backupPath);
+      } else {
+        // No backup - restore from original content in fix object
+        fs.writeFileSync(fullPath, fix.originalContent, 'utf-8');
+      }
+    } catch (error) {
+      // Best effort - ignore errors during revert
+    }
+  },
+
+  /**
+   * Run tests to verify no regressions
+   *
+   * @param project - Project context
+   * @returns True if tests pass, false otherwise
+   */
+  async runTests(project: BugClassifierProjectContext): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Detect test framework by looking at package.json
+      const packageJsonPath = path.join(project.path, 'package.json');
+      let testCommand = 'npm test';
+
+      if (fs.existsSync(packageJsonPath)) {
+        try {
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+
+          // Check for vitest in devDependencies or dependencies
+          const hasVitest =
+            packageJson.devDependencies?.vitest || packageJson.dependencies?.vitest;
+
+          if (hasVitest) {
+            testCommand = 'npx vitest run';
+          } else if (packageJson.scripts?.test) {
+            testCommand = 'npm test';
+          }
+        } catch {
+          // Use default npm test
+        }
+      }
+
+      // Run the test command
+      const testProcess = spawn('sh', ['-c', testCommand], {
+        cwd: project.path,
+        stdio: 'pipe',
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      testProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      testProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      // Set timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        testProcess.kill();
+        resolve(false);
+      }, 5 * 60 * 1000); // 5 minute timeout
+
+      testProcess.on('close', (code) => {
+        clearTimeout(timeout);
+        // Tests pass if exit code is 0
+        resolve(code === 0);
+      });
+
+      testProcess.on('error', () => {
+        clearTimeout(timeout);
+        resolve(false);
+      });
+    });
+  },
+
+  /**
+   * Clean up backup files after auto-fix is complete
+   *
+   * @param project - Project context
+   * @param filePaths - List of file paths that were fixed
+   */
+  async cleanupBackups(
+    project: BugClassifierProjectContext,
+    filePaths: string[]
+  ): Promise<void> {
+    for (const filePath of filePaths) {
+      const backupPath = path.join(project.path, `${filePath}.backup`);
+      if (fs.existsSync(backupPath)) {
+        try {
+          fs.unlinkSync(backupPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   },
 };

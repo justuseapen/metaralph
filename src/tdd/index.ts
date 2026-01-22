@@ -68,6 +68,9 @@ export {
   type NewFile,
   type BugClassificationResult,
   type BugClassificationMetrics,
+  type AutoFixConfig,
+  type AutoFixResult,
+  type AutoFixMetrics,
 } from './bug-classifier.js';
 
 // Export repositories
