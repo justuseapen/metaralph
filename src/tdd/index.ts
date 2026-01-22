@@ -19,6 +19,10 @@ export {
   AgentRepository,
   type CreateAgentInput,
   type UpdateAgentInput,
+  BugRepository,
+  type CreateBugInput,
+  type UpdateBugInput,
+  type BugPriorityCounts,
 } from './repositories/index.js';
 
 // Export all types

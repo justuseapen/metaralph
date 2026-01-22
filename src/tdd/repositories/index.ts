@@ -22,3 +22,10 @@ export {
   type CreateAgentInput,
   type UpdateAgentInput,
 } from './agent-repository.js';
+
+export {
+  BugRepository,
+  type CreateBugInput,
+  type UpdateBugInput,
+  type BugPriorityCounts,
+} from './bug-repository.js';
