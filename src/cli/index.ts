@@ -30,10 +30,13 @@ import { executeRalph, displaySummary, validatePrd } from './ralph.js';
 import {
   PhaseOrchestrator,
   PhaseRepository,
+  BugRepository,
   type TddResult,
   type TddPhaseRecord,
   type PhaseOrchestratorEvents,
   type TddPhase,
+  type BugSeverity,
+  type Bug,
   PHASE_TIME_TARGETS,
 } from '../tdd/index.js';
 
@@ -1346,6 +1349,191 @@ function displayTimeEstimates(phases: TddPhaseRecord[], executionStatus: string)
   } else if (executionStatus === 'failed') {
     console.log(`Status:    Failed`);
   }
+}
+
+// TDD Bugs command - view bugs found during TDD refinement
+program
+  .command('tdd-bugs <execution>')
+  .description('View bugs found during TDD refinement phase')
+  .option('-s, --severity <level>', 'Filter by severity (P0, P1, P2, P3)')
+  .action((executionId: string, options: { severity?: string }) => {
+    displayTddBugs(executionId, options.severity as BugSeverity | undefined);
+  });
+
+/**
+ * Display TDD bugs for an execution
+ */
+function displayTddBugs(executionId: string, severityFilter?: BugSeverity): void {
+  // Find the execution
+  const execution = ExecutionRepository.findById(executionId);
+
+  if (!execution) {
+    console.error(`✗ Execution not found: ${executionId}`);
+    process.exit(1);
+  }
+
+  // Check if TDD is enabled for this execution
+  if (!execution.tddEnabled) {
+    console.error(`✗ Execution ${executionId} is not a TDD execution.`);
+    console.log('TDD mode was not enabled for this execution.');
+    process.exit(1);
+  }
+
+  // Validate severity filter if provided
+  if (severityFilter) {
+    const validSeverities: BugSeverity[] = ['P0', 'P1', 'P2', 'P3'];
+    if (!validSeverities.includes(severityFilter)) {
+      console.error(`✗ Invalid severity: ${severityFilter}. Must be P0, P1, P2, or P3.`);
+      process.exit(1);
+    }
+  }
+
+  console.log('TDD Bugs Report');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Execution ID: ${execution.id}`);
+  if (severityFilter) {
+    console.log(`Severity Filter: ${severityFilter}`);
+  }
+  console.log('');
+
+  // Get all REFINE phases for this execution
+  const phases = PhaseRepository.findByExecution(executionId);
+  const refinePhases = phases.filter(p => p.phase === 'refine');
+
+  if (refinePhases.length === 0) {
+    console.log('No REFINE phases have been executed yet.');
+    console.log('Bugs are found during the REFINE phase of the TDD workflow.');
+    console.log('');
+    return;
+  }
+
+  // Collect all bugs from all REFINE phases
+  let allBugs: Bug[] = [];
+  for (const phase of refinePhases) {
+    const phaseBugs = severityFilter
+      ? BugRepository.findBySeverity(phase.id, severityFilter)
+      : BugRepository.findByPhase(phase.id);
+    allBugs = allBugs.concat(phaseBugs);
+  }
+
+  if (allBugs.length === 0) {
+    if (severityFilter) {
+      console.log(`No ${severityFilter} bugs found.`);
+    } else {
+      console.log('No bugs found during refinement.');
+    }
+    console.log('');
+    return;
+  }
+
+  // Display severity counts
+  displayBugSeverityCounts(allBugs);
+  console.log('');
+
+  // Display bug table
+  console.log('Bugs');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Severity | Category     | Status   | Description                                    | File');
+  console.log('─────────┼──────────────┼──────────┼────────────────────────────────────────────────┼────────────────────────');
+
+  for (const bug of allBugs) {
+    const severityDisplay = formatBugSeverity(bug.severity);
+    const categoryDisplay = bug.category.padEnd(12);
+    const statusDisplay = formatBugStatus(bug.status).padEnd(8);
+    const descriptionDisplay = truncateString(bug.description, 46);
+    const fileDisplay = truncateString(bug.filePath, 22);
+
+    console.log(`${severityDisplay}  | ${categoryDisplay} | ${statusDisplay} | ${descriptionDisplay} | ${fileDisplay}`);
+    if (bug.lineNumber) {
+      console.log(`         |              |          | Line: ${bug.lineNumber}`);
+    }
+  }
+
+  console.log('');
+  console.log(`Total: ${allBugs.length} bug(s)`);
+  console.log('');
+}
+
+/**
+ * Display bug counts by severity
+ */
+function displayBugSeverityCounts(bugs: Bug[]): void {
+  const counts = {
+    P0: { total: 0, open: 0, fixed: 0 },
+    P1: { total: 0, open: 0, fixed: 0 },
+    P2: { total: 0, open: 0, fixed: 0 },
+    P3: { total: 0, open: 0, fixed: 0 },
+  };
+
+  for (const bug of bugs) {
+    const severity = bug.severity as keyof typeof counts;
+    counts[severity].total++;
+    if (bug.status === 'open') {
+      counts[severity].open++;
+    } else if (bug.status === 'fixed') {
+      counts[severity].fixed++;
+    }
+  }
+
+  console.log('Severity Counts');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Level | Total | Open | Fixed');
+  console.log('──────┼───────┼──────┼──────');
+  console.log(`P0    |   ${String(counts.P0.total).padStart(3)} |  ${String(counts.P0.open).padStart(3)} |  ${String(counts.P0.fixed).padStart(3)}`);
+  console.log(`P1    |   ${String(counts.P1.total).padStart(3)} |  ${String(counts.P1.open).padStart(3)} |  ${String(counts.P1.fixed).padStart(3)}`);
+  console.log(`P2    |   ${String(counts.P2.total).padStart(3)} |  ${String(counts.P2.open).padStart(3)} |  ${String(counts.P2.fixed).padStart(3)}`);
+  console.log(`P3    |   ${String(counts.P3.total).padStart(3)} |  ${String(counts.P3.open).padStart(3)} |  ${String(counts.P3.fixed).padStart(3)}`);
+
+  const totalOpen = counts.P0.open + counts.P1.open + counts.P2.open + counts.P3.open;
+  const totalFixed = counts.P0.fixed + counts.P1.fixed + counts.P2.fixed + counts.P3.fixed;
+  console.log('──────┼───────┼──────┼──────');
+  console.log(`Total |   ${String(bugs.length).padStart(3)} |  ${String(totalOpen).padStart(3)} |  ${String(totalFixed).padStart(3)}`);
+}
+
+/**
+ * Format bug severity with color indicator
+ */
+function formatBugSeverity(severity: BugSeverity): string {
+  switch (severity) {
+    case 'P0':
+      return '🔴 P0  ';
+    case 'P1':
+      return '🟠 P1  ';
+    case 'P2':
+      return '🟡 P2  ';
+    case 'P3':
+      return '🟢 P3  ';
+    default:
+      return `   ${severity}  `;
+  }
+}
+
+/**
+ * Format bug status
+ */
+function formatBugStatus(status: string): string {
+  switch (status) {
+    case 'open':
+      return 'Open';
+    case 'fixed':
+      return 'Fixed';
+    case 'wontfix':
+      return 'Wontfix';
+    case 'deferred':
+      return 'Deferred';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Truncate a string to a maximum length with ellipsis
+ */
+function truncateString(str: string, maxLength: number): string {
+  if (str.length <= maxLength) {
+    return str.padEnd(maxLength);
+  }
+  return str.slice(0, maxLength - 3) + '...';
 }
 
 // Default action (no subcommand) - launch dashboard
