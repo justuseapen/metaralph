@@ -700,7 +700,7 @@
         "Typecheck passes"
       ],
       "priority": 35,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-019", "US-020"],
       "notes": "Unit tests for REFINE phase."
     }

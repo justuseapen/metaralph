@@ -627,3 +627,24 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Partial success: when some agents fail, success=true if at least one succeeded, with error message listing failed agents
   - Mock fs module with both default and named exports for readdirSync with withFileTypes: true option
 ---
+
+## 2026-01-22 - US-034
+- What was implemented: Added comprehensive unit tests for the Bug Classifier module (REFINE phase)
+- Files changed:
+  - src/tdd/bug-classifier.test.ts (new file - 90 tests covering all acceptance criteria)
+  - prd.json (marked US-034 as passes: true)
+- **Learnings for future iterations:**
+  - BugClassifier is a module object with static methods (same pattern as TestGenerator, ResearchCoordinator)
+  - Mock BugRepository for database operations (create, update, findById)
+  - validateSeverity() normalizes case (lowercase input like 'p0' returns 'P0')
+  - validateCategory() normalizes case (uppercase input like 'LOGIC' returns 'logic')
+  - parseBugsFromReview() handles: valid JSON, JSON in markdown blocks, JSON with surrounding text, malformed JSON
+  - autoFix() processes bugs in priority order: P0/P1 first, then P2/P3
+  - For spawn mocks in autoFix tests, use mockImplementation(() => createMockChildProcess(...)) instead of mockReturnValue()
+  - mockReturnValue returns same EventEmitter instance; subsequent calls don't get new events (causes timeouts)
+  - createMockChildProcess() helper creates EventEmitter with stdout/stderr Readable streams and uses setImmediate for event emission
+  - autoFix metrics include: totalBugsProcessed, totalAttempts, p0Fixed, p1Fixed, successRate, escalationUsed
+  - escalationUsed is true when isFinalIteration flag is set and escalationModel is provided
+  - canExitRefineLoop is implemented in BugRepository but tested via autoFix success/failure outcomes
+  - Test sections: createClient (1), validateSeverity (8), validateCategory (7), parseBugsFromReview (9), updateMetrics (3), countLinesReviewed (4), truncateContent (3), buildReceipt (1), buildSystemPrompt (2), buildReviewPrompt (5), aiReview (6), parseFixResponse (6), applyFix (3), revertFix (2), runTests (4), generateFix (4), autoFix (13), cleanupBackups (3), loadCodeChanges (2), canExitRefineLoop integration (3)
+---
