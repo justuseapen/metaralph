@@ -35,6 +35,18 @@ export {
   type ResearchCoordinatorConfig,
 } from './research-coordinator.js';
 
+// Export Green Phase (GREEN phase)
+export {
+  GreenPhase,
+  type GreenPhaseTaskContext,
+  type GreenPhaseProjectContext,
+  type GreenPhaseConfig,
+  type GreenPhaseAttempt,
+  type TestRunResult,
+  type GreenPhaseResult,
+  type EnhancedPrd,
+} from './green-phase.js';
+
 // Export repositories
 export {
   PhaseRepository,

@@ -370,7 +370,7 @@
         "Typecheck passes"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-004", "US-013"],
       "notes": "GREEN phase - implementation until tests pass. Uses native Ralph execution."
     },
