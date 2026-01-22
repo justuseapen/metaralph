@@ -548,7 +548,7 @@
         "Typecheck passes"
       ],
       "priority": 27,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-011"],
       "notes": "Observation command for viewing bugs found."
     },

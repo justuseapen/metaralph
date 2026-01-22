@@ -489,3 +489,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Reuses existing helper functions: getPhaseEmoji(), formatDuration(), displayPhaseMetrics()
   - Pattern: Use tabular display format with consistent column widths for readability
 ---
+
+## 2026-01-21 - US-026
+- What was implemented: Added tdd-bugs CLI command to view bugs found during TDD refinement
+- Files changed:
+  - src/cli/index.ts (added ~188 lines for tdd-bugs command)
+  - prd.json (marked US-026 as passes: true)
+- **Learnings for future iterations:**
+  - The tdd-bugs command takes an execution ID and optional --severity filter
+  - Bugs are stored per phase (not per execution), so need to query all REFINE phases first
+  - Uses PhaseRepository.findByExecution() to get phases, then BugRepository.findByPhase() or findBySeverity() for bugs
+  - BugRepository.findBySeverity(phaseId, severity) filters by severity level
+  - Helper functions added: displayBugSeverityCounts(), formatBugSeverity(), formatBugStatus(), truncateString()
+  - Bug severity uses emoji indicators: 🔴 P0, 🟠 P1, 🟡 P2, 🟢 P3
+  - Severity counts show breakdown of total/open/fixed for each level
+  - Pattern: Import BugSeverity type from tdd module for type-safe severity handling
+  - Pattern: Collect bugs from multiple REFINE phases into a single array for display
+---
