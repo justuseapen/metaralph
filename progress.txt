@@ -198,3 +198,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - findByType() returns the most recent agent of that type (ORDER BY created_at DESC LIMIT 1) in case multiple exist
   - When extending the module index.ts, add all new exports from repositories (types and class)
 ---
+
+## 2026-01-21 - US-011
+- What was implemented: Created bugs repository for CRUD operations on bug records found during REFINE phase
+- Files changed:
+  - src/tdd/repositories/bug-repository.ts (new file - ~350 lines)
+  - src/tdd/repositories/index.ts (added BugRepository exports)
+  - src/tdd/index.ts (added BugRepository exports to module)
+  - prd.json (marked US-011 as passes: true)
+- **Learnings for future iterations:**
+  - BugRepository follows identical patterns to PhaseRepository, TestRepository, and AgentRepository
+  - Bug severity uses P0-P3 scale where P0 is most critical; P2/P3 bugs are acceptable to ship with
+  - The bugs table has fix_attempts column (integer) and suggested_fix column (text) for AI-generated fixes
+  - findByPhase() and findOpen() order by severity (P0 first, then P1, P2, P3) using CASE WHEN in ORDER BY
+  - countOpenByPriority() uses GROUP BY to aggregate counts by severity in a single query
+  - canExitRefineLoop() is the critical exit condition - returns true only when P0=0 AND P1=0 for open bugs
+  - The BugPriorityCounts interface returns {p0, p1, p2, p3} for easy dashboard display
+---
