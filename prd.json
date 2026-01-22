@@ -515,7 +515,7 @@
         "Typecheck passes"
       ],
       "priority": 25,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-023"],
       "notes": "CLI integration with existing self-improve command."
     },

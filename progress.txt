@@ -452,3 +452,23 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use executePhase() helper method to handle common phase logic (create record, emit events, error handling)
   - Pattern: Use executePhaseLogic() switch statement to dispatch to correct phase implementation
 ---
+
+## 2026-01-21 - US-024
+- What was implemented: Added TDD mode to self-improve CLI command
+- Files changed:
+  - src/cli/index.ts (added ~300 lines for TDD mode integration)
+  - prd.json (marked US-024 as passes: true)
+- **Learnings for future iterations:**
+  - The self-improve command now supports --tdd flag to enable TDD workflow
+  - Additional TDD options: --max-refine <n> (default: 3), --max-green-retries <n> (default: 2)
+  - PhaseOrchestrator extends EventEmitter, listen for 'phase:started', 'phase:completed', 'phase:failed' events
+  - Event payloads follow PhaseOrchestratorEvents interface from src/tdd/types.ts
+  - SelfImprovementEngine.analyze() returns opportunities categorized by risk level
+  - SelfImprovementEngine.generatePrdJson() creates PRD structure from an opportunity
+  - TDD mode takes first safe opportunity (or first overall if none safe) for implementation
+  - TddResult interface has phases[], receipt?, error?, totalDurationMs fields
+  - PrReceipt has three sub-receipts: testReceipt, integrationReceipt, reviewReceipt
+  - Helper functions added: getPhaseEmoji(), formatDuration(), displayPhaseMetrics(), displayTddReceipt(), displayTddFailureReport()
+  - Pattern: Use emojis for visual phase status (🔴 RED, 🔬 RESEARCH, 🟢 GREEN, etc.)
+  - Pattern: Track phase start time with variable and compute duration on completion
+---
