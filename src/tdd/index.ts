@@ -7,6 +7,14 @@
  * This workflow produces production-ready PRs with P0/P1 bugs = 0.
  */
 
+// Export Phase Orchestrator
+export {
+  PhaseOrchestrator,
+  type ProjectContext,
+  type TaskContext,
+  type PhaseFailure,
+} from './phase-orchestrator.js';
+
 // Export repositories
 export {
   PhaseRepository,
