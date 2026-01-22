@@ -26,7 +26,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "dependsOn": [],
       "notes": "FOUNDATION - This makes metaRalph self-contained. No external ralph.sh dependency. Must be completed first so metaRalph can build itself."
     },

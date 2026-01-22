@@ -13,3 +13,19 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - The inferTaskType function checks description for keywords like "test", "bug", "fix", "doc", "refactor" - avoid these words in test descriptions if testing for "feature" type
   - Pattern: All collaboration modules (conversation.ts, discussion.ts, prd-builder.ts) follow similar patterns with database injection and Anthropic client mocking
 ---
+
+## 2026-01-21 - US-000
+- What was implemented: Added native `metaralph ralph` command for Ralph execution without external scripts
+- Files changed:
+  - src/cli/ralph.ts (new file - 321 lines)
+  - src/cli/index.ts (added ralph command import and registration)
+  - prd.json (marked US-000 as passes: true)
+- **Learnings for future iterations:**
+  - The CLI uses Commander.js with patterns like `.command()`, `.option()`, `.action()`
+  - Child processes are spawned with `spawn()` from `node:child_process`
+  - The RalphSpawner in src/workers/ralph-spawner.ts provides patterns for spawning and monitoring processes
+  - Completion detection uses `<promise>COMPLETE</promise>` string in stdout
+  - PRD validation follows existing Prd/UserStory interfaces from src/collaboration/prd-builder.ts
+  - Export functions from new modules for import in index.ts (e.g., `executeRalph`, `displaySummary`, `validatePrd`)
+  - CLI option parsing: use `parseInt()` for numeric options, validate before use
+---
