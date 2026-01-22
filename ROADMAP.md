@@ -112,8 +112,8 @@ cp prds/phase-2-work-queue.json prd.json
 # Create feature branch
 git checkout -b ralph/phase-2-work-queue
 
-# Run Ralph
-./ralph.sh --tool claude 15
+# Run Ralph (native execution)
+npx metaralph ralph --iterations 15
 ```
 
 Or let MetaRalph orchestrate itself once Phase 8 is complete!

@@ -765,7 +765,7 @@ program
 // Ralph command - native Ralph execution without external scripts
 program
   .command('ralph [path]')
-  .description('Run Ralph loops natively without external ralph.sh scripts')
+  .description('Run Ralph loops natively using Claude Code CLI')
   .option('-i, --iterations <n>', 'Maximum iterations before stopping', '10')
   .option('-t, --tool <tool>', 'Tool to use for execution (claude or cursor)', 'claude')
   .option('-p, --parallel', 'Enable parallel story execution (experimental)')

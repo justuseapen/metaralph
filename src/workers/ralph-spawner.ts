@@ -3,7 +3,7 @@
  *
  * Responsible for:
  * - Creating prd.json in the target project
- * - Spawning ralph.sh subprocess
+ * - Spawning Claude CLI subprocess for native execution
  * - Capturing stdout/stderr
  * - Detecting completion via '<promise>COMPLETE</promise>'
  */
@@ -93,33 +93,17 @@ export const RalphSpawner = {
         };
       }
 
-      // Find ralph.sh script
-      const ralphScript = findRalphScript(project.path);
-      if (!ralphScript) {
-        ExecutionRepository.update(execution.id, {
-          status: 'failed',
-          errorLog: 'ralph.sh script not found in project or standard locations',
-          completedAt: new Date().toISOString(),
-        }, db);
+      // Build the prompt that tells Claude to act as Ralph agent
+      const ralphPrompt = buildRalphPrompt();
 
-        return {
-          success: false,
-          execution,
-          error: 'ralph.sh script not found',
-        };
-      }
+      // Determine the CLI tool to use
+      const cliTool = options.tool ?? 'claude';
 
-      // Build command arguments
-      const args: string[] = [];
-      if (options.tool) {
-        args.push('--tool', options.tool);
-      }
-      if (options.maxIterations) {
-        args.push(String(options.maxIterations));
-      }
+      // Build command arguments for Claude CLI
+      const args: string[] = ['--print', '--dangerously-skip-permissions', '-p', ralphPrompt];
 
-      // Spawn the Ralph process
-      const childProcess = spawn(ralphScript, args, {
+      // Spawn the Claude CLI process
+      const childProcess = spawn(cliTool, args, {
         cwd: project.path,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
@@ -161,18 +145,13 @@ export const RalphSpawner = {
     return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
-      let iterationsUsed = 0;
+      // Each spawn() call is a single iteration in native mode
+      const iterationsUsed = 1;
 
       // Collect stdout
       childProcess.stdout?.on('data', (data: Buffer) => {
         const chunk = data.toString();
         stdout += chunk;
-
-        // Count iterations (Ralph outputs iteration markers)
-        const iterationMatches = chunk.match(/iteration \d+/gi);
-        if (iterationMatches) {
-          iterationsUsed = Math.max(iterationsUsed, iterationMatches.length);
-        }
       });
 
       // Collect stderr
@@ -260,41 +239,80 @@ export const RalphSpawner = {
 };
 
 /**
- * Find the ralph.sh script in the project or standard locations
+ * Build the Ralph agent prompt for Claude CLI
  *
- * @param projectPath - Path to the project
- * @returns Path to ralph.sh or undefined if not found
+ * This prompt instructs Claude to act as an autonomous Ralph agent,
+ * reading prd.json, implementing the next user story, and tracking progress.
+ *
+ * @returns The Ralph agent prompt string
  */
-function findRalphScript(projectPath: string): string | undefined {
-  // Check standard locations in order of preference
-  const locations = [
-    // Project-local locations
-    path.join(projectPath, 'ralph.sh'),
-    path.join(projectPath, 'scripts', 'ralph.sh'),
-    path.join(projectPath, 'scripts', 'ralph', 'ralph.sh'),
-    // User-level location
-    path.join(process.env.HOME ?? '', 'ralph.sh'),
-    path.join(process.env.HOME ?? '', 'scripts', 'ralph.sh'),
-  ];
+function buildRalphPrompt(): string {
+  return `# Ralph Agent Instructions
 
-  for (const location of locations) {
-    if (fs.existsSync(location)) {
-      // Verify it's executable
-      try {
-        fs.accessSync(location, fs.constants.X_OK);
-        return location;
-      } catch {
-        // Not executable, try to make it executable
-        try {
-          fs.chmodSync(location, 0o755);
-          return location;
-        } catch {
-          // Can't make executable, skip this location
-          continue;
-        }
-      }
-    }
-  }
+You are an autonomous coding agent working on a software project.
 
-  return undefined;
+## Your Task
+
+1. Read the PRD at \`prd.json\` (in the same directory as this file)
+2. Read the progress log at \`progress.txt\` (check Codebase Patterns section first)
+3. Check you're on the correct branch from PRD \`branchName\`. If not, check it out or create from main.
+4. Pick the **highest priority** user story where \`passes: false\`
+5. Implement that single user story
+6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+7. Update AGENTS.md files if you discover reusable patterns (see below)
+8. If checks pass, commit ALL changes with message: \`feat: [Story ID] - [Story Title]\`
+9. Update the PRD to set \`passes: true\` for the completed story
+10. Append your progress to \`progress.txt\`
+
+## Progress Report Format
+
+APPEND to progress.txt (never replace, always append):
+\`\`\`
+## [Date/Time] - [Story ID]
+- What was implemented
+- Files changed
+- **Learnings for future iterations:**
+  - Patterns discovered (e.g., "this codebase uses X for Y")
+  - Gotchas encountered (e.g., "don't forget to update Z when changing W")
+  - Useful context (e.g., "the evaluation panel is in component X")
+---
+\`\`\`
+
+The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
+
+## Consolidate Patterns
+
+If you discover a **reusable pattern** that future iterations should know, add it to the \`## Codebase Patterns\` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
+
+\`\`\`
+## Codebase Patterns
+- Example: Use \`sql<number>\` template for aggregations
+- Example: Always use \`IF NOT EXISTS\` for migrations
+- Example: Export types from actions.ts for UI components
+\`\`\`
+
+Only add patterns that are **general and reusable**, not story-specific details.
+
+## Quality Requirements
+
+- ALL commits must pass your project's quality checks (typecheck, lint, test)
+- Do NOT commit broken code
+- Keep changes focused and minimal
+- Follow existing code patterns
+
+## Stop Condition
+
+After completing a user story, check if ALL stories have \`passes: true\`.
+
+If ALL stories are complete and passing, reply with:
+<promise>COMPLETE</promise>
+
+If there are still stories with \`passes: false\`, end your response normally (another iteration will pick up the next story).
+
+## Important
+
+- Work on ONE story per iteration
+- Commit frequently
+- Keep CI green
+- Read the Codebase Patterns section in progress.txt before starting`;
 }
