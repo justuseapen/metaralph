@@ -281,7 +281,7 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-008"],
       "notes": "Core orchestrator - stub implementation first, will be wired up later."
     },
