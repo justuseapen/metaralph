@@ -473,7 +473,7 @@
         "Typecheck passes"
       ],
       "priority": 23,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-021"],
       "notes": "COMMIT phase - final PR creation with gh CLI."
     },

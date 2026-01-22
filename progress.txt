@@ -413,3 +413,22 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use the latest phase for metrics when multiple iterations exist
   - Pattern: Default to empty receipts (zeros, empty arrays) when phases don't exist
 ---
+
+## 2026-01-21 - US-022
+- What was implemented: Implemented COMMIT phase PR Creation for creating GitHub PRs with receipts
+- Files changed:
+  - src/tdd/receipt-builder.ts (added ~200 lines with createPr method and helpers)
+  - src/tdd/index.ts (added PrTaskContext, PrProjectContext, CreatePrResult exports)
+  - prd.json (marked US-022 as passes: true)
+- **Learnings for future iterations:**
+  - ReceiptBuilder.createPr() takes task context (storyId, title, description), receipt, and project context (path, baseBranch)
+  - PR title format: "[US-XXX] Task Title" when storyId is present, otherwise just "Task Title"
+  - PR body is generated using existing generatePrBody() method with all three receipts
+  - Base branch detection: first try git symbolic-ref for origin/HEAD, then fallback to checking refs/heads/main
+  - gh pr create is spawned with --title, --base, and --body arguments
+  - PR URL is extracted from stdout (gh outputs the URL on success)
+  - PR URL is stored in receipt record via ReceiptRepository.update() after creation
+  - CreatePrResult includes success, prUrl (if created), error (if failed), and title
+  - Pattern: Use spawn() from node:child_process for running CLI commands with complex arguments
+  - Pattern: Return success/failure result objects rather than throwing for recoverable errors
+---
