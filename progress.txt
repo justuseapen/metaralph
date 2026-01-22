@@ -115,3 +115,21 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use optional Anthropic client in config to allow testing without API calls
   - Pattern: Add optional fields to result interface for feature-specific stats (parallel.conflictStrategy, conflictsDetected)
 ---
+
+## 2026-01-21 - US-006
+- What was implemented: Created TDD type definitions for the 6-phase autonomous workflow
+- Files changed:
+  - src/tdd/types.ts (new file - ~500 lines with all TDD types)
+  - src/tdd/index.ts (new file - module exports)
+  - prd.json (marked US-006 as passes: true)
+- **Learnings for future iterations:**
+  - TDD module follows the same pattern as parallel module: types.ts for definitions, index.ts for exports
+  - The 6 TDD phases are: red -> research -> green -> integrate -> refine -> commit
+  - Bug severity uses P0-P3 scale where P0 is most critical
+  - Research agents run in parallel: patterns, contracts, testing, security, performance
+  - PHASE_TIME_TARGETS provides default timeouts per phase (e.g., 5 min for RED, 30 min for GREEN)
+  - DEFAULT_TDD_CONFIG provides sensible defaults: maxRefineIterations=3, maxGreenRetries=2
+  - FrozenContracts interface captures UI/API/DB layer contracts from RESEARCH phase
+  - PrReceipt has three sub-receipts: TestReceipt, IntegrationReceipt, ReviewReceipt
+  - PhaseOrchestratorEvents follow Node.js EventEmitter pattern with typed event payloads
+---

@@ -147,7 +147,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-001"],
       "notes": "TDD Foundation - types for the 6-phase workflow. Can run in parallel with US-002 through US-005."
     },
