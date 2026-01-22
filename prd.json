@@ -260,7 +260,7 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-007"],
       "notes": "Repository for PR receipt documentation. Can run parallel with US-008 through US-011."
     },

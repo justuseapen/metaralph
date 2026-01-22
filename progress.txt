@@ -215,3 +215,19 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - canExitRefineLoop() is the critical exit condition - returns true only when P0=0 AND P1=0 for open bugs
   - The BugPriorityCounts interface returns {p0, p1, p2, p3} for easy dashboard display
 ---
+
+## 2026-01-21 - US-012
+- What was implemented: Created PR receipts repository for CRUD operations on PR receipt records
+- Files changed:
+  - src/tdd/repositories/receipt-repository.ts (new file - ~200 lines)
+  - src/tdd/repositories/index.ts (added ReceiptRepository exports)
+  - src/tdd/index.ts (added ReceiptRepository exports to module)
+  - prd.json (marked US-012 as passes: true)
+- **Learnings for future iterations:**
+  - ReceiptRepository follows identical patterns to other TDD repositories for consistency
+  - The pr_receipts table has UNIQUE constraint on execution_id (one receipt per execution)
+  - Receipt columns (test_receipt, integration_receipt, review_receipt) store JSON-serialized objects
+  - findByExecution() is the primary query since receipts are unique per execution
+  - The PrReceipt interface has three sub-receipts: TestReceipt, IntegrationReceipt, ReviewReceipt
+  - Receipt types (TestReceipt, IntegrationReceipt, ReviewReceipt) are imported from ../types.js
+---
