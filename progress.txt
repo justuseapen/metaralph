@@ -370,3 +370,26 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Use JSON response format in AI prompts for structured output parsing
   - Pattern: Provide fallback regex parsing when JSON parsing fails for robustness
 ---
+
+## 2026-01-21 - US-020
+- What was implemented: Implemented REFINE phase Auto Fix Loop for autonomous P0/P1 bug fixing
+- Files changed:
+  - src/tdd/bug-classifier.ts (added ~500 lines with autoFix method and helpers)
+  - src/tdd/index.ts (added AutoFixConfig, AutoFixResult, AutoFixMetrics exports)
+  - prd.json (marked US-020 as passes: true)
+- **Learnings for future iterations:**
+  - BugClassifier.autoFix() takes bugs, project context, config (with isFinalIteration flag), and optional db
+  - AutoFixConfig includes model, escalationModel, and isFinalIteration for model escalation on final REFINE iteration
+  - P0/P1 bugs are prioritized first, then P2/P3 if time permits
+  - generateFix() uses Claude API to generate complete file content with the bug fixed
+  - parseFixResponse() handles JSON responses with/without code blocks, similar to parseBugsFromReview()
+  - applyFix() creates a .backup file before applying changes for safe revert
+  - revertFix() restores from backup when tests fail after a fix attempt
+  - runTests() detects vitest vs npm test by checking package.json for vitest dependency
+  - AutoFixMetrics tracks p0Fixed, p1Fixed, p2Fixed, p3Fixed, unfixable, totalAttempts, successRate, escalationUsed
+  - Bug status is updated to 'fixed' on success, 'wontfix' when AI can't generate a fix
+  - fixAttempts counter is incremented on each attempt regardless of success
+  - Pattern: Create backup files before applying changes, clean up on success or restore on failure
+  - Pattern: Run tests after each fix to verify no regressions introduced
+  - Pattern: Use isFinalIteration flag to trigger model escalation (sonnet -> opus) for harder bugs
+---

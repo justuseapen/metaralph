@@ -431,7 +431,7 @@
         "Typecheck passes"
       ],
       "priority": 21,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-019"],
       "notes": "REFINE phase - autonomous bug fixing with model escalation."
     },
