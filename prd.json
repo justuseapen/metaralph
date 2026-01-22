@@ -224,7 +224,7 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-007"],
       "notes": "Repository for tracking parallel research agents. Can run parallel with US-008, US-009."
     },

@@ -182,3 +182,19 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - The optional errorMessage field maps to nullable error_message column - use `?? undefined` for null->undefined conversion
   - Generated tests default to 'failing' status - this is the expected TDD state for newly created tests
 ---
+
+## 2026-01-21 - US-010
+- What was implemented: Created research agents repository for CRUD operations on research agent records
+- Files changed:
+  - src/tdd/repositories/agent-repository.ts (new file - ~270 lines)
+  - src/tdd/repositories/index.ts (added AgentRepository exports)
+  - src/tdd/index.ts (added TestRepository and AgentRepository exports to module)
+  - prd.json (marked US-010 as passes: true)
+- **Learnings for future iterations:**
+  - AgentRepository follows identical patterns to PhaseRepository and TestRepository for consistency
+  - The research_agents table has duration_ms column (integer) for tracking agent execution time
+  - findings column stores JSON-serialized ResearchFindings object
+  - allCompleted() checks for agents NOT in ('pending', 'running') status - includes completed, failed, timeout
+  - findByType() returns the most recent agent of that type (ORDER BY created_at DESC LIMIT 1) in case multiple exist
+  - When extending the module index.ts, add all new exports from repositories (types and class)
+---
