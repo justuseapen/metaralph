@@ -212,6 +212,99 @@ function createTables(db: DatabaseInstance): void {
     )
   `);
 
+  // TDD Phases table - tracks execution of each TDD phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tdd_phases (
+      id TEXT PRIMARY KEY,
+      execution_id TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      started_at TEXT,
+      completed_at TEXT,
+      metrics TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (execution_id) REFERENCES executions(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Generated Tests table - tests created during RED phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS generated_tests (
+      id TEXT PRIMARY KEY,
+      phase_id TEXT NOT NULL,
+      test_type TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      test_content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'failing',
+      error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (phase_id) REFERENCES tdd_phases(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Research Agents table - tracks parallel research agents in RESEARCH phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS research_agents (
+      id TEXT PRIMARY KEY,
+      phase_id TEXT NOT NULL,
+      agent_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      findings TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      duration_ms INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (phase_id) REFERENCES tdd_phases(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Contracts table - frozen contracts from RESEARCH phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contracts (
+      id TEXT PRIMARY KEY,
+      execution_id TEXT NOT NULL,
+      layer TEXT NOT NULL,
+      contract_type TEXT NOT NULL,
+      definition TEXT NOT NULL,
+      frozen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (execution_id) REFERENCES executions(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Bugs table - bugs found during REFINE phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bugs (
+      id TEXT PRIMARY KEY,
+      phase_id TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      line_number INTEGER,
+      status TEXT NOT NULL DEFAULT 'open',
+      suggested_fix TEXT,
+      fix_attempts INTEGER NOT NULL DEFAULT 0,
+      fixed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (phase_id) REFERENCES tdd_phases(id) ON DELETE CASCADE
+    )
+  `);
+
+  // PR Receipts table - documentation for PRs created in COMMIT phase
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pr_receipts (
+      id TEXT PRIMARY KEY,
+      execution_id TEXT NOT NULL UNIQUE,
+      test_receipt TEXT NOT NULL,
+      integration_receipt TEXT NOT NULL,
+      review_receipt TEXT NOT NULL,
+      pr_url TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (execution_id) REFERENCES executions(id) ON DELETE CASCADE
+    )
+  `);
+
   // Create indexes for common queries
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_projects_group_id ON projects(group_id);
@@ -227,6 +320,25 @@ function createTables(db: DatabaseInstance): void {
     CREATE INDEX IF NOT EXISTS idx_executions_status ON executions(status);
     CREATE INDEX IF NOT EXISTS idx_learnings_project_id ON learnings(project_id);
     CREATE INDEX IF NOT EXISTS idx_learnings_category ON learnings(category);
+  `);
+
+  // TDD-specific indexes for common queries
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tdd_phases_execution_id ON tdd_phases(execution_id);
+    CREATE INDEX IF NOT EXISTS idx_tdd_phases_phase ON tdd_phases(phase);
+    CREATE INDEX IF NOT EXISTS idx_tdd_phases_status ON tdd_phases(status);
+    CREATE INDEX IF NOT EXISTS idx_generated_tests_phase_id ON generated_tests(phase_id);
+    CREATE INDEX IF NOT EXISTS idx_generated_tests_test_type ON generated_tests(test_type);
+    CREATE INDEX IF NOT EXISTS idx_generated_tests_status ON generated_tests(status);
+    CREATE INDEX IF NOT EXISTS idx_research_agents_phase_id ON research_agents(phase_id);
+    CREATE INDEX IF NOT EXISTS idx_research_agents_agent_type ON research_agents(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_research_agents_status ON research_agents(status);
+    CREATE INDEX IF NOT EXISTS idx_contracts_execution_id ON contracts(execution_id);
+    CREATE INDEX IF NOT EXISTS idx_contracts_layer ON contracts(layer);
+    CREATE INDEX IF NOT EXISTS idx_bugs_phase_id ON bugs(phase_id);
+    CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity);
+    CREATE INDEX IF NOT EXISTS idx_bugs_status ON bugs(status);
+    CREATE INDEX IF NOT EXISTS idx_pr_receipts_execution_id ON pr_receipts(execution_id);
   `);
 }
 
