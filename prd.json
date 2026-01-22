@@ -565,7 +565,7 @@
         "Typecheck passes"
       ],
       "priority": 28,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-012"],
       "notes": "Observation command for viewing PR receipts."
     },

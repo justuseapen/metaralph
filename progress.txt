@@ -506,3 +506,21 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Import BugSeverity type from tdd module for type-safe severity handling
   - Pattern: Collect bugs from multiple REFINE phases into a single array for display
 ---
+
+## 2026-01-21 - US-027
+- What was implemented: Added tdd-receipt CLI command to view PR receipts for TDD executions
+- Files changed:
+  - src/cli/index.ts (added ~161 lines for tdd-receipt command)
+  - prd.json (marked US-027 as passes: true)
+- **Learnings for future iterations:**
+  - The tdd-receipt command takes an execution ID and displays the PR receipt from the COMMIT phase
+  - ReceiptRepository.findByExecution(executionId) retrieves the receipt (unique per execution)
+  - Receipt has three sub-sections: TestReceipt, IntegrationReceipt, ReviewReceipt
+  - Helper functions added: displayTddReceipt2(), displayTestReceiptSection(), displayIntegrationReceiptSection(), displayReviewReceiptSection()
+  - Named displayTddReceipt2 to avoid conflict with existing displayTddReceipt() in self-improve TDD mode
+  - Status indicators: ✅ for passing/good, ⚠️ for warnings, ❌ for failures
+  - Coverage thresholds: ≥80% = ✅, ≥60% = ⚠️, <60% = ❌
+  - P0/P1 check: openP0P1 ≤ 0 shows ✅, otherwise ❌
+  - Reuses existing formatTimestamp() and truncateString() helper functions
+  - Pattern: Import additional types from tdd module for typed receipt handling (PrReceipt, TestReceipt, IntegrationReceipt, ReviewReceipt)
+---
