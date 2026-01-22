@@ -63,3 +63,20 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Export pattern: Create index.ts in the module directory to re-export classes and types
   - The UserStory interface is in prd-builder.ts - add new optional fields there to extend story metadata
 ---
+
+## 2026-01-21 - US-003
+- What was implemented: Added parallel scheduler for orchestrating multiple Claude Code workers
+- Files changed:
+  - src/parallel/scheduler.ts (new file - 454 lines)
+  - src/parallel/index.ts (added ParallelScheduler exports)
+  - prd.json (marked US-003 as passes: true)
+- **Learnings for future iterations:**
+  - ParallelScheduler uses DependencyAnalyzer to determine which stories can run concurrently
+  - The scheduler extends EventEmitter to emit events: 'worker:started', 'worker:completed', 'worker:failed', 'batch:completed', 'story:skipped'
+  - Worker completion is detected by: (1) looking for `<promise>COMPLETE</promise>` in output, or (2) re-reading prd.json to check if story.passes is now true
+  - When a story fails, all its dependents are recursively marked as 'skipped'
+  - getStatus() returns a snapshot of running workers, completed/failed/skipped counts, and queued stories
+  - Each worker gets a specialized prompt for its single story (buildWorkerPrompt) instead of the full Ralph prompt
+  - The scheduler tracks batchesExecuted and maxConcurrencyReached for summary statistics
+  - Import RalphPrd from src/cli/ralph.ts for PRD type definition
+---
