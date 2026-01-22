@@ -26,6 +26,15 @@ export {
   type TestGeneratorConfig,
 } from './test-generator.js';
 
+// Export Research Coordinator (RESEARCH phase)
+export {
+  ResearchCoordinator,
+  type ResearchContext,
+  type AgentResult,
+  type ResearchResult,
+  type ResearchCoordinatorConfig,
+} from './research-coordinator.js';
+
 // Export repositories
 export {
   PhaseRepository,
