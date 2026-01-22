@@ -47,6 +47,17 @@ export {
   type EnhancedPrd,
 } from './green-phase.js';
 
+// Export Contract Validator (INTEGRATE phase)
+export {
+  ContractValidator,
+  type ContractValidatorProjectContext,
+  type ContractValidatorConfig,
+  type LayerValidationResult,
+  type ValidationError,
+  type ContractValidationResult,
+  type ImplementedContract,
+} from './contract-validator.js';
+
 // Export repositories
 export {
   PhaseRepository,
