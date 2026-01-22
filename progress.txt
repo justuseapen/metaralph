@@ -80,3 +80,18 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - The scheduler tracks batchesExecuted and maxConcurrencyReached for summary statistics
   - Import RalphPrd from src/cli/ralph.ts for PRD type definition
 ---
+
+## 2026-01-21 - US-004
+- What was implemented: Wired parallel execution into the ralph CLI command
+- Files changed:
+  - src/cli/ralph.ts (added parallel execution integration, ~170 lines)
+  - prd.json (marked US-004 as passes: true)
+- **Learnings for future iterations:**
+  - The executeParallel() function integrates ParallelScheduler with the CLI
+  - Event-driven status display using scheduler.on() for worker:started, worker:completed, worker:failed, story:skipped, batch:completed
+  - Periodic status updates via setInterval() for long-running workers (cleanup with clearInterval in finally block)
+  - RalphResult interface extended with optional `parallel` field for parallel-specific stats
+  - Time savings estimation uses rough 30-second average per story; could be improved by tracking actual execution times
+  - The displaySummary() function branches on result.parallel to show mode-specific output
+  - Pattern: For CLI features with different modes, extend the result interface with optional mode-specific fields
+---

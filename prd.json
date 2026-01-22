@@ -106,7 +106,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "dependsOn": ["US-003"],
       "notes": "CLI integration for parallel execution."
     },
