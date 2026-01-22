@@ -393,3 +393,23 @@ Started: Tue Jan 13 13:38:47 EST 2026
   - Pattern: Run tests after each fix to verify no regressions introduced
   - Pattern: Use isFinalIteration flag to trigger model escalation (sonnet -> opus) for harder bugs
 ---
+
+## 2026-01-21 - US-021
+- What was implemented: Implemented COMMIT phase Receipt Builder for generating comprehensive PR receipts
+- Files changed:
+  - src/tdd/receipt-builder.ts (new file - ~450 lines with ReceiptBuilder module)
+  - src/tdd/index.ts (added ReceiptBuilder exports)
+  - prd.json (marked US-021 as passes: true)
+- **Learnings for future iterations:**
+  - ReceiptBuilder.build() is the main entry point - takes executionId and optional config
+  - buildTestReceipt() queries PhaseRepository for RED phase, then TestRepository.countByStatus() for test counts
+  - buildIntegrationReceipt() queries PhaseRepository for INTEGRATE phase, extracts metrics from phase.metrics
+  - buildReviewReceipt() queries PhaseRepository for all REFINE phases, aggregates bug counts from BugRepository
+  - generatePrBody() formats receipts into markdown with: Summary, Test Coverage, Contract Validation, AI Review, Receipts sections
+  - Uses collapsible <details> section for full JSON receipts to keep PR description clean
+  - Status indicators use emoji: ✅ for passing states, ⚠️ for warnings/failures
+  - Coverage and duration are optional in TestReceipt - only included if available in phase metrics
+  - Pattern: Query multiple phases when data spans iterations (e.g., all REFINE phases for bug aggregation)
+  - Pattern: Use the latest phase for metrics when multiple iterations exist
+  - Pattern: Default to empty receipts (zeros, empty arrays) when phases don't exist
+---
