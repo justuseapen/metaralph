@@ -58,6 +58,18 @@ export {
   type ImplementedContract,
 } from './contract-validator.js';
 
+// Export Bug Classifier (REFINE phase)
+export {
+  BugClassifier,
+  type BugClassifierProjectContext,
+  type BugClassifierConfig,
+  type CodeChanges,
+  type ModifiedFile,
+  type NewFile,
+  type BugClassificationResult,
+  type BugClassificationMetrics,
+} from './bug-classifier.js';
+
 // Export repositories
 export {
   PhaseRepository,
