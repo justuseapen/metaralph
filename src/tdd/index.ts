@@ -73,6 +73,16 @@ export {
   type AutoFixMetrics,
 } from './bug-classifier.js';
 
+// Export Receipt Builder (COMMIT phase)
+export {
+  ReceiptBuilder,
+  type ReceiptBuilderConfig,
+  type TestResultsSummary,
+  type ContractValidationSummary,
+  type BugResolutionSummary,
+  type PrBodyInput,
+} from './receipt-builder.js';
+
 // Export repositories
 export {
   PhaseRepository,
